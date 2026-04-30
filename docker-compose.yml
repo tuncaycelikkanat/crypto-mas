@@ -1,0 +1,40 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crypto_mas_api
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - .:/app
+    command: uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: crypto_mas_postgres
+    environment:
+      POSTGRES_USER: crypto
+      POSTGRES_PASSWORD: crypto
+      POSTGRES_DB: crypto_mas
+    ports:
+      - "5432:5432"
+    volumes:
+      - crypto_mas_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: crypto_mas_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - crypto_mas_redis_data:/data
+
+volumes:
+  crypto_mas_postgres_data:
+  crypto_mas_redis_data:
