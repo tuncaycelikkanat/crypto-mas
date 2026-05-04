@@ -3,7 +3,6 @@ from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 TradingMode = Literal["BACKTEST", "PAPER", "LIVE"]
 
 
@@ -15,8 +14,8 @@ class Settings(BaseSettings):
     trading_mode: TradingMode = "PAPER"
     log_level: str = "INFO"
 
-    database_url: str
-    redis_url: str
+    database_url: str = ""
+    redis_url: str = ""
 
     binance_api_key: str = ""
     binance_api_secret: str = ""

@@ -20,6 +20,7 @@ def health_check() -> dict[str, str]:
         "mode": settings.trading_mode,
     }
 
+
 @app.get("/health/db")
 def database_health_check() -> dict[str, str]:
     is_connected = check_db_connection()
@@ -28,6 +29,7 @@ def database_health_check() -> dict[str, str]:
         "status": "ok" if is_connected else "error",
         "database": "connected" if is_connected else "disconnected",
     }
+
 
 @app.get("/health/redis")
 def redis_health_check() -> dict[str, str]:
