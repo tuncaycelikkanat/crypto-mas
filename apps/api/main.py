@@ -145,12 +145,15 @@ async def save_mock_candles(
 
     fetcher = HistoricalFetcherService(provider=provider, db=db)
 
-    result = await fetcher.fetch_and_store(
-        symbol="BTCUSDT",
-        timeframe=Timeframe.FOUR_HOURS,
-        start_time=start_time,
-        end_time=end_time,
-        limit=100,
-    )
+    try:
+        result = await fetcher.fetch_and_store(
+            symbol="BTCUSDT",
+            timeframe=Timeframe.FOUR_HOURS,
+            start_time=start_time,
+            end_time=end_time,
+            limit=100,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return result.model_dump(mode="json")

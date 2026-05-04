@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from domain.repositories.candle_repository import CandleRepository
+from services.market_data_service.integrity import CandleIntegrityChecker
 from services.market_data_service.interfaces import MarketDataProvider
 from services.market_data_service.schemas import HistoricalFetchResult, Timeframe
 
@@ -15,6 +16,7 @@ class HistoricalFetcherService:
     ) -> None:
         self.provider = provider
         self.candle_repository = CandleRepository(db)
+        self.integrity_checker = CandleIntegrityChecker()
 
     async def fetch_and_store(
         self,
@@ -31,6 +33,16 @@ class HistoricalFetcherService:
             end_time=end_time,
             limit=limit,
         )
+
+        integrity_report = self.integrity_checker.validate(
+            candles=candles,
+            timeframe=timeframe,
+        )
+
+        if not integrity_report.is_valid:
+            raise ValueError(
+                f"Candle integrity check failed: {integrity_report.model_dump(mode='json')}"
+            )
 
         processed_rows = self.candle_repository.bulk_upsert(candles)
 
