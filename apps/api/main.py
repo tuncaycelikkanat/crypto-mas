@@ -5,6 +5,9 @@ import httpx
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
+from agents.scoring_agent.scoring_agent import ScoringAgent
+from agents.signal_agent.trend_agent import TrendSignalAgent
+from domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
 from domain.repositories.symbol_repository import SymbolRepository
 from infrastructure.cache.redis_client import check_redis_connection
 from infrastructure.config.settings import get_settings
@@ -172,3 +175,66 @@ def calculate_mock_features(
         timeframe=Timeframe.FOUR_HOURS,
         limit=200,
     )
+
+
+@app.get("/signals/mock/trend")
+def generate_mock_trend_signal(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object] | None:
+    repository = FeatureSnapshotRepository(db)
+
+    snapshots = repository.list_by_symbol(
+        exchange=Exchange.MOCK.value,
+        symbol="BTCUSDT",
+        timeframe=Timeframe.FOUR_HOURS.value,
+        limit=200,
+    )
+
+    signal = TrendSignalAgent().generate(
+        exchange=Exchange.MOCK,
+        symbol="BTCUSDT",
+        timeframe=Timeframe.FOUR_HOURS,
+        snapshots=snapshots,
+    )
+
+    if signal is None:
+        return None
+
+    return signal.model_dump(mode="json")
+
+
+@app.get("/scores/mock/trend")
+def generate_mock_trend_score(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object] | None:
+    repository = FeatureSnapshotRepository(db)
+
+    snapshots = repository.list_by_symbol(
+        exchange=Exchange.MOCK.value,
+        symbol="BTCUSDT",
+        timeframe=Timeframe.FOUR_HOURS.value,
+        limit=200,
+    )
+
+    signal = TrendSignalAgent().generate(
+        exchange=Exchange.MOCK,
+        symbol="BTCUSDT",
+        timeframe=Timeframe.FOUR_HOURS,
+        snapshots=snapshots,
+    )
+
+    if signal is None:
+        return None
+
+    score = ScoringAgent().score(
+        exchange=Exchange.MOCK,
+        symbol="BTCUSDT",
+        timeframe=Timeframe.FOUR_HOURS,
+        signal=signal,
+        snapshots=snapshots,
+    )
+
+    if score is None:
+        return None
+
+    return score.model_dump(mode="json")
