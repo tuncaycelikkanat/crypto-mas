@@ -1,5 +1,7 @@
 from collections.abc import Sequence
+from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -55,3 +57,31 @@ class CandleRepository:
         self.db.commit()
 
         return len(rows)
+
+    def list_by_symbol(
+        self,
+        exchange: str,
+        symbol: str,
+        timeframe: str,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[Candle]:
+        stmt = (
+            select(Candle)
+            .where(Candle.exchange == exchange)
+            .where(Candle.symbol == symbol)
+            .where(Candle.timeframe == timeframe)
+            .order_by(Candle.open_time.asc())
+        )
+
+        if start_time is not None:
+            stmt = stmt.where(Candle.open_time >= start_time)
+
+        if end_time is not None:
+            stmt = stmt.where(Candle.open_time <= end_time)
+
+        if limit is not None:
+            stmt = stmt.limit(limit)
+
+        return list(self.db.scalars(stmt).all())

@@ -46,13 +46,13 @@ class MockMarketDataProvider(MarketDataProvider):
         end_time: datetime | None = None,
         limit: int = 1000,
     ) -> list[OHLCVCandle]:
-        end = end_time or datetime.now(UTC)
+        end = self._align_to_timeframe(end_time or datetime.now(UTC), timeframe)
         candles: list[OHLCVCandle] = []
 
-        current = start_time
-        price = Decimal("100.00")
-
         step = self._timeframe_to_delta(timeframe)
+        current = self._align_to_timeframe(start_time, timeframe)
+
+        price = Decimal("100.00")
 
         while current < end and len(candles) < limit:
             close_time = current + step
@@ -100,3 +100,33 @@ class MockMarketDataProvider(MarketDataProvider):
                 return timedelta(hours=4)
             case Timeframe.ONE_DAY:
                 return timedelta(days=1)
+
+    @staticmethod
+    def _align_to_timeframe(value: datetime, timeframe: Timeframe) -> datetime:
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+
+        value = value.astimezone(UTC)
+        value = value.replace(second=0, microsecond=0)
+
+        match timeframe:
+            case Timeframe.ONE_MINUTE:
+                return value
+
+            case Timeframe.FIVE_MINUTES:
+                minute = (value.minute // 5) * 5
+                return value.replace(minute=minute)
+
+            case Timeframe.FIFTEEN_MINUTES:
+                minute = (value.minute // 15) * 15
+                return value.replace(minute=minute)
+
+            case Timeframe.ONE_HOUR:
+                return value.replace(minute=0)
+
+            case Timeframe.FOUR_HOURS:
+                hour = (value.hour // 4) * 4
+                return value.replace(hour=hour, minute=0)
+
+            case Timeframe.ONE_DAY:
+                return value.replace(hour=0, minute=0)
