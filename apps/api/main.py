@@ -1,11 +1,15 @@
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy.orm import Session
 
+from domain.repositories.symbol_repository import SymbolRepository
 from infrastructure.cache.redis_client import check_redis_connection
 from infrastructure.config.settings import get_settings
-from infrastructure.db.session import check_db_connection
+from infrastructure.db.session import check_db_connection, get_db_session
+from services.market_data_service.historical_fetcher import HistoricalFetcherService
 from services.market_data_service.provider_factory import get_market_data_provider
 from services.market_data_service.schemas import Exchange, Timeframe
 
@@ -110,3 +114,43 @@ async def market_candles_sample() -> dict[str, object]:
         "count": len(candles),
         "sample": [candle.model_dump(mode="json") for candle in candles[:3]],
     }
+
+
+@app.post("/market/symbols/mock/save")
+async def save_mock_symbols(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    provider = get_market_data_provider(Exchange.MOCK)
+
+    symbols = await provider.fetch_symbols()
+
+    repository = SymbolRepository(db)
+    processed_rows = repository.bulk_upsert(symbols)
+
+    return {
+        "exchange": Exchange.MOCK.value,
+        "fetched": len(symbols),
+        "processed_rows": processed_rows,
+    }
+
+
+@app.post("/market/candles/mock/save")
+async def save_mock_candles(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    provider = get_market_data_provider(Exchange.MOCK)
+
+    end_time = datetime.now(UTC)
+    start_time = end_time - timedelta(days=7)
+
+    fetcher = HistoricalFetcherService(provider=provider, db=db)
+
+    result = await fetcher.fetch_and_store(
+        symbol="BTCUSDT",
+        timeframe=Timeframe.FOUR_HOURS,
+        start_time=start_time,
+        end_time=end_time,
+        limit=100,
+    )
+
+    return result.model_dump(mode="json")

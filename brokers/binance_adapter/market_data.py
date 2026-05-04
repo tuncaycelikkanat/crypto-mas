@@ -8,6 +8,10 @@ from services.market_data_service.schemas import Exchange, MarketSymbol, OHLCVCa
 
 
 class BinanceMarketDataProvider(MarketDataProvider):
+    @property
+    def exchange(self) -> Exchange:
+        return Exchange.BINANCE
+
     BASE_URL = "https://api.binance.com"
 
     async def fetch_symbols(self) -> list[MarketSymbol]:

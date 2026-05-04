@@ -6,6 +6,10 @@ from services.market_data_service.schemas import Exchange, MarketSymbol, OHLCVCa
 
 
 class MockMarketDataProvider(MarketDataProvider):
+    @property
+    def exchange(self) -> Exchange:
+        return Exchange.MOCK
+
     async def fetch_symbols(self) -> list[MarketSymbol]:
         return [
             MarketSymbol(

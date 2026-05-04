@@ -56,3 +56,13 @@ class OHLCVCandle(BaseModel):
     trade_count: int | None = None
 
     source: str = "REST"
+
+
+class HistoricalFetchResult(BaseModel):
+    exchange: Exchange
+    symbol: str
+    timeframe: Timeframe
+    fetched: int
+    processed_rows: int
+    start_time: datetime
+    end_time: datetime
