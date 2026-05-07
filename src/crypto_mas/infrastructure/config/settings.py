@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     binance_api_key: str = ""
     binance_api_secret: str = ""
 
+    binance_base_url: str = "https://data-api.binance.vision"
+    binance_testnet_base_url: str = "https://testnet.binance.vision/api"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

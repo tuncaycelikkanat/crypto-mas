@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import httpx
 
+from crypto_mas.infrastructure.config.settings import get_settings
 from crypto_mas.services.market_data_service.interfaces import MarketDataProvider
 from crypto_mas.services.market_data_service.schemas import (
     Exchange,
@@ -13,14 +14,16 @@ from crypto_mas.services.market_data_service.schemas import (
 
 
 class BinanceMarketDataProvider(MarketDataProvider):
+    def __init__(self) -> None:
+        self.settings = get_settings()
+        self.base_url = self.settings.binance_base_url.rstrip("/")
+
     @property
     def exchange(self) -> Exchange:
         return Exchange.BINANCE
 
-    BASE_URL = "https://api.binance.com"
-
     async def fetch_symbols(self) -> list[MarketSymbol]:
-        url = f"{self.BASE_URL}/api/v3/exchangeInfo"
+        url = f"{self.base_url}/api/v3/exchangeInfo"
 
         async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.get(url)
@@ -30,29 +33,34 @@ class BinanceMarketDataProvider(MarketDataProvider):
         symbols: list[MarketSymbol] = []
 
         for item in payload.get("symbols", []):
-            quote_asset = item.get("quoteAsset", "")
             symbol = item.get("symbol", "")
+            base_asset = item.get("baseAsset", "")
+            quote_asset = item.get("quoteAsset", "")
+            status = item.get("status", "UNKNOWN")
 
-            # İlk aşamada sadece USDT spot çiftlerini alıyoruz.
+            # İlk aşamada yalnızca USDT spot çiftlerini alıyoruz.
             if quote_asset != "USDT":
                 continue
 
+            is_spot_allowed = bool(item.get("isSpotTradingAllowed", False))
             permissions = item.get("permissions", [])
-            is_spot = "SPOT" in permissions or item.get("isSpotTradingAllowed", False)
+            has_spot_permission = "SPOT" in permissions
 
-            if not is_spot:
+            if not is_spot_allowed and not has_spot_permission:
                 continue
 
             symbols.append(
                 MarketSymbol(
                     exchange=Exchange.BINANCE,
                     symbol=symbol,
-                    base_asset=item.get("baseAsset", ""),
+                    base_asset=base_asset,
                     quote_asset=quote_asset,
-                    status=item.get("status", "UNKNOWN"),
-                    is_active=item.get("status") == "TRADING",
-                    is_stablecoin=self._is_stablecoin(item.get("baseAsset", "")),
+                    status=status,
+                    is_active=status == "TRADING",
+                    is_stablecoin=self._is_stablecoin(base_asset),
                     is_leveraged_token=self._is_leveraged_token(symbol),
+                    listing_date=None,
+                    delisting_date=None,
                 )
             )
 
@@ -66,7 +74,7 @@ class BinanceMarketDataProvider(MarketDataProvider):
         end_time: datetime | None = None,
         limit: int = 1000,
     ) -> list[OHLCVCandle]:
-        url = f"{self.BASE_URL}/api/v3/klines"
+        url = f"{self.base_url}/api/v3/klines"
 
         params: dict[str, str | int] = {
             "symbol": symbol,
@@ -91,14 +99,14 @@ class BinanceMarketDataProvider(MarketDataProvider):
                     exchange=Exchange.BINANCE,
                     symbol=symbol,
                     timeframe=timeframe,
-                    open_time=self._from_millis(row[0]),
-                    open=Decimal(row[1]),
-                    high=Decimal(row[2]),
-                    low=Decimal(row[3]),
-                    close=Decimal(row[4]),
-                    volume=Decimal(row[5]),
-                    close_time=self._from_millis(row[6]),
-                    quote_volume=Decimal(row[7]),
+                    open_time=self._from_millis(int(row[0])),
+                    open=Decimal(str(row[1])),
+                    high=Decimal(str(row[2])),
+                    low=Decimal(str(row[3])),
+                    close=Decimal(str(row[4])),
+                    volume=Decimal(str(row[5])),
+                    close_time=self._from_millis(int(row[6])),
+                    quote_volume=Decimal(str(row[7])),
                     trade_count=int(row[8]),
                     source="BINANCE_REST",
                 )
@@ -108,11 +116,16 @@ class BinanceMarketDataProvider(MarketDataProvider):
 
     @staticmethod
     def _to_millis(value: datetime) -> int:
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+
+        value = value.astimezone(UTC)
+
         return int(value.timestamp() * 1000)
 
     @staticmethod
     def _from_millis(value: int) -> datetime:
-        return datetime.fromtimestamp(value / 1000)
+        return datetime.fromtimestamp(value / 1000, tz=UTC)
 
     @staticmethod
     def _is_stablecoin(base_asset: str) -> bool:
@@ -124,10 +137,19 @@ class BinanceMarketDataProvider(MarketDataProvider):
             "DAI",
             "BUSD",
             "USDP",
+            "EUR",
+            "TRY",
         }
+
         return base_asset.upper() in stablecoins
 
     @staticmethod
     def _is_leveraged_token(symbol: str) -> bool:
-        leveraged_suffixes = ("UPUSDT", "DOWNUSDT", "BULLUSDT", "BEARUSDT")
+        leveraged_suffixes = (
+            "UPUSDT",
+            "DOWNUSDT",
+            "BULLUSDT",
+            "BEARUSDT",
+        )
+
         return symbol.upper().endswith(leveraged_suffixes)
