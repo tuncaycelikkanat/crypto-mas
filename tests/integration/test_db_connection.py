@@ -1,4 +1,4 @@
-from infrastructure.db.session import check_db_connection
+from crypto_mas.infrastructure.db.session import check_db_connection
 
 
 def test_db_connection() -> None:

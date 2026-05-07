@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from apps.api.main import app
+from crypto_mas.apps.api.main import app
 
 client = TestClient(app)
 

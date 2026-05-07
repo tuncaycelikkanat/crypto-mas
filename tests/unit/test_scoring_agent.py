@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 
-from agents.scoring_agent.scoring_agent import ScoringAgent
-from agents.signal_agent.schemas import SignalDirection, SignalType, TradingSignal
-from domain.models.feature_snapshot import FeatureSnapshot
-from services.market_data_service.schemas import Exchange, Timeframe
+from crypto_mas.agents.scoring_agent.scoring_agent import ScoringAgent
+from crypto_mas.agents.signal_agent.schemas import SignalDirection, SignalType, TradingSignal
+from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
+from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
 def test_scoring_agent_scores_long_signal() -> None:

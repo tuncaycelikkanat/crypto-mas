@@ -13,7 +13,7 @@ services:
       - redis
     volumes:
       - .:/app
-    command: uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uv run uvicorn crypto_mas.apps.api.main:app --host 0.0.0.0 --port 8000 --reload
 
   postgres:
     image: timescale/timescaledb:latest-pg16

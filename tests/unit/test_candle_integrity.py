@@ -1,8 +1,8 @@
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from services.market_data_service.integrity import CandleIntegrityChecker
-from services.market_data_service.schemas import Exchange, OHLCVCandle, Timeframe
+from crypto_mas.services.market_data_service.integrity import CandleIntegrityChecker
+from crypto_mas.services.market_data_service.schemas import Exchange, OHLCVCandle, Timeframe
 
 
 def _make_candle(open_time: datetime) -> OHLCVCandle:

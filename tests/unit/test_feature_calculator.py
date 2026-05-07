@@ -1,8 +1,8 @@
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from domain.models.candle import Candle
-from services.feature_pipeline.calculator import FeatureCalculator
+from crypto_mas.domain.models.candle import Candle
+from crypto_mas.services.feature_pipeline.calculator import FeatureCalculator
 
 
 def _make_candle(index: int) -> Candle:
