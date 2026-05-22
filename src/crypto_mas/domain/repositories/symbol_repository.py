@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -51,3 +52,24 @@ class SymbolRepository:
         self.db.commit()
 
         return len(rows)
+
+    def list_active_symbols(
+        self,
+        exchange: str,
+        quote_asset: str | None = None,
+        limit: int | None = None,
+    ) -> list[Symbol]:
+        stmt = (
+            select(Symbol)
+            .where(Symbol.exchange == exchange)
+            .where(Symbol.is_active.is_(True))
+            .order_by(Symbol.symbol.asc())
+        )
+
+        if quote_asset is not None:
+            stmt = stmt.where(Symbol.quote_asset == quote_asset)
+
+        if limit is not None:
+            stmt = stmt.limit(limit)
+
+        return list(self.db.scalars(stmt).all())

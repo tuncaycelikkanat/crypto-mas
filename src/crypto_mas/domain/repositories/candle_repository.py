@@ -59,20 +59,19 @@ class CandleRepository:
         return len(rows)
 
     def list_by_symbol(
-        self,
-        exchange: str,
-        symbol: str,
-        timeframe: str,
-        start_time: datetime | None = None,
-        end_time: datetime | None = None,
-        limit: int | None = None,
+            self,
+            exchange: str,
+            symbol: str,
+            timeframe: str,
+            start_time: datetime | None = None,
+            end_time: datetime | None = None,
+            limit: int | None = None,
     ) -> list[Candle]:
         stmt = (
             select(Candle)
             .where(Candle.exchange == exchange)
             .where(Candle.symbol == symbol)
             .where(Candle.timeframe == timeframe)
-            .order_by(Candle.open_time.asc())
         )
 
         if start_time is not None:
@@ -82,6 +81,9 @@ class CandleRepository:
             stmt = stmt.where(Candle.open_time <= end_time)
 
         if limit is not None:
-            stmt = stmt.limit(limit)
+            stmt = stmt.order_by(Candle.open_time.desc()).limit(limit)
+            candles = list(self.db.scalars(stmt).all())
+            return list(reversed(candles))
 
+        stmt = stmt.order_by(Candle.open_time.asc())
         return list(self.db.scalars(stmt).all())

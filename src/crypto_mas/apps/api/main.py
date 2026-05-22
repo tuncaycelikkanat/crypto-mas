@@ -5,6 +5,7 @@ import httpx
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
+from crypto_mas.agents.portfolio_manager_agent.portfolio_manager import PortfolioManagerAgent
 from crypto_mas.agents.regime_agent.regime_agent import RegimeAgent
 from crypto_mas.agents.scoring_agent.scoring_agent import ScoringAgent
 from crypto_mas.agents.signal_agent.trend_agent import TrendSignalAgent
@@ -14,6 +15,9 @@ from crypto_mas.infrastructure.cache.redis_client import check_redis_connection
 from crypto_mas.infrastructure.config.settings import get_settings
 from crypto_mas.infrastructure.db.session import check_db_connection, get_db_session
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider
+from crypto_mas.services.decision_orchestrator.multi_symbol_runner import (
+    MultiSymbolDecisionRunner,
+)
 from crypto_mas.services.decision_orchestrator.orchestrator import DecisionOrchestrator
 from crypto_mas.services.feature_pipeline.service import FeaturePipelineService
 from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
@@ -138,8 +142,8 @@ async def market_candles_sample() -> dict[str, object]:
 # region Mock Data Persistence Endpoints
 
 
-@app.post("/market/candles/mock/save")
-async def save_mock_candles(
+@app.post("/market/candles/mock/save-all")
+async def save_all_mock_candles(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> dict[str, object]:
     provider = get_market_data_provider(Exchange.MOCK)
@@ -150,18 +154,28 @@ async def save_mock_candles(
 
     fetcher = HistoricalFetcherService(provider=provider, db=db)
 
-    try:
-        result = await fetcher.fetch_and_store(
-            symbol="BTCUSDT",
-            timeframe=Timeframe.FOUR_HOURS,
-            start_time=start_time,
-            end_time=end_time,
-            limit=1000,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    results: list[dict[str, object]] = []
 
-    return result.model_dump(mode="json")
+    for symbol in symbols:
+        try:
+            result = await fetcher.fetch_and_store(
+                symbol=symbol,
+                timeframe=Timeframe.FOUR_HOURS,
+                start_time=start_time,
+                end_time=end_time,
+                limit=1000,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        results.append(result.model_dump(mode="json"))
+
+    return {
+        "exchange": Exchange.MOCK.value,
+        "symbols": symbols,
+        "results": results,
+    }
 
 
 # endregion
@@ -182,6 +196,30 @@ def calculate_mock_features(
         timeframe=Timeframe.FOUR_HOURS,
         limit=200,
     )
+
+@app.post("/features/mock/calculate-all")
+def calculate_all_mock_features(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    service = FeaturePipelineService(db)
+
+    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    results: list[dict[str, object]] = []
+
+    for symbol in symbols:
+        result = service.calculate_and_store(
+            exchange=Exchange.MOCK,
+            symbol=symbol,
+            timeframe=Timeframe.FOUR_HOURS,
+            limit=200,
+        )
+        results.append(result)
+
+    return {
+        "exchange": Exchange.MOCK.value,
+        "symbols": symbols,
+        "results": results,
+    }
 
 
 # endregion
@@ -429,6 +467,53 @@ def run_mock_decision(
         return None
 
     return decision.model_dump(mode="json")
+
+@app.get("/decision/mock/run-all")
+def run_all_mock_decisions(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    runner = MultiSymbolDecisionRunner(db)
+
+    result = runner.run(
+        exchange=Exchange.MOCK,
+        timeframe=Timeframe.FOUR_HOURS,
+        quote_asset="USDT",
+        symbol_limit=10,
+        snapshot_limit=200,
+    )
+
+    return result.model_dump(mode="json")
+
+# endregion
+
+# region Portfolio Manager Endpoints
+
+
+@app.get("/portfolio/mock/target")
+def build_mock_target_portfolio(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    runner = MultiSymbolDecisionRunner(db)
+
+    decision_result = runner.run(
+        exchange=Exchange.MOCK,
+        timeframe=Timeframe.FOUR_HOURS,
+        quote_asset="USDT",
+        symbol_limit=10,
+        snapshot_limit=200,
+    )
+
+    portfolio_target = PortfolioManagerAgent(
+        max_positions=3,
+        max_gross_exposure=0.90,
+        min_confidence=0.35,
+    ).build_target_portfolio(
+        exchange=Exchange.MOCK,
+        timeframe=Timeframe.FOUR_HOURS,
+        decisions=decision_result.decisions,
+    )
+
+    return portfolio_target.model_dump(mode="json")
 
 
 # endregion
