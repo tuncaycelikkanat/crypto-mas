@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from crypto_mas.agents.portfolio_manager_agent.portfolio_manager import PortfolioManagerAgent
 from crypto_mas.agents.regime_agent.regime_agent import RegimeAgent
+from crypto_mas.agents.risk_engine_agent.risk_engine import RiskEngineAgent
+from crypto_mas.agents.risk_engine_agent.schemas import RiskLimits
 from crypto_mas.agents.scoring_agent.scoring_agent import ScoringAgent
 from crypto_mas.agents.signal_agent.trend_agent import TrendSignalAgent
 from crypto_mas.domain.events import InMemoryEventPublisher, create_event
@@ -514,6 +516,47 @@ def build_mock_target_portfolio(
     )
 
     return portfolio_target.model_dump(mode="json")
+
+
+# endregion
+
+# region Risk Engine Endpoints
+
+
+@app.get("/risk/mock/assess")
+def assess_mock_portfolio_risk(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    runner = MultiSymbolDecisionRunner(db)
+
+    decision_result = runner.run(
+        exchange=Exchange.MOCK,
+        timeframe=Timeframe.FOUR_HOURS,
+        quote_asset="USDT",
+        symbol_limit=10,
+        snapshot_limit=200,
+    )
+
+    portfolio_target = PortfolioManagerAgent(
+        max_positions=3,
+        max_gross_exposure=0.90,
+        min_confidence=0.35,
+    ).build_target_portfolio(
+        exchange=Exchange.MOCK,
+        timeframe=Timeframe.FOUR_HOURS,
+        decisions=decision_result.decisions,
+    )
+
+    assessment = RiskEngineAgent(
+        limits=RiskLimits(
+            max_positions=3,
+            max_gross_exposure=0.90,
+            max_position_weight=0.35,
+            min_cash_weight=0.10,
+        )
+    ).assess(portfolio_target)
+
+    return assessment.model_dump(mode="json")
 
 
 # endregion

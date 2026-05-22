@@ -74,8 +74,8 @@ class PortfolioManagerAgent:
                 for decision in selected
             ]
 
-        gross_exposure = sum(position.target_weight for position in positions)
-        cash_weight = max(0.0, 1.0 - gross_exposure)
+        gross_exposure = round(sum(position.target_weight for position in positions), 6)
+        cash_weight = round(max(0.0, 1.0 - gross_exposure), 10)
 
         return PortfolioTarget(
             exchange=exchange,
@@ -98,7 +98,7 @@ class PortfolioManagerAgent:
     ) -> TargetPosition:
         return TargetPosition(
             symbol=decision.symbol,
-            target_weight=max(0.0, min(target_weight, 1.0)),
+            target_weight=round(max(0.0, min(target_weight, 1.0)), 6),
             confidence=decision.confidence,
             final_score=decision.score.final_score,
             reason=reason,
