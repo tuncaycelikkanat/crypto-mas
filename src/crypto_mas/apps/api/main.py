@@ -90,7 +90,6 @@ def config() -> dict[str, str]:
 
 # endregion
 
-
 # region Mock Market Data Endpoints
 
 
@@ -163,7 +162,6 @@ async def save_mock_symbols(
 
 # endregion
 
-
 # region Mock Data Persistence Endpoints
 
 
@@ -204,7 +202,6 @@ async def save_all_mock_candles(
 
 
 # endregion
-
 
 # region Feature Pipeline Endpoints
 
@@ -249,7 +246,6 @@ def calculate_all_mock_features(
 
 
 # endregion
-
 
 # region Signal, Score & Regime Endpoints
 
@@ -358,7 +354,6 @@ def detect_mock_regime(
 
 # endregion
 
-
 # region Binance Market Data Endpoints
 
 
@@ -464,7 +459,6 @@ async def save_binance_candles(
 
 
 # endregion
-
 
 # region Decision Orchestrator Endpoints
 
@@ -712,5 +706,19 @@ def execute_mock_paper_target(
         "execution_report": report.model_dump(mode="json"),
     }
 
+@app.post("/paper/mock/mark-to-market")
+def mark_mock_paper_positions(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    report = PaperBrokerService(db).update_mark_prices(
+        account_name="default-paper",
+        exchange=Exchange.MOCK,
+        timeframe=Timeframe.FOUR_HOURS.value,
+    )
+
+    return {
+        "status": "UPDATED",
+        "mark_to_market_report": report.model_dump(mode="json"),
+    }
 
 # endregion

@@ -70,15 +70,35 @@ class PositionRepository:
         return position
 
     def update_mark_price(
-        self,
-        position: Position,
-        current_price: Decimal,
+            self,
+            position: Position,
+            current_price: Decimal,
     ) -> Position:
+        current_price = self._money(current_price)
+
+        raw_unrealized_pnl = (current_price - position.entry_price) * position.quantity
+        unrealized_pnl = self._zero_if_tiny(raw_unrealized_pnl)
+
         position.current_price = current_price
-        position.notional_value = position.quantity * current_price
-        position.unrealized_pnl = (current_price - position.entry_price) * position.quantity
+        position.unrealized_pnl = unrealized_pnl
+
+        if unrealized_pnl == Decimal("0.00000000"):
+            position.notional_value = self._money(position.notional_value)
+        else:
+            position.notional_value = self._money(position.quantity * current_price)
 
         self.db.commit()
         self.db.refresh(position)
 
         return position
+
+    @staticmethod
+    def _money(value: Decimal) -> Decimal:
+        return value.quantize(Decimal("0.00000001"))
+
+    @staticmethod
+    def _zero_if_tiny(value: Decimal) -> Decimal:
+        if abs(value) < Decimal("0.00000001"):
+            return Decimal("0.00000000")
+
+        return value.quantize(Decimal("0.00000001"))
