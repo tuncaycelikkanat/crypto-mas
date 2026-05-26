@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: cef8a96477fe
+Revision ID: 79d3ef2a0e4b
 Revises:
-Create Date: 2026-05-04 18:40:43.315278
+Create Date: 2026-05-26 09:00:58.169782
 
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "cef8a96477fe"
+revision: str = "79d3ef2a0e4b"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -91,6 +91,49 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_table(
+        "paper_accounts",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("name", sa.String(length=64), nullable=False),
+        sa.Column("exchange", sa.String(length=32), nullable=False),
+        sa.Column("base_currency", sa.String(length=16), nullable=False),
+        sa.Column("initial_balance", sa.Numeric(precision=20, scale=8), nullable=False),
+        sa.Column("cash_balance", sa.Numeric(precision=20, scale=8), nullable=False),
+        sa.Column("equity", sa.Numeric(precision=20, scale=8), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name"),
+    )
+    op.create_table(
+        "positions",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("account_name", sa.String(length=64), nullable=False),
+        sa.Column("exchange", sa.String(length=32), nullable=False),
+        sa.Column("symbol", sa.String(length=64), nullable=False),
+        sa.Column("side", sa.String(length=16), nullable=False),
+        sa.Column("status", sa.String(length=16), nullable=False),
+        sa.Column("quantity", sa.Numeric(precision=20, scale=8), nullable=False),
+        sa.Column("entry_price", sa.Numeric(precision=20, scale=8), nullable=False),
+        sa.Column("current_price", sa.Numeric(precision=20, scale=8), nullable=False),
+        sa.Column("notional_value", sa.Numeric(precision=20, scale=8), nullable=False),
+        sa.Column("unrealized_pnl", sa.Numeric(precision=20, scale=8), nullable=False),
+        sa.Column("realized_pnl", sa.Numeric(precision=20, scale=8), nullable=False),
+        sa.Column("opened_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("closed_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_positions_account_status", "positions", ["account_name", "status"], unique=False
+    )
+    op.create_index(
+        "ix_positions_exchange_symbol_status",
+        "positions",
+        ["exchange", "symbol", "status"],
+        unique=False,
+    )
+    op.create_table(
         "symbols",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("exchange", sa.String(length=32), nullable=False),
@@ -135,6 +178,10 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_symbols_symbol"), table_name="symbols")
     op.drop_index("ix_symbols_exchange_symbol", table_name="symbols")
     op.drop_table("symbols")
+    op.drop_index("ix_positions_exchange_symbol_status", table_name="positions")
+    op.drop_index("ix_positions_account_status", table_name="positions")
+    op.drop_table("positions")
+    op.drop_table("paper_accounts")
     op.drop_index(
         "ix_feature_snapshots_exchange_symbol_tf_timestamp", table_name="feature_snapshots"
     )

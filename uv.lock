@@ -109,7 +109,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "alembic", specifier = ">=1.18.4" },
+    { name = "alembic", specifier = ">=1.13.2" },
     { name = "fastapi", specifier = ">=0.136.1" },
     { name = "orjson", specifier = ">=3.11.8" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.3" },

@@ -9,6 +9,7 @@ from crypto_mas.agents.risk_engine_agent.schemas import (
 
 class RiskEngineAgent:
     EPSILON = 1e-9
+
     def __init__(self, limits: RiskLimits | None = None) -> None:
         self.limits = limits or RiskLimits()
 

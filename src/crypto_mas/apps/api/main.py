@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Annotated
 
 import httpx
@@ -13,6 +14,9 @@ from crypto_mas.agents.scoring_agent.scoring_agent import ScoringAgent
 from crypto_mas.agents.signal_agent.trend_agent import TrendSignalAgent
 from crypto_mas.domain.events import InMemoryEventPublisher, create_event
 from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
+from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
+from crypto_mas.domain.repositories.position_repository import PositionRepository
+from crypto_mas.domain.repositories.symbol_repository import SymbolRepository
 from crypto_mas.infrastructure.cache.redis_client import check_redis_connection
 from crypto_mas.infrastructure.config.settings import get_settings
 from crypto_mas.infrastructure.db.session import check_db_connection, get_db_session
@@ -138,6 +142,24 @@ async def market_candles_sample() -> dict[str, object]:
     }
 
 
+@app.post("/market/symbols/mock/save")
+async def save_mock_symbols(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    provider = get_market_data_provider(Exchange.MOCK)
+
+    symbols = await provider.fetch_symbols()
+
+    repository = SymbolRepository(db)
+    processed_rows = repository.bulk_upsert(symbols)
+
+    return {
+        "exchange": Exchange.MOCK.value,
+        "fetched": len(symbols),
+        "processed_rows": processed_rows,
+    }
+
+
 # endregion
 
 
@@ -198,6 +220,7 @@ def calculate_mock_features(
         timeframe=Timeframe.FOUR_HOURS,
         limit=200,
     )
+
 
 @app.post("/features/mock/calculate-all")
 def calculate_all_mock_features(
@@ -470,6 +493,7 @@ def run_mock_decision(
 
     return decision.model_dump(mode="json")
 
+
 @app.get("/decision/mock/run-all")
 def run_all_mock_decisions(
     db: Annotated[Session, Depends(get_db_session)],
@@ -485,6 +509,7 @@ def run_all_mock_decisions(
     )
 
     return result.model_dump(mode="json")
+
 
 # endregion
 
@@ -557,6 +582,73 @@ def assess_mock_portfolio_risk(
     ).assess(portfolio_target)
 
     return assessment.model_dump(mode="json")
+
+
+# endregion
+
+# region Paper Trading Endpoints
+
+
+@app.post("/paper/mock/account/init")
+def initialize_mock_paper_account(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    repository = PaperAccountRepository(db)
+
+    account = repository.create_if_not_exists(
+        name="default-paper",
+        exchange=Exchange.MOCK.value,
+        base_currency="USDT",
+        initial_balance=Decimal("10000"),
+    )
+
+    return {
+        "name": account.name,
+        "exchange": account.exchange,
+        "base_currency": account.base_currency,
+        "initial_balance": str(account.initial_balance),
+        "cash_balance": str(account.cash_balance),
+        "equity": str(account.equity),
+    }
+
+
+@app.get("/paper/mock/account")
+def get_mock_paper_account(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    account_repository = PaperAccountRepository(db)
+    position_repository = PositionRepository(db)
+
+    account = account_repository.get_by_name("default-paper")
+
+    if account is None:
+        raise HTTPException(status_code=404, detail="Paper account not found.")
+
+    positions = position_repository.list_open_positions(account_name=account.name)
+
+    return {
+        "name": account.name,
+        "exchange": account.exchange,
+        "base_currency": account.base_currency,
+        "initial_balance": str(account.initial_balance),
+        "cash_balance": str(account.cash_balance),
+        "equity": str(account.equity),
+        "open_positions": [
+            {
+                "symbol": position.symbol,
+                "side": position.side,
+                "status": position.status,
+                "quantity": str(position.quantity),
+                "entry_price": str(position.entry_price),
+                "current_price": str(position.current_price),
+                "notional_value": str(position.notional_value),
+                "unrealized_pnl": str(position.unrealized_pnl),
+                "realized_pnl": str(position.realized_pnl),
+                "opened_at": position.opened_at.isoformat(),
+            }
+            for position in positions
+        ],
+    }
 
 
 # endregion

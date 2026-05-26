@@ -33,13 +33,13 @@ class FeatureSnapshotRepository:
         return len(snapshots)
 
     def list_by_symbol(
-            self,
-            exchange: str,
-            symbol: str,
-            timeframe: str,
-            start_time: datetime | None = None,
-            end_time: datetime | None = None,
-            limit: int | None = None,
+        self,
+        exchange: str,
+        symbol: str,
+        timeframe: str,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        limit: int | None = None,
     ) -> list[FeatureSnapshot]:
         stmt = (
             select(FeatureSnapshot)

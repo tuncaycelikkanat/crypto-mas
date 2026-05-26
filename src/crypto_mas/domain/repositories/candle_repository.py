@@ -59,13 +59,13 @@ class CandleRepository:
         return len(rows)
 
     def list_by_symbol(
-            self,
-            exchange: str,
-            symbol: str,
-            timeframe: str,
-            start_time: datetime | None = None,
-            end_time: datetime | None = None,
-            limit: int | None = None,
+        self,
+        exchange: str,
+        symbol: str,
+        timeframe: str,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        limit: int | None = None,
     ) -> list[Candle]:
         stmt = (
             select(Candle)

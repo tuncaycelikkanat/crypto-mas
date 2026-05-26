@@ -66,8 +66,7 @@ def test_risk_engine_reduces_position_weights() -> None:
     assert assessment.approved_target is not None
     assert assessment.approved_target.gross_exposure <= 0.90
     assert all(
-        position.target_weight <= 0.35
-        for position in assessment.approved_target.target_positions
+        position.target_weight <= 0.35 for position in assessment.approved_target.target_positions
     )
 
 
