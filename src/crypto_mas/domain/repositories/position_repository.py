@@ -70,9 +70,9 @@ class PositionRepository:
         return position
 
     def update_mark_price(
-            self,
-            position: Position,
-            current_price: Decimal,
+        self,
+        position: Position,
+        current_price: Decimal,
     ) -> Position:
         current_price = self._money(current_price)
 
@@ -86,6 +86,34 @@ class PositionRepository:
             position.notional_value = self._money(position.notional_value)
         else:
             position.notional_value = self._money(position.quantity * current_price)
+
+        self.db.commit()
+        self.db.refresh(position)
+
+        return position
+
+    def close_position(
+            self,
+            position: Position,
+            exit_price: Decimal,
+            closed_at: datetime,
+    ) -> Position:
+        exit_price = self._money(exit_price)
+
+        raw_realized_pnl = (exit_price - position.entry_price) * position.quantity
+        realized_pnl = self._zero_if_tiny(raw_realized_pnl)
+
+        position.current_price = exit_price
+        position.realized_pnl = realized_pnl
+        position.unrealized_pnl = Decimal("0.00000000")
+
+        if realized_pnl == Decimal("0.00000000"):
+            position.notional_value = self._money(position.notional_value)
+        else:
+            position.notional_value = self._money(position.quantity * exit_price)
+
+        position.status = "CLOSED"
+        position.closed_at = closed_at
 
         self.db.commit()
         self.db.refresh(position)

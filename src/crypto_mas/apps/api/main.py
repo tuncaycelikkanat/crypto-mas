@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
 from crypto_mas.agents.portfolio_manager_agent.portfolio_manager import PortfolioManagerAgent
+from crypto_mas.agents.portfolio_manager_agent.schemas import PortfolioTarget
 from crypto_mas.agents.regime_agent.regime_agent import RegimeAgent
 from crypto_mas.agents.risk_engine_agent.risk_engine import RiskEngineAgent
 from crypto_mas.agents.risk_engine_agent.schemas import RiskDecisionStatus, RiskLimits
@@ -706,6 +707,7 @@ def execute_mock_paper_target(
         "execution_report": report.model_dump(mode="json"),
     }
 
+
 @app.post("/paper/mock/mark-to-market")
 def mark_mock_paper_positions(
     db: Annotated[Session, Depends(get_db_session)],
@@ -720,5 +722,31 @@ def mark_mock_paper_positions(
         "status": "UPDATED",
         "mark_to_market_report": report.model_dump(mode="json"),
     }
+
+
+@app.post("/paper/mock/close-all")
+def close_all_mock_paper_positions(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    empty_target = PortfolioTarget(
+        exchange=Exchange.MOCK,
+        timeframe=Timeframe.FOUR_HOURS,
+        target_positions=[],
+        cash_weight=1.0,
+        gross_exposure=0.0,
+        reason="Manual close-all target.",
+        created_at=SystemTimeProvider().now(),
+    )
+
+    report = PaperBrokerService(db).close_positions_not_in_target(
+        account_name="default-paper",
+        target=empty_target,
+    )
+
+    return {
+        "status": "CLOSED",
+        "execution_report": report.model_dump(mode="json"),
+    }
+
 
 # endregion

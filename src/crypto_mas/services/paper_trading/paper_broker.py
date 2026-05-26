@@ -182,6 +182,107 @@ class PaperBrokerService:
             )
         )
 
+    def close_positions_not_in_target(
+        self,
+        account_name: str,
+        target: PortfolioTarget,
+    ) -> PaperExecutionReport:
+        account = self.account_repository.get_by_name(account_name)
+
+        if account is None:
+            raise ValueError(f"Paper account not found: {account_name}")
+
+        starting_cash = account.cash_balance
+        starting_equity = account.equity
+
+        target_symbols = {position.symbol for position in target.target_positions}
+        open_positions = self.position_repository.list_open_positions(account_name=account.name)
+
+        available_cash = account.cash_balance
+        executed: list[PaperExecutionItem] = []
+        skipped: list[PaperExecutionItem] = []
+
+        for position in open_positions:
+            if position.symbol in target_symbols:
+                skipped.append(
+                    PaperExecutionItem(
+                        symbol=position.symbol,
+                        side=PaperOrderSide.SELL,
+                        status=PaperExecutionStatus.SKIPPED,
+                        target_weight=0.0,
+                        notional=float(position.notional_value),
+                        price=float(position.current_price),
+                        quantity=float(position.quantity),
+                        reason="Position is still present in target portfolio.",
+                    )
+                )
+                continue
+
+            latest_snapshot = self.feature_snapshot_repository.get_latest(
+                exchange=target.exchange.value,
+                symbol=position.symbol,
+                timeframe=target.timeframe.value,
+            )
+
+            price = self._extract_close_price(latest_snapshot)
+
+            if price is None or price <= Decimal("0"):
+                skipped.append(
+                    PaperExecutionItem(
+                        symbol=position.symbol,
+                        side=PaperOrderSide.SELL,
+                        status=PaperExecutionStatus.SKIPPED,
+                        target_weight=0.0,
+                        notional=float(position.notional_value),
+                        price=None,
+                        quantity=float(position.quantity),
+                        reason="Latest close price not available for paper SELL.",
+                    )
+                )
+                continue
+
+            closed_position = self.position_repository.close_position(
+                position=position,
+                exit_price=price,
+                closed_at=self.time_provider.now(),
+            )
+
+            available_cash = self._money(available_cash + closed_position.notional_value)
+
+            executed.append(
+                PaperExecutionItem(
+                    symbol=closed_position.symbol,
+                    side=PaperOrderSide.SELL,
+                    status=PaperExecutionStatus.EXECUTED,
+                    target_weight=0.0,
+                    notional=float(closed_position.notional_value),
+                    price=float(closed_position.current_price),
+                    quantity=float(closed_position.quantity),
+                    reason="Paper SELL executed because position is not in target portfolio.",
+                )
+            )
+
+        open_positions_value = self._calculate_open_positions_value(account.name)
+        ending_equity = self._money(available_cash + open_positions_value)
+
+        updated_account = self.account_repository.update_balances(
+            account=account,
+            cash_balance=available_cash,
+            equity=ending_equity,
+        )
+
+        return PaperExecutionReport(
+            account_name=account.name,
+            exchange=target.exchange,
+            starting_cash=float(starting_cash),
+            ending_cash=float(updated_account.cash_balance),
+            starting_equity=float(starting_equity),
+            ending_equity=float(updated_account.equity),
+            executed=executed,
+            skipped=skipped,
+            created_at=self.time_provider.now(),
+        )
+
     @staticmethod
     def _extract_close_price(snapshot: FeatureSnapshot | None) -> Decimal | None:
         if snapshot is None:
@@ -197,6 +298,7 @@ class PaperBrokerService:
             return Decimal(str(value))
         except Exception:
             return None
+
     def update_mark_prices(
         self,
         account_name: str,

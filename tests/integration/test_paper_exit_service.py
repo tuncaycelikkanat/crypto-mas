@@ -15,6 +15,7 @@ from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
+from crypto_mas.services.paper_trading.schemas import PaperExecutionStatus
 
 
 @pytest.fixture()
@@ -68,7 +69,7 @@ def _add_feature_snapshot(
     db.commit()
 
 
-def _make_target() -> PortfolioTarget:
+def _make_entry_target() -> PortfolioTarget:
     created_at = datetime(2026, 1, 1, tzinfo=UTC)
 
     return PortfolioTarget(
@@ -85,12 +86,26 @@ def _make_target() -> PortfolioTarget:
         ],
         cash_weight=0.70,
         gross_exposure=0.30,
-        reason="test target",
+        reason="entry target",
         created_at=created_at,
     )
 
 
-def test_paper_broker_updates_mark_prices_and_equity(db_session: Session) -> None:
+def _make_empty_target() -> PortfolioTarget:
+    created_at = datetime(2026, 1, 1, tzinfo=UTC)
+
+    return PortfolioTarget(
+        exchange=Exchange.MOCK,
+        timeframe=Timeframe.FOUR_HOURS,
+        target_positions=[],
+        cash_weight=1.0,
+        gross_exposure=0.0,
+        reason="exit target",
+        created_at=created_at,
+    )
+
+
+def test_paper_broker_closes_positions_not_in_target(db_session: Session) -> None:
     fixed_time = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
 
     _create_account(db_session)
@@ -109,7 +124,7 @@ def test_paper_broker_updates_mark_prices_and_equity(db_session: Session) -> Non
 
     broker.execute_target_portfolio(
         account_name="default-paper",
-        target=_make_target(),
+        target=_make_entry_target(),
     )
 
     _add_feature_snapshot(
@@ -119,26 +134,23 @@ def test_paper_broker_updates_mark_prices_and_equity(db_session: Session) -> Non
         timestamp=datetime(2026, 1, 1, 4, 0, tzinfo=UTC),
     )
 
-    report = broker.update_mark_prices(
+    report = broker.close_positions_not_in_target(
         account_name="default-paper",
-        exchange=Exchange.MOCK,
-        timeframe=Timeframe.FOUR_HOURS.value,
+        target=_make_empty_target(),
     )
 
+    assert len(report.executed) == 1
+    assert report.executed[0].symbol == "BTCUSDT"
+    assert report.executed[0].status == PaperExecutionStatus.EXECUTED
+    assert report.ending_cash == 10300.0
     assert report.ending_equity == 10300.0
 
     positions = PositionRepository(db_session).list_open_positions("default-paper")
 
-    assert len(positions) == 1
-
-    position = positions[0]
-
-    assert position.current_price == Decimal("110.00000000")
-    assert position.notional_value == Decimal("3300.00000000")
-    assert position.unrealized_pnl == Decimal("300.00000000")
+    assert positions == []
 
     account = PaperAccountRepository(db_session).get_by_name("default-paper")
 
     assert account is not None
-    assert account.cash_balance == Decimal("7000.00000000")
+    assert account.cash_balance == Decimal("10300.00000000")
     assert account.equity == Decimal("10300.00000000")
