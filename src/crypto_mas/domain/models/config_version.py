@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import JSON, Boolean, DateTime, String, Text, UniqueConstraint
@@ -24,7 +24,7 @@ class ConfigVersion(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(UTC),
     )
 
     __table_args__ = (UniqueConstraint("name", "version", name="uq_config_versions_name_version"),)

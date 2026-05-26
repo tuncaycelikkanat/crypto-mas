@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import JSON, DateTime, Index, String
@@ -18,9 +18,7 @@ class SystemEvent(Base):
     trace_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=datetime.utcnow,
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
     __table_args__ = (Index("ix_system_events_created_at", "created_at"),)

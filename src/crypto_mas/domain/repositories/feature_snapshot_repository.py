@@ -32,6 +32,23 @@ class FeatureSnapshotRepository:
 
         return len(snapshots)
 
+    def get_latest(
+        self,
+        exchange: str,
+        symbol: str,
+        timeframe: str,
+    ) -> FeatureSnapshot | None:
+        stmt = (
+            select(FeatureSnapshot)
+            .where(FeatureSnapshot.exchange == exchange)
+            .where(FeatureSnapshot.symbol == symbol)
+            .where(FeatureSnapshot.timeframe == timeframe)
+            .order_by(FeatureSnapshot.timestamp.desc())
+            .limit(1)
+        )
+
+        return self.db.scalars(stmt).first()
+
     def list_by_symbol(
         self,
         exchange: str,

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import JSON, DateTime, Index, String, UniqueConstraint
@@ -22,9 +22,7 @@ class FeatureSnapshot(Base):
     features_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=datetime.utcnow,
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
     __table_args__ = (

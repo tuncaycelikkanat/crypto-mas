@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from crypto_mas.agents.portfolio_manager_agent.portfolio_manager import PortfolioManagerAgent
 from crypto_mas.agents.regime_agent.regime_agent import RegimeAgent
 from crypto_mas.agents.risk_engine_agent.risk_engine import RiskEngineAgent
-from crypto_mas.agents.risk_engine_agent.schemas import RiskLimits
+from crypto_mas.agents.risk_engine_agent.schemas import RiskDecisionStatus, RiskLimits
 from crypto_mas.agents.scoring_agent.scoring_agent import ScoringAgent
 from crypto_mas.agents.signal_agent.trend_agent import TrendSignalAgent
 from crypto_mas.domain.events import InMemoryEventPublisher, create_event
@@ -29,6 +29,7 @@ from crypto_mas.services.feature_pipeline.service import FeaturePipelineService
 from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
 from crypto_mas.services.market_data_service.provider_factory import get_market_data_provider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
 
 settings = get_settings()
 
@@ -648,6 +649,67 @@ def get_mock_paper_account(
             }
             for position in positions
         ],
+    }
+
+
+@app.post("/paper/mock/execute-target")
+def execute_mock_paper_target(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict[str, object]:
+    account_repository = PaperAccountRepository(db)
+
+    account = account_repository.create_if_not_exists(
+        name="default-paper",
+        exchange=Exchange.MOCK.value,
+        base_currency="USDT",
+        initial_balance=Decimal("10000"),
+    )
+
+    runner = MultiSymbolDecisionRunner(db)
+
+    decision_result = runner.run(
+        exchange=Exchange.MOCK,
+        timeframe=Timeframe.FOUR_HOURS,
+        quote_asset="USDT",
+        symbol_limit=10,
+        snapshot_limit=200,
+    )
+
+    portfolio_target = PortfolioManagerAgent(
+        max_positions=3,
+        max_gross_exposure=0.90,
+        min_confidence=0.35,
+    ).build_target_portfolio(
+        exchange=Exchange.MOCK,
+        timeframe=Timeframe.FOUR_HOURS,
+        decisions=decision_result.decisions,
+    )
+
+    assessment = RiskEngineAgent(
+        limits=RiskLimits(
+            max_positions=3,
+            max_gross_exposure=0.90,
+            max_position_weight=0.35,
+            min_cash_weight=0.10,
+        )
+    ).assess(portfolio_target)
+
+    if assessment.status == RiskDecisionStatus.REJECTED or assessment.approved_target is None:
+        return {
+            "status": "REJECTED",
+            "reason": assessment.reason,
+            "issues": [issue.model_dump(mode="json") for issue in assessment.issues],
+        }
+
+    report = PaperBrokerService(db).execute_target_portfolio(
+        account_name=account.name,
+        target=assessment.approved_target,
+    )
+
+    return {
+        "status": "EXECUTED",
+        "risk_status": assessment.status.value,
+        "execution_report": report.model_dump(mode="json"),
     }
 
 
