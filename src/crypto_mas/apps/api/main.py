@@ -16,6 +16,8 @@ from crypto_mas.apps.api.routers import (
     portfolio_router,
     risk_router,
     paper_router,
+    cycle_router,
+    backtest_router,
 )
 
 settings = get_settings()
@@ -58,4 +60,4 @@ app.include_router(portfolio_router)
 app.include_router(risk_router)
 app.include_router(paper_router)
 app.include_router(cycle_router)
-
+app.include_router(backtest_router)
