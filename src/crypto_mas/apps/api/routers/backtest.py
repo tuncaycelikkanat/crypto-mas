@@ -17,6 +17,7 @@ class RunBacktestRequest(BaseModel):
     exchange: Exchange
     symbols: list[str] = Field(..., min_length=1)
     timeframe: Timeframe
+    strategy_name: str = "multi_agent"
     start_time: datetime
     end_time: datetime
     initial_balance: float = 10000.0
@@ -30,6 +31,7 @@ class BacktestStatusResponse(BaseModel):
     status: str
     exchange: str
     timeframe: str
+    strategy_name: str
     symbols: list[str]
     start_time: datetime
     end_time: datetime
@@ -46,6 +48,7 @@ async def run_backtest_task(
     exchange: Exchange,
     symbols: list[str],
     timeframe: Timeframe,
+    strategy_name: str,
     start_time: datetime,
     end_time: datetime,
     initial_balance: float,
@@ -58,6 +61,7 @@ async def run_backtest_task(
             exchange=exchange,
             symbols=symbols,
             timeframe=timeframe,
+            strategy_name=strategy_name,
             start_time=start_time,
             end_time=end_time,
             initial_balance=initial_balance,
@@ -84,6 +88,7 @@ async def start_backtest(
         exchange=request.exchange,
         symbols=request.symbols,
         timeframe=request.timeframe,
+        strategy_name=request.strategy_name,
         start_time=request.start_time,
         end_time=request.end_time,
         initial_balance=request.initial_balance,
@@ -111,6 +116,7 @@ def get_backtest_status(
         status=result.status,
         exchange=result.exchange,
         timeframe=result.timeframe,
+        strategy_name=result.strategy_name,
         symbols=result.symbols,
         start_time=result.start_time,
         end_time=result.end_time,

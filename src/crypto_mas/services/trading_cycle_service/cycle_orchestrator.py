@@ -10,7 +10,7 @@ from crypto_mas.domain.repositories.trading_cycle_repository import TradingCycle
 from crypto_mas.engine.portfolio.portfolio import PortfolioEngine
 from crypto_mas.engine.risk.risk import RiskEngine
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
-from crypto_mas.services.decision_orchestrator.orchestrator import DecisionOrchestrator
+from crypto_mas.engine.strategy.factory import StrategyFactory
 from crypto_mas.services.feature_pipeline.service import FeaturePipelineService
 from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
 from crypto_mas.services.market_data_service.interfaces import MarketDataProvider
@@ -35,7 +35,7 @@ class TradingCycleService:
         
         self.fetcher_service = HistoricalFetcherService(provider=market_provider, db=db)
         self.feature_service = FeaturePipelineService(db)
-        self.decision_orchestrator = DecisionOrchestrator(time_provider=self.time_provider)
+        
         self.portfolio_engine = PortfolioEngine(time_provider=self.time_provider)
         self.risk_engine = RiskEngine()
         self.paper_broker = PaperBrokerService(db=db, time_provider=self.time_provider)
@@ -45,9 +45,11 @@ class TradingCycleService:
         account_name: str,
         symbols: list[str],
         timeframe: Timeframe,
+        strategy_name: str = "multi_agent",
         trigger: str = "MANUAL",
     ) -> TradingCycle:
         now = self.time_provider.now()
+        strategy = StrategyFactory.create(strategy_name, time_provider=self.time_provider)
         
         # 1. Initialize Cycle
         cycle = TradingCycle(
@@ -100,7 +102,7 @@ class TradingCycleService:
                     continue
                 
                 # Decision
-                decision = self.decision_orchestrator.run(
+                decision = strategy.decide(
                     exchange=self.fetcher_service.provider.exchange,
                     symbol=symbol,
                     timeframe=timeframe,

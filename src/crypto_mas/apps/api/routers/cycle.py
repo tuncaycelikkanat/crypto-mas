@@ -16,12 +16,14 @@ class RunCycleRequest(BaseModel):
     exchange: Exchange
     symbols: list[str]
     timeframe: Timeframe
+    strategy_name: str = "multi_agent"
     trigger: str = "MANUAL"
 
 class RunCycleResponse(BaseModel):
     cycle_id: int
     account_name: str
     status: str
+    strategy_name: str
     symbols_processed: int
     decisions_made: int
     trades_executed: int
@@ -44,6 +46,7 @@ async def run_trading_cycle(
             account_name=request.account_name,
             symbols=request.symbols,
             timeframe=request.timeframe,
+            strategy_name=request.strategy_name,
             trigger=request.trigger,
         )
         
@@ -51,6 +54,7 @@ async def run_trading_cycle(
             cycle_id=cycle.id,
             account_name=cycle.account_name,
             status=cycle.status,
+            strategy_name=request.strategy_name,
             symbols_processed=cycle.symbols_processed,
             decisions_made=cycle.decisions_made,
             trades_executed=cycle.trades_executed,

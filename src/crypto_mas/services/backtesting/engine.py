@@ -2,8 +2,10 @@ import logging
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from crypto_mas.domain.models.backtest_result import BacktestResult
+from crypto_mas.domain.models.trading_cycle import TradingCycle
 from crypto_mas.domain.repositories.backtest_result_repository import BacktestResultRepository
 from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
 from crypto_mas.infrastructure.time.time_provider import SimulatedTimeProvider
@@ -25,6 +27,7 @@ class BacktestEngineService:
         exchange: Exchange,
         symbols: list[str],
         timeframe: Timeframe,
+        strategy_name: str,
         start_time: datetime,
         end_time: datetime,
         initial_balance: float = 10000.0,
@@ -35,6 +38,7 @@ class BacktestEngineService:
             status="RUNNING",
             exchange=exchange.value,
             timeframe=timeframe.value,
+            strategy_name=strategy_name,
             symbols=symbols,
             start_time=start_time,
             end_time=end_time,
@@ -94,6 +98,7 @@ class BacktestEngineService:
                     account_name=account_name,
                     symbols=symbols,
                     timeframe=timeframe,
+                    strategy_name=strategy_name,
                     trigger=f"BACKTEST-{job_id}",
                 )
                 
@@ -103,15 +108,30 @@ class BacktestEngineService:
             # Step 5: Final metrics
             account = account_repo.get_by_name(account_name)
             
-            result.status = "COMPLETED"
-            result.final_equity = float(account.equity) if account else initial_balance
-            result.total_trades = total_trades
+            # 6. Calculate Performance Analytics
+            logger.info(f"[{job_id}] Calculating performance analytics.")
+            from crypto_mas.services.reporting_service.analytics import PerformanceAnalytics
+            analytics = PerformanceAnalytics(self.db)
+            metrics = analytics.calculate_for_account(account_name, initial_balance)
             
-            self.repository.update_status(job_id, "COMPLETED")
+            result.total_trades = metrics.total_trades
+            
+            # A more accurate final equity comes from the last cycle or current equity:
+            stmt = select(TradingCycle).where(TradingCycle.account_name == account_name).order_by(TradingCycle.started_at.desc()).limit(1)
+            last_cycle = self.db.scalars(stmt).first()
+            if last_cycle and last_cycle.ending_equity:
+                result.final_equity = last_cycle.ending_equity
+            else:
+                result.final_equity = initial_balance + metrics.total_pnl
+                
+            result.win_rate = metrics.win_rate
+            result.max_drawdown = metrics.max_drawdown
+            
+            result.status = "COMPLETED"
             result.completed_at = datetime.now(UTC)
             self.db.commit()
             
-            logger.info(f"[{job_id}] Backtest completed. Final equity: {result.final_equity}")
+            logger.info(f"[{job_id}] Backtest completed successfully. Final Equity: {result.final_equity}, Win Rate: {result.win_rate}, Max DD: {result.max_drawdown}")
             return result
             
         except Exception as e:

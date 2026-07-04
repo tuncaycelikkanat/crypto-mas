@@ -5,11 +5,11 @@ from crypto_mas.engine.signal import SignalDirection
 from crypto_mas.engine.signal.trend import TrendSignalEngine
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
-from crypto_mas.services.decision_orchestrator.schemas import DecisionAction, TradingDecision
+from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+from crypto_mas.engine.strategy.base import BaseStrategy
 
-
-class DecisionOrchestrator:
+class MultiAgentStrategy(BaseStrategy):
     def __init__(
         self,
         signal_agent: TrendSignalEngine | None = None,
@@ -22,7 +22,7 @@ class DecisionOrchestrator:
         self.regime_agent = regime_agent or RegimeEngine()
         self.time_provider = time_provider or SystemTimeProvider()
 
-    def run(
+    def decide(
         self,
         exchange: Exchange,
         symbol: str,

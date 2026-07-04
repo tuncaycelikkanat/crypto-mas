@@ -14,6 +14,7 @@ class BacktestResult(Base):
     
     exchange = Column(String(50), nullable=False)
     timeframe = Column(String(20), nullable=False)
+    strategy_name = Column(String(50), nullable=False, default="multi_agent")
     symbols = Column(JSON, nullable=False)
     
     start_time = Column(DateTime(timezone=True), nullable=False)
