@@ -7,11 +7,13 @@ from crypto_mas.engine.portfolio import PortfolioTarget
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.domain.models.order import Order
 from crypto_mas.domain.models.trade import Trade
+from crypto_mas.domain.models.execution_log import ExecutionLog
 from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
 from crypto_mas.domain.repositories.order_repository import OrderRepository
 from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
 from crypto_mas.domain.repositories.position_repository import PositionRepository
 from crypto_mas.domain.repositories.trade_repository import TradeRepository
+from crypto_mas.domain.repositories.execution_log_repository import ExecutionLogRepository
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange
 from crypto_mas.services.paper_trading.schemas import (
@@ -33,12 +35,14 @@ class PaperBrokerService:
         self.feature_snapshot_repository = FeatureSnapshotRepository(db)
         self.trade_repository = TradeRepository(db)
         self.order_repository = OrderRepository(db)
+        self.log_repository = ExecutionLogRepository(db)
         self.time_provider = time_provider or SystemTimeProvider()
 
     def execute_target_portfolio(
         self,
         account_name: str,
         target: PortfolioTarget,
+        cycle_id: int | None = None,
     ) -> PaperExecutionReport:
         account = self.account_repository.get_by_name(account_name)
 
@@ -72,6 +76,14 @@ class PaperBrokerService:
                         reason="Open position already exists.",
                     )
                 )
+                self._log_execution(
+                    account_name=account.name,
+                    level="INFO",
+                    stage="PAPER_BROKER",
+                    message=f"Skipped BUY for {target_position.symbol}: Open position already exists.",
+                    cycle_id=cycle_id,
+                    payload={"target_weight": target_position.target_weight}
+                )
                 continue
 
             latest_snapshot = self.feature_snapshot_repository.get_latest(
@@ -95,6 +107,14 @@ class PaperBrokerService:
                         reason="Latest close price not available.",
                     )
                 )
+                self._log_execution(
+                    account_name=account.name,
+                    level="WARNING",
+                    stage="PAPER_BROKER",
+                    message=f"Skipped BUY for {target_position.symbol}: Latest close price not available.",
+                    cycle_id=cycle_id,
+                    payload={"target_weight": target_position.target_weight}
+                )
                 continue
 
             target_notional = Decimal(str(target_position.target_weight)) * starting_equity
@@ -112,6 +132,14 @@ class PaperBrokerService:
                         reason="Target notional is zero.",
                     )
                 )
+                self._log_execution(
+                    account_name=account.name,
+                    level="INFO",
+                    stage="PAPER_BROKER",
+                    message=f"Skipped BUY for {target_position.symbol}: Target notional is zero.",
+                    cycle_id=cycle_id,
+                    payload={"target_weight": target_position.target_weight, "price": float(price)}
+                )
                 continue
 
             if target_notional > available_cash:
@@ -126,6 +154,14 @@ class PaperBrokerService:
                         quantity=None,
                         reason="Insufficient paper cash balance.",
                     )
+                )
+                self._log_execution(
+                    account_name=account.name,
+                    level="WARNING",
+                    stage="PAPER_BROKER",
+                    message=f"Rejected BUY for {target_position.symbol}: Insufficient cash.",
+                    cycle_id=cycle_id,
+                    payload={"notional": float(target_notional), "available_cash": float(available_cash)}
                 )
                 continue
 
@@ -151,7 +187,7 @@ class PaperBrokerService:
                 notional=target_notional,
                 realized_pnl=Decimal("0"),
                 position_id=position.id,
-                cycle_id=None,
+                cycle_id=cycle_id,
                 reason="Paper BUY executed at latest close price.",
                 executed_at=self.time_provider.now(),
             )
@@ -184,6 +220,14 @@ class PaperBrokerService:
                     quantity=float(quantity),
                     reason="Paper BUY executed at latest close price.",
                 )
+            )
+            self._log_execution(
+                account_name=account.name,
+                level="INFO",
+                stage="PAPER_BROKER",
+                message=f"Executed BUY for {target_position.symbol}.",
+                cycle_id=cycle_id,
+                payload={"notional": float(target_notional), "price": float(price), "quantity": float(quantity)}
             )
 
         ending_equity = self._money(
@@ -222,6 +266,7 @@ class PaperBrokerService:
         self,
         account_name: str,
         target: PortfolioTarget,
+        cycle_id: int | None = None,
     ) -> PaperExecutionReport:
         account = self.account_repository.get_by_name(account_name)
 
@@ -252,6 +297,13 @@ class PaperBrokerService:
                         reason="Position is still present in target portfolio.",
                     )
                 )
+                self._log_execution(
+                    account_name=account.name,
+                    level="INFO",
+                    stage="PAPER_BROKER",
+                    message=f"Skipped SELL for {position.symbol}: Position is still in target portfolio.",
+                    cycle_id=cycle_id,
+                )
                 continue
 
             latest_snapshot = self.feature_snapshot_repository.get_latest(
@@ -275,6 +327,13 @@ class PaperBrokerService:
                         reason="Latest close price not available for paper SELL.",
                     )
                 )
+                self._log_execution(
+                    account_name=account.name,
+                    level="WARNING",
+                    stage="PAPER_BROKER",
+                    message=f"Skipped SELL for {position.symbol}: Latest close price not available.",
+                    cycle_id=cycle_id,
+                )
                 continue
 
             closed_position = self.position_repository.close_position(
@@ -293,7 +352,7 @@ class PaperBrokerService:
                 notional=self._money(closed_position.quantity * price),
                 realized_pnl=closed_position.realized_pnl,
                 position_id=closed_position.id,
-                cycle_id=None,
+                cycle_id=cycle_id,
                 reason="Paper SELL executed because position is not in target portfolio.",
                 executed_at=self.time_provider.now(),
             )
@@ -326,6 +385,14 @@ class PaperBrokerService:
                     quantity=float(closed_position.quantity),
                     reason="Paper SELL executed because position is not in target portfolio.",
                 )
+            )
+            self._log_execution(
+                account_name=account.name,
+                level="INFO",
+                stage="PAPER_BROKER",
+                message=f"Executed SELL for {closed_position.symbol}.",
+                cycle_id=cycle_id,
+                payload={"notional": float(closed_position.notional_value), "price": float(price), "quantity": float(closed_position.quantity)}
             )
 
         open_positions_value = self._calculate_open_positions_value(account.name)
@@ -370,6 +437,7 @@ class PaperBrokerService:
         account_name: str,
         exchange: Exchange,
         timeframe: str,
+        cycle_id: int | None = None,
     ) -> PaperExecutionReport:
         account = self.account_repository.get_by_name(account_name)
 
@@ -406,6 +474,13 @@ class PaperBrokerService:
                         reason="Latest close price not available for mark-to-market.",
                     )
                 )
+                self._log_execution(
+                    account_name=account.name,
+                    level="WARNING",
+                    stage="PAPER_BROKER",
+                    message=f"Skipped M2M for {position.symbol}: Latest close price not available.",
+                    cycle_id=cycle_id,
+                )
                 continue
 
             updated_position = self.position_repository.update_mark_price(
@@ -424,6 +499,14 @@ class PaperBrokerService:
                     quantity=float(updated_position.quantity),
                     reason="Position marked to latest close price.",
                 )
+            )
+            self._log_execution(
+                account_name=account.name,
+                level="DEBUG",
+                stage="PAPER_BROKER",
+                message=f"Updated mark price for {updated_position.symbol}.",
+                cycle_id=cycle_id,
+                payload={"price": float(updated_position.current_price)}
             )
 
         open_positions_value = self._calculate_open_positions_value(account.name)
@@ -457,3 +540,23 @@ class PaperBrokerService:
             return Decimal("0.00000000")
 
         return value.quantize(Decimal("0.00000001"))
+
+    def _log_execution(
+        self,
+        account_name: str,
+        level: str,
+        stage: str,
+        message: str,
+        cycle_id: int | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> None:
+        log = ExecutionLog(
+            account_name=account_name,
+            cycle_id=cycle_id,
+            level=level,
+            stage=stage,
+            message=message,
+            payload_json=payload,
+            created_at=self.time_provider.now(),
+        )
+        self.log_repository.add(log)
