@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     binance_base_url: str = "https://data-api.binance.vision"
     binance_testnet_base_url: str = "https://testnet.binance.vision/api"
 
+    # Scheduler Settings
+    scheduled_symbols: list[str] = ["BTCUSDT", "ETHUSDT"]
+    scheduled_timeframe: str = "1h"
+    schedule_cron: str = "0 * * * *"  # Every hour at minute 0
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
