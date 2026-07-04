@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 import crypto_mas.domain.models  # noqa: F401
-from crypto_mas.agents.portfolio_manager_agent.schemas import PortfolioTarget, TargetPosition
+from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
 from crypto_mas.domain.repositories.position_repository import PositionRepository

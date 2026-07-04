@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from crypto_mas.agents.scoring_agent.scoring_agent import ScoringAgent
-from crypto_mas.agents.signal_agent.schemas import SignalDirection, SignalType, TradingSignal
+from crypto_mas.engine.scoring.scoring import ScoringEngine
+from crypto_mas.engine.signal import SignalDirection, SignalType, TradingSignal
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
@@ -34,7 +34,7 @@ def test_scoring_agent_scores_long_signal() -> None:
         timestamp=datetime(2026, 1, 1, tzinfo=UTC),
     )
 
-    score = ScoringAgent().score(
+    score = ScoringEngine().score(
         exchange=Exchange.MOCK,
         symbol="BTCUSDT",
         timeframe=Timeframe.FOUR_HOURS,
@@ -77,7 +77,7 @@ def test_scoring_agent_returns_zero_for_neutral_signal() -> None:
         timestamp=datetime(2026, 1, 1, tzinfo=UTC),
     )
 
-    score = ScoringAgent().score(
+    score = ScoringEngine().score(
         exchange=Exchange.MOCK,
         symbol="BTCUSDT",
         timeframe=Timeframe.FOUR_HOURS,

@@ -1,5 +1,5 @@
-from crypto_mas.agents.portfolio_manager_agent.schemas import PortfolioTarget, TargetPosition
-from crypto_mas.agents.risk_engine_agent.schemas import (
+from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
+from crypto_mas.engine.risk import (
     RiskAssessment,
     RiskCheckIssue,
     RiskDecisionStatus,
@@ -7,7 +7,7 @@ from crypto_mas.agents.risk_engine_agent.schemas import (
 )
 
 
-class RiskEngineAgent:
+class RiskEngine:
     EPSILON = 1e-9
 
     def __init__(self, limits: RiskLimits | None = None) -> None:

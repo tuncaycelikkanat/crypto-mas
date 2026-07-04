@@ -1,11 +1,11 @@
 from typing import Any
 
-from crypto_mas.agents.regime_agent.schemas import MarketRegime, RegimeSnapshot
+from crypto_mas.engine.regime import MarketRegime, RegimeSnapshot
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
-class RegimeAgent:
+class RegimeEngine:
     def detect(
         self,
         exchange: Exchange,

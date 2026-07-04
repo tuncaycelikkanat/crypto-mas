@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 
-from crypto_mas.agents.portfolio_manager_agent.schemas import PortfolioTarget, TargetPosition
-from crypto_mas.agents.risk_engine_agent.risk_engine import RiskEngineAgent
-from crypto_mas.agents.risk_engine_agent.schemas import RiskDecisionStatus, RiskLimits
+from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
+from crypto_mas.engine.risk.risk import RiskEngine
+from crypto_mas.engine.risk import RiskDecisionStatus, RiskLimits
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
@@ -36,7 +36,7 @@ def _make_target(weights: list[float]) -> PortfolioTarget:
 def test_risk_engine_approves_valid_target() -> None:
     target = _make_target([0.30, 0.30, 0.30])
 
-    assessment = RiskEngineAgent(
+    assessment = RiskEngine(
         limits=RiskLimits(
             max_positions=3,
             max_gross_exposure=0.90,
@@ -53,7 +53,7 @@ def test_risk_engine_approves_valid_target() -> None:
 def test_risk_engine_reduces_position_weights() -> None:
     target = _make_target([0.50, 0.30, 0.20])
 
-    assessment = RiskEngineAgent(
+    assessment = RiskEngine(
         limits=RiskLimits(
             max_positions=3,
             max_gross_exposure=0.90,
@@ -73,7 +73,7 @@ def test_risk_engine_reduces_position_weights() -> None:
 def test_risk_engine_reduces_when_too_many_positions_are_requested() -> None:
     target = _make_target([0.25, 0.25, 0.25, 0.15])
 
-    assessment = RiskEngineAgent(
+    assessment = RiskEngine(
         limits=RiskLimits(
             max_positions=2,
             max_gross_exposure=0.90,

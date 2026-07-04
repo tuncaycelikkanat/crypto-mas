@@ -1,11 +1,11 @@
 from typing import Any
 
-from crypto_mas.agents.signal_agent.schemas import SignalDirection, SignalType, TradingSignal
+from crypto_mas.engine.signal import SignalDirection, SignalType, TradingSignal
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
-class TrendSignalAgent:
+class TrendSignalEngine:
     def generate(
         self,
         exchange: Exchange,

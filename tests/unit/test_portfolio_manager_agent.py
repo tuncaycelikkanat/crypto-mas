@@ -2,10 +2,10 @@ from datetime import UTC, datetime
 
 from pytest import approx
 
-from crypto_mas.agents.portfolio_manager_agent.portfolio_manager import PortfolioManagerAgent
-from crypto_mas.agents.regime_agent.schemas import MarketRegime, RegimeSnapshot
-from crypto_mas.agents.scoring_agent.schemas import AssetScore
-from crypto_mas.agents.signal_agent.schemas import SignalDirection, SignalType, TradingSignal
+from crypto_mas.engine.portfolio.portfolio import PortfolioEngine
+from crypto_mas.engine.regime import MarketRegime, RegimeSnapshot
+from crypto_mas.engine.scoring import AssetScore
+from crypto_mas.engine.signal import SignalDirection, SignalType, TradingSignal
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.decision_orchestrator.schemas import DecisionAction, TradingDecision
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
@@ -77,7 +77,7 @@ def test_portfolio_manager_builds_target_portfolio() -> None:
         _make_decision("SOLUSDT", DecisionAction.HOLD, 0.80, 0.80),
     ]
 
-    target = PortfolioManagerAgent(
+    target = PortfolioEngine(
         max_positions=2,
         max_gross_exposure=0.90,
         min_confidence=0.35,
@@ -106,7 +106,7 @@ def test_portfolio_manager_returns_cash_when_no_candidates() -> None:
         _make_decision("ETHUSDT", DecisionAction.AVOID, 0.50, 0.50),
     ]
 
-    target = PortfolioManagerAgent(
+    target = PortfolioEngine(
         max_positions=2,
         max_gross_exposure=0.90,
         min_confidence=0.35,

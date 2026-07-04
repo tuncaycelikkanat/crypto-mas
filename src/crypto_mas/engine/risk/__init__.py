@@ -2,7 +2,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from crypto_mas.agents.portfolio_manager_agent.schemas import PortfolioTarget
+from crypto_mas.engine.portfolio import PortfolioTarget
 
 
 class RiskDecisionStatus(StrEnum):

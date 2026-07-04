@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from crypto_mas.agents.regime_agent.regime_agent import RegimeAgent
-from crypto_mas.agents.regime_agent.schemas import MarketRegime
+from crypto_mas.engine.regime.regime import RegimeEngine
+from crypto_mas.engine.regime import MarketRegime
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
@@ -22,7 +22,7 @@ def test_regime_agent_detects_bull_trend() -> None:
         },
     )
 
-    regime = RegimeAgent().detect(
+    regime = RegimeEngine().detect(
         exchange=Exchange.MOCK,
         symbol="BTCUSDT",
         timeframe=Timeframe.FOUR_HOURS,
@@ -50,7 +50,7 @@ def test_regime_agent_detects_bear_trend() -> None:
         },
     )
 
-    regime = RegimeAgent().detect(
+    regime = RegimeEngine().detect(
         exchange=Exchange.MOCK,
         symbol="BTCUSDT",
         timeframe=Timeframe.FOUR_HOURS,
@@ -78,7 +78,7 @@ def test_regime_agent_detects_high_volatility() -> None:
         },
     )
 
-    regime = RegimeAgent().detect(
+    regime = RegimeEngine().detect(
         exchange=Exchange.MOCK,
         symbol="BTCUSDT",
         timeframe=Timeframe.FOUR_HOURS,

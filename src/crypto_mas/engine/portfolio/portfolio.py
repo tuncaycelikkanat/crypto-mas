@@ -1,10 +1,10 @@
-from crypto_mas.agents.portfolio_manager_agent.schemas import PortfolioTarget, TargetPosition
+from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.services.decision_orchestrator.schemas import DecisionAction, TradingDecision
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
-class PortfolioManagerAgent:
+class PortfolioEngine:
     def __init__(
         self,
         max_positions: int = 3,

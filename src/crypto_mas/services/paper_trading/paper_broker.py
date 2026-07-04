@@ -3,11 +3,15 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from crypto_mas.agents.portfolio_manager_agent.schemas import PortfolioTarget
+from crypto_mas.engine.portfolio import PortfolioTarget
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
+from crypto_mas.domain.models.order import Order
+from crypto_mas.domain.models.trade import Trade
 from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
+from crypto_mas.domain.repositories.order_repository import OrderRepository
 from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
 from crypto_mas.domain.repositories.position_repository import PositionRepository
+from crypto_mas.domain.repositories.trade_repository import TradeRepository
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange
 from crypto_mas.services.paper_trading.schemas import (
@@ -27,6 +31,8 @@ class PaperBrokerService:
         self.account_repository = PaperAccountRepository(db)
         self.position_repository = PositionRepository(db)
         self.feature_snapshot_repository = FeatureSnapshotRepository(db)
+        self.trade_repository = TradeRepository(db)
+        self.order_repository = OrderRepository(db)
         self.time_provider = time_provider or SystemTimeProvider()
 
     def execute_target_portfolio(
@@ -125,7 +131,7 @@ class PaperBrokerService:
 
             quantity = self._money(target_notional / price)
 
-            self.position_repository.create_open_position(
+            position = self.position_repository.create_open_position(
                 account_name=account.name,
                 exchange=target.exchange.value,
                 symbol=target_position.symbol,
@@ -134,6 +140,36 @@ class PaperBrokerService:
                 notional_value=target_notional,
                 opened_at=self.time_provider.now(),
             )
+
+            trade = Trade(
+                account_name=account.name,
+                exchange=target.exchange.value,
+                symbol=target_position.symbol,
+                side="BUY",
+                quantity=quantity,
+                price=price,
+                notional=target_notional,
+                realized_pnl=Decimal("0"),
+                position_id=position.id,
+                cycle_id=None,
+                reason="Paper BUY executed at latest close price.",
+                executed_at=self.time_provider.now(),
+            )
+            self.trade_repository.add(trade)
+
+            order = Order(
+                account_name=account.name,
+                exchange=target.exchange.value,
+                symbol=target_position.symbol,
+                side="BUY",
+                status="FILLED",
+                requested_quantity=quantity,
+                filled_quantity=quantity,
+                requested_price=None,
+                filled_price=price,
+                trade_id=trade.id,
+            )
+            self.order_repository.add(order)
 
             available_cash = self._money(available_cash - target_notional)
 
@@ -246,6 +282,36 @@ class PaperBrokerService:
                 exit_price=price,
                 closed_at=self.time_provider.now(),
             )
+
+            trade = Trade(
+                account_name=account.name,
+                exchange=target.exchange.value,
+                symbol=closed_position.symbol,
+                side="SELL",
+                quantity=closed_position.quantity,
+                price=price,
+                notional=self._money(closed_position.quantity * price),
+                realized_pnl=closed_position.realized_pnl,
+                position_id=closed_position.id,
+                cycle_id=None,
+                reason="Paper SELL executed because position is not in target portfolio.",
+                executed_at=self.time_provider.now(),
+            )
+            self.trade_repository.add(trade)
+
+            order = Order(
+                account_name=account.name,
+                exchange=target.exchange.value,
+                symbol=closed_position.symbol,
+                side="SELL",
+                status="FILLED",
+                requested_quantity=closed_position.quantity,
+                filled_quantity=closed_position.quantity,
+                requested_price=None,
+                filled_price=price,
+                trade_id=trade.id,
+            )
+            self.order_repository.add(order)
 
             available_cash = self._money(available_cash + closed_position.notional_value)
 

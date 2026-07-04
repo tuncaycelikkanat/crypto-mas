@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from crypto_mas.agents.signal_agent.schemas import SignalDirection
+from crypto_mas.engine.signal import SignalDirection
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 

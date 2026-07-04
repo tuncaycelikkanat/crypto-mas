@@ -3,9 +3,9 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
-from crypto_mas.agents.regime_agent.schemas import RegimeSnapshot
-from crypto_mas.agents.scoring_agent.schemas import AssetScore
-from crypto_mas.agents.signal_agent.schemas import TradingSignal
+from crypto_mas.engine.regime import RegimeSnapshot
+from crypto_mas.engine.scoring import AssetScore
+from crypto_mas.engine.signal import TradingSignal
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 

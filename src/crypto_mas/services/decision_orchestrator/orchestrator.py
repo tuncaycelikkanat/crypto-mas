@@ -1,8 +1,8 @@
-from crypto_mas.agents.regime_agent.regime_agent import RegimeAgent
-from crypto_mas.agents.regime_agent.schemas import MarketRegime
-from crypto_mas.agents.scoring_agent.scoring_agent import ScoringAgent
-from crypto_mas.agents.signal_agent.schemas import SignalDirection
-from crypto_mas.agents.signal_agent.trend_agent import TrendSignalAgent
+from crypto_mas.engine.regime.regime import RegimeEngine
+from crypto_mas.engine.regime import MarketRegime
+from crypto_mas.engine.scoring.scoring import ScoringEngine
+from crypto_mas.engine.signal import SignalDirection
+from crypto_mas.engine.signal.trend import TrendSignalEngine
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.services.decision_orchestrator.schemas import DecisionAction, TradingDecision
@@ -12,14 +12,14 @@ from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 class DecisionOrchestrator:
     def __init__(
         self,
-        signal_agent: TrendSignalAgent | None = None,
-        scoring_agent: ScoringAgent | None = None,
-        regime_agent: RegimeAgent | None = None,
+        signal_agent: TrendSignalEngine | None = None,
+        scoring_agent: ScoringEngine | None = None,
+        regime_agent: RegimeEngine | None = None,
         time_provider: TimeProvider | None = None,
     ) -> None:
-        self.signal_agent = signal_agent or TrendSignalAgent()
-        self.scoring_agent = scoring_agent or ScoringAgent()
-        self.regime_agent = regime_agent or RegimeAgent()
+        self.signal_agent = signal_agent or TrendSignalEngine()
+        self.scoring_agent = scoring_agent or ScoringEngine()
+        self.regime_agent = regime_agent or RegimeEngine()
         self.time_provider = time_provider or SystemTimeProvider()
 
     def run(

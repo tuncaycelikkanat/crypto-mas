@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import asyncio
+from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
 import httpx
 
 from crypto_mas.infrastructure.config.settings import get_settings
@@ -66,6 +68,12 @@ class BinanceMarketDataProvider(MarketDataProvider):
 
         return symbols
 
+    @retry(
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(5),
+        retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.RequestError)),
+        reraise=True,
+    )
     async def fetch_ohlcv(
         self,
         symbol: str,
@@ -85,6 +93,9 @@ class BinanceMarketDataProvider(MarketDataProvider):
 
         if end_time is not None:
             params["endTime"] = self._to_millis(end_time)
+
+        # Rate limit protection
+        await asyncio.sleep(0.1)
 
         async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.get(url, params=params)
