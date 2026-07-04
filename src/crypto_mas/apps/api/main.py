@@ -57,4 +57,5 @@ app.include_router(decision_router)
 app.include_router(portfolio_router)
 app.include_router(risk_router)
 app.include_router(paper_router)
+app.include_router(cycle_router)
 
