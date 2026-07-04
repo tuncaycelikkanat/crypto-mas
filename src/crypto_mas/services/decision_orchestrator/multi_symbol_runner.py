@@ -3,16 +3,16 @@ from sqlalchemy.orm import Session
 from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
 from crypto_mas.domain.repositories.symbol_repository import SymbolRepository
 from crypto_mas.services.decision_orchestrator.multi_symbol import MultiSymbolDecisionResult
-from crypto_mas.services.decision_orchestrator.orchestrator import DecisionOrchestrator
-from crypto_mas.services.decision_orchestrator.schemas import DecisionAction, TradingDecision
+from crypto_mas.engine.strategy.factory import StrategyFactory
+from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
 class MultiSymbolDecisionRunner:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, strategy_name: str = "multi_agent") -> None:
         self.symbol_repository = SymbolRepository(db)
         self.feature_snapshot_repository = FeatureSnapshotRepository(db)
-        self.orchestrator = DecisionOrchestrator()
+        self.strategy = StrategyFactory.create(strategy_name)
 
     def run(
         self,
@@ -38,7 +38,7 @@ class MultiSymbolDecisionRunner:
                 limit=snapshot_limit,
             )
 
-            decision = self.orchestrator.run(
+            decision = self.strategy.evaluate(
                 exchange=exchange,
                 symbol=symbol.symbol,
                 timeframe=timeframe,

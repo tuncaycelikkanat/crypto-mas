@@ -9,7 +9,7 @@ from crypto_mas.engine.scoring.scoring import ScoringEngine
 from crypto_mas.engine.signal.trend import TrendSignalEngine
 from crypto_mas.infrastructure.db.session import get_db_session
 from crypto_mas.services.decision_orchestrator.multi_symbol_runner import MultiSymbolDecisionRunner
-from crypto_mas.services.decision_orchestrator.orchestrator import DecisionOrchestrator
+from crypto_mas.engine.strategy.factory import StrategyFactory
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 router = APIRouter(tags=["Decision Engine"])
@@ -90,7 +90,8 @@ def run_mock_decision(
         limit=200,
     )
 
-    decision = DecisionOrchestrator().run(
+    strategy = StrategyFactory.create("multi_agent")
+    decision = strategy.evaluate(
         exchange=Exchange.MOCK,
         symbol="BTCUSDT",
         timeframe=Timeframe.FOUR_HOURS,

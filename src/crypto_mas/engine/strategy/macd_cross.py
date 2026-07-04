@@ -1,9 +1,11 @@
 from datetime import datetime, UTC
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
-from crypto_mas.engine.signal import SignalDirection
+from crypto_mas.engine.signal import SignalDirection, TradingSignal
+from crypto_mas.engine.scoring import AssetScore
+from crypto_mas.engine.regime import RegimeSnapshot, MarketRegime
 from crypto_mas.engine.strategy.base import BaseStrategy
-from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision, SignalDecision, ScoringDecision, RegimeDecision
+from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 class MACDStrategy(BaseStrategy):
@@ -13,7 +15,7 @@ class MACDStrategy(BaseStrategy):
     Avoid if trend is weak (MACD hist is very close to 0).
     """
 
-    def decide(
+    def evaluate(
         self,
         exchange: Exchange,
         symbol: str,
@@ -53,30 +55,39 @@ class MACDStrategy(BaseStrategy):
                 action = DecisionAction.CONSIDER_SHORT
                 confidence = 0.8
 
-        # We construct a mock SignalDecision/ScoringDecision just to fulfill the schema
-        # Since this is a direct strategy, we fake the "multi-agent" internals if needed,
-        # or we could make them optional in TradingDecision in a true refactoring.
-        # But let's supply basic ones for now.
-        
         return TradingDecision(
             exchange=exchange,
             symbol=symbol,
             timeframe=timeframe,
             action=action,
             confidence=confidence,
-            signal=SignalDecision(
+            signal=TradingSignal(
+                exchange=exchange,
+                symbol=symbol,
+                timeframe=timeframe,
                 direction=direction,
                 strength=confidence,
                 indicators={"macd": macd, "macd_signal": macd_signal},
+                reason="MACD Cross",
+                timestamp=datetime.now(UTC),
             ),
-            score=ScoringDecision(
+            score=AssetScore(
+                exchange=exchange,
+                symbol=symbol,
+                timeframe=timeframe,
                 final_score=confidence,
                 components={},
+                timestamp=datetime.now(UTC),
             ),
-            regime=RegimeDecision(
-                regime="TRENDING",
+            regime=RegimeSnapshot(
+                exchange=exchange,
+                symbol=symbol,
+                timeframe=timeframe,
+                regime=MarketRegime.BULL_TREND,
                 confidence=1.0,
                 risk_multiplier=1.0,
+                reason="Default",
+                timestamp=datetime.now(UTC),
             ),
             reason=f"MACD={macd:.2f}, Signal={macd_signal:.2f}, Hist={macd_hist:.2f}",
             created_at=datetime.now(UTC),

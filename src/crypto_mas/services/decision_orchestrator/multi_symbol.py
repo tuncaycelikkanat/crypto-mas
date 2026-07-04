@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from crypto_mas.services.decision_orchestrator.schemas import TradingDecision
+from crypto_mas.engine.strategy.schemas import TradingDecision
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
