@@ -25,9 +25,11 @@ from crypto_mas.services.paper_trading.schemas import (
 
 
 class PaperBrokerService:
-    # Stop-loss / take-profit percentages per mode
     SL_PCT = {"scalping": 0.01, "swing": 0.03, "hodl": 0.05}
     TP_PCT = {"scalping": 0.02, "swing": 0.06, "hodl": 0.12}
+    
+    COMMISSION_RATE = Decimal("0.001") # 0.1%
+    SLIPPAGE_RATE = Decimal("0.0005")  # 0.05%
 
     def __init__(
         self,
@@ -148,17 +150,20 @@ class PaperBrokerService:
                 )
                 continue
 
-            if target_notional > available_cash:
+            fee = self._money(target_notional * self.COMMISSION_RATE)
+            total_cost = target_notional + fee
+
+            if total_cost > available_cash:
                 skipped.append(
                     PaperExecutionItem(
                         symbol=target_position.symbol,
                         side=PaperOrderSide.BUY,
                         status=PaperExecutionStatus.REJECTED,
                         target_weight=target_position.target_weight,
-                        notional=float(target_notional),
+                        notional=float(total_cost),
                         price=float(price),
                         quantity=None,
-                        reason="Insufficient paper cash balance.",
+                        reason="Insufficient paper cash balance for notional + fee.",
                     )
                 )
                 self._log_execution(
@@ -167,11 +172,12 @@ class PaperBrokerService:
                     stage="PAPER_BROKER",
                     message=f"Rejected BUY for {target_position.symbol}: Insufficient cash.",
                     cycle_id=cycle_id,
-                    payload={"notional": float(target_notional), "available_cash": float(available_cash)}
+                    payload={"total_cost": float(total_cost), "available_cash": float(available_cash)}
                 )
                 continue
 
-            quantity = self._money(target_notional / price)
+            execution_price = self._money(price * (Decimal("1") + self.SLIPPAGE_RATE))
+            quantity = self._money(target_notional / execution_price)
 
             # Calculate Stop-Loss and Take-Profit prices
             sl_pct = Decimal(str(self.SL_PCT.get(self.strategy_mode, 0.03)))
@@ -198,12 +204,12 @@ class PaperBrokerService:
                 symbol=target_position.symbol,
                 side="BUY",
                 quantity=quantity,
-                price=price,
-                notional=target_notional,
-                realized_pnl=Decimal("0"),
+                price=execution_price,
+                notional=target_notional, # Cost basis
+                realized_pnl=Decimal("0") - fee, # Initial PnL is the fee paid
                 position_id=position.id,
                 cycle_id=cycle_id,
-                reason="Paper BUY executed at latest close price.",
+                reason=f"Paper BUY executed (Fee: {float(fee):.2f})",
                 executed_at=self.time_provider.now(),
             )
             self.trade_repository.add(trade)
@@ -217,12 +223,12 @@ class PaperBrokerService:
                 requested_quantity=quantity,
                 filled_quantity=quantity,
                 requested_price=None,
-                filled_price=price,
+                filled_price=execution_price,
                 trade_id=trade.id,
             )
             self.order_repository.add(order)
 
-            available_cash = self._money(available_cash - target_notional)
+            available_cash = self._money(available_cash - total_cost)
 
             executed.append(
                 PaperExecutionItem(
@@ -231,9 +237,9 @@ class PaperBrokerService:
                     status=PaperExecutionStatus.EXECUTED,
                     target_weight=target_position.target_weight,
                     notional=float(target_notional),
-                    price=float(price),
+                    price=float(execution_price),
                     quantity=float(quantity),
-                    reason="Paper BUY executed at latest close price.",
+                    reason=f"Paper BUY executed with slippage/fee. Fee: ${float(fee):.2f}",
                 )
             )
             self._log_execution(
@@ -351,11 +357,21 @@ class PaperBrokerService:
                 )
                 continue
 
+            execution_price = self._money(price * (Decimal("1") - self.SLIPPAGE_RATE))
+            gross_notional = self._money(closed_position.quantity * execution_price)
+            fee = self._money(gross_notional * self.COMMISSION_RATE)
+            net_recovered = gross_notional - fee
+            
+            # The close_position method records the trade. But wait, closed_position.realized_pnl is calculated inside repository based on exit_price.
+            # We must pass execution_price to close_position!
             closed_position = self.position_repository.close_position(
                 position=position,
-                exit_price=price,
+                exit_price=execution_price,
                 closed_at=self.time_provider.now(),
             )
+            
+            # Adjust realized PnL to account for exit fee
+            closed_position.realized_pnl -= fee
 
             trade = Trade(
                 account_name=account.name,
@@ -363,12 +379,12 @@ class PaperBrokerService:
                 symbol=closed_position.symbol,
                 side="SELL",
                 quantity=closed_position.quantity,
-                price=price,
-                notional=self._money(closed_position.quantity * price),
+                price=execution_price,
+                notional=gross_notional,
                 realized_pnl=closed_position.realized_pnl,
                 position_id=closed_position.id,
                 cycle_id=cycle_id,
-                reason="Paper SELL executed because position is not in target portfolio.",
+                reason=f"Paper SELL executed (Fee: ${float(fee):.2f})",
                 executed_at=self.time_provider.now(),
             )
             self.trade_repository.add(trade)
@@ -382,12 +398,12 @@ class PaperBrokerService:
                 requested_quantity=closed_position.quantity,
                 filled_quantity=closed_position.quantity,
                 requested_price=None,
-                filled_price=price,
+                filled_price=execution_price,
                 trade_id=trade.id,
             )
             self.order_repository.add(order)
 
-            available_cash = self._money(available_cash + closed_position.notional_value)
+            available_cash = self._money(available_cash + net_recovered)
 
             executed.append(
                 PaperExecutionItem(
@@ -395,8 +411,8 @@ class PaperBrokerService:
                     side=PaperOrderSide.SELL,
                     status=PaperExecutionStatus.EXECUTED,
                     target_weight=0.0,
-                    notional=float(closed_position.notional_value),
-                    price=float(closed_position.current_price),
+                    notional=float(net_recovered),
+                    price=float(execution_price),
                     quantity=float(closed_position.quantity),
                     reason="Paper SELL executed because position is not in target portfolio.",
                 )
@@ -515,17 +531,26 @@ class PaperBrokerService:
 
             if sl_hit or tp_hit:
                 close_reason = "STOP_LOSS" if sl_hit else "TAKE_PROFIT"
-                pnl_pct = float((price - updated_position.entry_price) / updated_position.entry_price * 100)
+                
+                execution_price = self._money(price * (Decimal("1") - self.SLIPPAGE_RATE))
+                gross_notional = self._money(position.quantity * execution_price)
+                fee = self._money(gross_notional * self.COMMISSION_RATE)
+                net_recovered = gross_notional - fee
+
+                pnl_pct = float((execution_price - position.entry_price) / position.entry_price * 100)
+                
                 closed = self.position_repository.close_position(
                     position=updated_position,
-                    exit_price=price,
+                    exit_price=execution_price,
                     closed_at=self.time_provider.now(),
                     close_reason=close_reason,
                 )
+                
+                # Adjust realized PnL to account for exit fee
+                closed.realized_pnl -= fee
 
                 # Return cash to account
-                recovered_cash = self._money(closed.quantity * price)
-                new_cash = self._money(account.cash_balance + recovered_cash)
+                new_cash = self._money(account.cash_balance + net_recovered)
                 account.cash_balance = new_cash
                 self.db.commit()
 
@@ -536,12 +561,12 @@ class PaperBrokerService:
                     symbol=closed.symbol,
                     side="SELL",
                     quantity=closed.quantity,
-                    price=price,
-                    notional=self._money(closed.quantity * price),
+                    price=execution_price,
+                    notional=gross_notional,
                     realized_pnl=closed.realized_pnl,
                     position_id=closed.id,
                     cycle_id=cycle_id,
-                    reason=f"Auto-closed: {close_reason}",
+                    reason=f"Auto-closed: {close_reason} (Fee: ${float(fee):.2f})",
                     executed_at=self.time_provider.now(),
                 )
                 self.trade_repository.add(trade)
@@ -551,9 +576,9 @@ class PaperBrokerService:
                     account_name=account.name,
                     level="SUCCESS" if tp_hit else "WARN",
                     stage="SL_TP",
-                    message=f"{emoji} {close_reason}: {closed.symbol} @ ${float(price):.2f} | PnL: {pnl_pct:+.2f}%",
+                    message=f"{emoji} {close_reason}: {closed.symbol} @ ${float(execution_price):.2f} | PnL: {pnl_pct:+.2f}%",
                     cycle_id=cycle_id,
-                    payload={"reason": close_reason, "price": float(price), "realized_pnl": float(closed.realized_pnl)},
+                    payload={"reason": close_reason, "price": float(execution_price), "realized_pnl": float(closed.realized_pnl)},
                 )
 
                 executed.append(
@@ -562,8 +587,8 @@ class PaperBrokerService:
                         side=PaperOrderSide.SELL,
                         status=PaperExecutionStatus.EXECUTED,
                         target_weight=0.0,
-                        notional=float(recovered_cash),
-                        price=float(price),
+                        notional=float(net_recovered),
+                        price=float(execution_price),
                         quantity=float(closed.quantity),
                         reason=close_reason,
                     )

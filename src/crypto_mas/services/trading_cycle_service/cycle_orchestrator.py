@@ -12,6 +12,7 @@ from crypto_mas.engine.risk.risk import RiskEngine
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.engine.strategy.factory import StrategyFactory
 from crypto_mas.services.feature_pipeline.service import FeaturePipelineService
+from crypto_mas.engine.regime.htf_manager import HTFRegimeManager
 from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
 from crypto_mas.services.market_data_service.interfaces import MarketDataProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
@@ -45,6 +46,7 @@ class TradingCycleService:
             time_provider=self.time_provider,
             strategy_mode=strategy_mode,
         )
+        self.htf_manager = HTFRegimeManager()
 
     async def run_cycle(
         self,
@@ -89,15 +91,55 @@ class TradingCycleService:
             logger.info(f"[Cycle {cycle.id}] Starting market data sync for {len(symbols)} symbols.")
             _log("MARKET_DATA", f"Fetching history from {self.fetcher_service.provider.exchange.value} for {timeframe}")
             
+            # Ensure BTCUSDT is in the fetch list for market-wide correlation checks
+            fetch_symbols = set(symbols)
+            fetch_symbols.add("BTCUSDT")
+            fetch_symbols_list = list(fetch_symbols)
+            
             # Fetch up to 60 periods back as a fallback if no state exists
             fallback_start = now - self._get_timedelta(timeframe) * 60
             
             await self.fetcher_service.backfill_universe(
-                symbols=symbols,
+                symbols=fetch_symbols_list,
                 timeframe=timeframe,
                 start_time=fallback_start,
                 end_time=now,
             )
+            
+            # Fetch HTF data if we are trading on a lower timeframe
+            htf = Timeframe.FOUR_HOURS
+            is_ltf = timeframe in (Timeframe.ONE_MINUTE, Timeframe.FIFTEEN_MINUTES, Timeframe.ONE_HOUR)
+            
+            if is_ltf:
+                _log("MARKET_DATA", f"Fetching HTF ({htf.value}) history for Regime Filter")
+                htf_start = now - self._get_timedelta(htf) * 60
+                await self.fetcher_service.backfill_universe(
+                    symbols=fetch_symbols_list,
+                    timeframe=htf,
+                    start_time=htf_start,
+                    end_time=now,
+                )
+                
+            # Pre-calculate BTC features for market-wide check
+            self.feature_service.calculate_and_store(
+                exchange=self.fetcher_service.provider.exchange,
+                symbol="BTCUSDT",
+                timeframe=timeframe,
+            )
+            btc_snapshots = self.feature_snapshot_repository.list_by_symbol(
+                exchange=self.fetcher_service.provider.exchange.value,
+                symbol="BTCUSDT",
+                timeframe=timeframe.value,
+                limit=5,
+            )
+            
+            btc_is_crashing = False
+            if btc_snapshots:
+                latest_btc = btc_snapshots[-1].features_json
+                btc_roc = latest_btc.get("roc_14")
+                if btc_roc is not None and btc_roc < -2.0: # BTC dropped > 2% in the last 14 periods
+                    btc_is_crashing = True
+                    _log("RISK", f"MARKET CRASH DETECTED! BTC ROC: {btc_roc:.2f}%. Longs will be restricted.", "WARN")
             
             # 3 & 4. Feature Engineering and Decisions
             decisions = []
@@ -125,6 +167,24 @@ class TradingCycleService:
                     _log("STRATEGY", f"No data available for {symbol}, skipped", "WARN")
                     continue
                 
+                # Check HTF Filter
+                htf_long_allowed = True
+                htf_short_allowed = True
+                if is_ltf:
+                    self.feature_service.calculate_and_store(
+                        exchange=self.fetcher_service.provider.exchange,
+                        symbol=symbol,
+                        timeframe=htf,
+                    )
+                    htf_snapshots = self.feature_snapshot_repository.list_by_symbol(
+                        exchange=self.fetcher_service.provider.exchange.value,
+                        symbol=symbol,
+                        timeframe=htf.value,
+                        limit=5,
+                    )
+                    htf_long_allowed = self.htf_manager.is_long_allowed(htf_snapshots)
+                    htf_short_allowed = self.htf_manager.is_short_allowed(htf_snapshots)
+                
                 # Decision
                 decision = strategy.decide(
                     exchange=self.fetcher_service.provider.exchange,
@@ -134,8 +194,27 @@ class TradingCycleService:
                 )
                 
                 if decision:
-                    decisions.append(decision)
-                    _log("STRATEGY", f"Decision made for {symbol}: {decision.action.value} (Confidence: {decision.confidence})")
+                    # Apply HTF filter overrides
+                    from crypto_mas.engine.strategy.schemas import DecisionAction
+                    
+                    if decision.action == DecisionAction.CONSIDER_LONG:
+                        if btc_is_crashing and symbol != "BTCUSDT":
+                            _log("STRATEGY", f"Decision CONSIDER_LONG for {symbol} REJECTED due to general BTC market crash.", "WARN")
+                            decision.action = DecisionAction.HOLD
+                            decision.reason += " | REJECTED by BTC Crash Filter"
+                        elif not htf_long_allowed:
+                            _log("STRATEGY", f"Decision CONSIDER_LONG for {symbol} REJECTED by HTF 4H Bear Trend filter.", "WARN")
+                            decision.action = DecisionAction.HOLD
+                            decision.reason += " | REJECTED by HTF Bear Trend"
+                            
+                    elif decision.action == DecisionAction.CONSIDER_SHORT and not htf_short_allowed:
+                        _log("STRATEGY", f"Decision CONSIDER_SHORT for {symbol} REJECTED by HTF 4H Bull Trend filter.", "WARN")
+                        decision.action = DecisionAction.HOLD
+                        decision.reason += " | REJECTED by HTF Bull Trend"
+                        
+                    if decision.action != DecisionAction.HOLD:
+                        decisions.append(decision)
+                        _log("STRATEGY", f"Decision made for {symbol}: {decision.action.value} (Confidence: {decision.confidence})")
                     
             cycle.symbols_processed = len(symbols)
             cycle.decisions_made = len(decisions)
