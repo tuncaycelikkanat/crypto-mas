@@ -99,6 +99,16 @@ class PositionRepository:
 
         return position
 
+    def update_stop_loss(
+        self,
+        position: Position,
+        stop_loss_price: Decimal,
+    ) -> Position:
+        position.stop_loss_price = self._money(stop_loss_price)
+        self.db.commit()
+        self.db.refresh(position)
+        return position
+
     def close_position(
             self,
             position: Position,

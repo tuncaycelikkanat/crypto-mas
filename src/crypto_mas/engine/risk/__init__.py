@@ -19,9 +19,9 @@ class RiskCheckIssue(BaseModel):
 
 class RiskLimits(BaseModel):
     max_positions: int = Field(default=10, ge=1)
-    max_gross_exposure: float = Field(default=0.85, ge=0.0, le=1.0)
-    max_position_weight: float = Field(default=0.20, ge=0.0, le=1.0)
-    min_cash_weight: float = Field(default=0.15, ge=0.0, le=1.0)
+    max_gross_exposure: float = Field(default=0.50, ge=0.0, le=1.0)
+    max_position_weight: float = Field(default=0.10, ge=0.0, le=1.0)
+    min_cash_weight: float = Field(default=0.50, ge=0.0, le=1.0)
 
 
 class RiskAssessment(BaseModel):

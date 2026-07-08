@@ -519,6 +519,25 @@ class PaperBrokerService:
                 current_price=price,
             )
 
+            # --- Trailing Stop-Loss Update ---
+            sl_pct = Decimal(str(self.SL_PCT.get(self.strategy_mode, 0.03)))
+            potential_sl = self._money(price * (Decimal("1") - sl_pct))
+            
+            # Only trail the stop loss UPWARDS, and only if the price has moved favorably (above entry)
+            if updated_position.stop_loss_price is None or potential_sl > updated_position.stop_loss_price:
+                if price > updated_position.entry_price:
+                    updated_position = self.position_repository.update_stop_loss(
+                        position=updated_position,
+                        stop_loss_price=potential_sl,
+                    )
+                    self._log_execution(
+                        account_name=account.name,
+                        level="INFO",
+                        stage="TRAILING_SL",
+                        message=f"Trailing SL moved UP for {updated_position.symbol} to ${float(potential_sl):.2f} (Locking profit)",
+                        cycle_id=cycle_id,
+                    )
+
             # --- Stop-Loss / Take-Profit Check ---
             sl_hit = (
                 updated_position.stop_loss_price is not None
