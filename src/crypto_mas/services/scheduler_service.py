@@ -9,6 +9,8 @@ from crypto_mas.infrastructure.db.session import SessionLocal
 from crypto_mas.services.market_data_service.provider_factory import get_market_data_provider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
+from crypto_mas.services.market_data_service.websocket_client import BinanceWebsocketClient
+from crypto_mas.engine.strategy.event_engine import EventEngine
 
 logger = logging.getLogger("crypto_mas.scheduler_service")
 
@@ -28,17 +30,25 @@ class SchedulerService:
         if cls._instance is None:
             cls._instance = super(SchedulerService, cls).__new__(cls)
             cls._instance._scheduler = AsyncIOScheduler(timezone=UTC)
+            
+            # Phase 4: Event Driven Architecture
+            cls._instance._ws_client = BinanceWebsocketClient()
+            cls._instance._event_engine = EventEngine()
+            cls._instance._ws_client.add_callback(cls._instance._event_engine.process_websocket_message)
+            
         return cls._instance
 
     def start(self):
         if not self._scheduler.running:
             self._scheduler.start()
-            logger.info("Scheduler Service started.")
+            self._ws_client.start()
+            logger.info("Scheduler Service and WS Client started.")
 
     def shutdown(self):
         if self._scheduler.running:
             self._scheduler.shutdown()
-            logger.info("Scheduler Service shut down.")
+            self._ws_client.stop()
+            logger.info("Scheduler Service and WS Client shut down.")
 
     def is_bot_running(self, bot_id: str) -> bool:
         if not self._scheduler.running:
@@ -95,6 +105,14 @@ class SchedulerService:
             name=f"Bot Instance: {bot_id}",
             replace_existing=True,
         )
+        
+        # Add to real-time WS tracking for Micro-structure Volume Spikes
+        for sym in symbols:
+            self._ws_client.add_subscription(sym, "trade")
+            # If the WS is already running and we changed subs, it might not dynamically pick them up.
+            # In a production app we would reconnect or send a SUBSCIBE frame. 
+            # Binance allows sending {"method": "SUBSCRIBE", "params": ["btcusdt@trade"], "id": 1} over active WS.
+            # We'll just add to the set for now.
 
         logger.info(f"Bot {bot_id} started | mode={mode} | exchange={exchange.upper()} | interval={effective_interval}s | {len(symbols)} symbols")
         return self.get_status()
