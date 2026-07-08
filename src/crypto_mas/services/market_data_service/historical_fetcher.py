@@ -36,9 +36,17 @@ class HistoricalFetcherService:
         
         # Kaldığı yerden devam etme (Resume) mantığı
         state = self.state_repository.get_state(self.provider.exchange.value, symbol, timeframe.value)
-        if state and state.last_fetched_at and state.last_fetched_at > start_time:
-            logger.info(f"[{symbol}] Resuming backfill from {state.last_fetched_at}")
-            current_start = state.last_fetched_at + timedelta(milliseconds=1)
+        if state and state.last_fetched_at:
+            last_fetched = state.last_fetched_at
+            if last_fetched.tzinfo is None:
+                from datetime import UTC
+                last_fetched = last_fetched.replace(tzinfo=UTC)
+                
+            if last_fetched > start_time:
+                logger.info(f"[{symbol}] Resuming backfill from {last_fetched}")
+                current_start = last_fetched + timedelta(milliseconds=1)
+            else:
+                current_start = start_time
         else:
             current_start = start_time
 

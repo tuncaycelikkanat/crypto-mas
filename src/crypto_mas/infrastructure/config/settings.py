@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     binance_base_url: str = "https://data-api.binance.vision"
     binance_testnet_base_url: str = "https://testnet.binance.vision/api"
+    
+    mexc_base_url: str = "https://api.mexc.com"
 
     # Scheduler Settings
     scheduled_symbols: list[str] = ["BTCUSDT", "ETHUSDT"]

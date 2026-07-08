@@ -14,6 +14,7 @@ class SignalDirection(StrEnum):
 
 class SignalType(StrEnum):
     TREND_FOLLOWING = "TREND_FOLLOWING"
+    MEAN_REVERSION = "MEAN_REVERSION"
 
 
 class TradingSignal(BaseModel):

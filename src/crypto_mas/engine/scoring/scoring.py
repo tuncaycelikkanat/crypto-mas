@@ -27,8 +27,10 @@ class ScoringEngine:
         rsi_14 = self._get_float(features, "rsi_14")
         roc_14 = self._get_float(features, "roc_14")
         atr_14 = self._get_float(features, "atr_14")
+        macd = self._get_float(features, "macd")
+        macd_signal = self._get_float(features, "macd_signal")
 
-        if None in {close, ema_20, ema_50, rsi_14, roc_14, atr_14}:
+        if None in {close, ema_20, ema_50, rsi_14, roc_14, atr_14, macd, macd_signal}:
             return AssetScore(
                 exchange=exchange,
                 symbol=symbol,
@@ -48,6 +50,8 @@ class ScoringEngine:
         assert rsi_14 is not None
         assert roc_14 is not None
         assert atr_14 is not None
+        assert macd is not None
+        assert macd_signal is not None
 
         trend_score = self._trend_score(
             close=close,
@@ -58,6 +62,9 @@ class ScoringEngine:
         momentum_score = self._momentum_score(
             rsi_14=rsi_14,
             roc_14=roc_14,
+            macd=macd,
+            macd_signal=macd_signal,
+            close=close,
             direction=signal.direction,
         )
         volatility_penalty = self._volatility_penalty(
@@ -124,18 +131,28 @@ class ScoringEngine:
     def _momentum_score(
         rsi_14: float,
         roc_14: float,
+        macd: float,
+        macd_signal: float,
+        close: float,
         direction: SignalDirection,
     ) -> float:
+        if close <= 0:
+            return 0.0
+            
+        macd_hist = macd - macd_signal
+        
         if direction == SignalDirection.LONG:
             rsi_score = max((rsi_14 - 50) / 50, 0.0)
             roc_score = max(roc_14 / 10, 0.0)
+            macd_score = max(macd_hist / close * 200, 0.0)
         elif direction == SignalDirection.SHORT:
             rsi_score = max((50 - rsi_14) / 50, 0.0)
             roc_score = max((-roc_14) / 10, 0.0)
+            macd_score = max(-macd_hist / close * 200, 0.0)
         else:
             return 0.0
 
-        return max(0.0, min((rsi_score * 0.5) + (roc_score * 0.5), 1.0))
+        return max(0.0, min((rsi_score * 0.3) + (roc_score * 0.3) + (macd_score * 0.4), 1.0))
 
     @staticmethod
     def _volatility_penalty(close: float, atr_14: float) -> float:

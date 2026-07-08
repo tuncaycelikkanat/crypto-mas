@@ -4,7 +4,7 @@ from crypto_mas.infrastructure.db.session import check_db_connection
 from crypto_mas.infrastructure.cache.redis_client import check_redis_connection
 
 settings = get_settings()
-router = APIRouter(tags=["Health"])
+router = APIRouter(prefix="/api/v1", tags=["Health"])
 
 @router.get("/health")
 def health_check() -> dict[str, str]:

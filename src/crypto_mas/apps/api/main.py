@@ -7,6 +7,7 @@ from crypto_mas.infrastructure.db.session import SessionLocal
 from crypto_mas.domain.models.config_version import ConfigVersion
 from crypto_mas.services.config_service.config_service import ConfigService
 from crypto_mas.services.config_service.schemas import TradingConfig
+from crypto_mas.services.scheduler_service import SchedulerService
 from crypto_mas.apps.api.routers import (
     health_router,
     market_router,
@@ -18,6 +19,9 @@ from crypto_mas.apps.api.routers import (
     paper_router,
     cycle_router,
     backtest_router,
+    bot_router,
+    logs_router,
+    analytics_router,
 )
 
 settings = get_settings()
@@ -41,9 +45,12 @@ async def lifespan(app: FastAPI):
             config_service.repository.add(new_version)
             db.commit()
 
+    # Start Scheduler
+    SchedulerService().start()
+
     yield
     # Shutdown
-    pass
+    SchedulerService().shutdown()
 
 app = FastAPI(
     title="Crypto MAS API",
@@ -61,3 +68,6 @@ app.include_router(risk_router)
 app.include_router(paper_router)
 app.include_router(cycle_router)
 app.include_router(backtest_router)
+app.include_router(bot_router)
+app.include_router(logs_router)
+app.include_router(analytics_router)

@@ -24,8 +24,11 @@ class RegimeEngine:
         ema_50 = self._get_float(features, "ema_50")
         atr_14 = self._get_float(features, "atr_14")
         roc_14 = self._get_float(features, "roc_14")
+        bb_upper = self._get_float(features, "bb_upper")
+        bb_middle = self._get_float(features, "bb_middle")
+        bb_lower = self._get_float(features, "bb_lower")
 
-        if None in {close, ema_20, ema_50, atr_14, roc_14}:
+        if None in {close, ema_20, ema_50, atr_14, roc_14, bb_upper, bb_middle, bb_lower}:
             return RegimeSnapshot(
                 exchange=exchange,
                 symbol=symbol,
@@ -42,18 +45,23 @@ class RegimeEngine:
         assert ema_50 is not None
         assert atr_14 is not None
         assert roc_14 is not None
+        assert bb_upper is not None
+        assert bb_middle is not None
+        assert bb_lower is not None
 
         volatility_ratio = atr_14 / close if close > 0 else 0.0
+        bb_width = (bb_upper - bb_lower) / bb_middle if bb_middle > 0 else 0.0
 
-        if volatility_ratio > 0.06:
+        if volatility_ratio > 0.06 or bb_width > 0.12:
+            confidence = max(min(volatility_ratio / 0.10, 1.0), min(bb_width / 0.20, 1.0))
             return RegimeSnapshot(
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,
                 regime=MarketRegime.HIGH_VOLATILITY,
-                confidence=min(volatility_ratio / 0.10, 1.0),
+                confidence=confidence,
                 risk_multiplier=0.50,
-                reason="ATR/close ratio is above high-volatility threshold.",
+                reason=f"ATR ratio ({volatility_ratio:.2f}) or BB width ({bb_width:.2f}) indicates high volatility.",
                 timestamp=latest.timestamp,
             )
 

@@ -16,7 +16,7 @@ from crypto_mas.services.decision_orchestrator.multi_symbol_runner import MultiS
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
 
-router = APIRouter(prefix="/paper", tags=["Paper Trading"])
+router = APIRouter(prefix="/api/v1/paper", tags=["Paper Trading"])
 
 @router.post("/mock/account/init")
 def initialize_mock_paper_account(

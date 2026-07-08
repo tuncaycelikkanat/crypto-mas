@@ -9,7 +9,7 @@ from crypto_mas.services.market_data_service.provider_factory import get_market_
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
 
-router = APIRouter(prefix="/cycle", tags=["Trading Cycle"])
+router = APIRouter(prefix="/api/v1/cycle", tags=["Trading Cycle"])
 
 class RunCycleRequest(BaseModel):
     account_name: str

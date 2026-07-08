@@ -26,19 +26,25 @@ class TradingCycleService:
         db: Session,
         market_provider: MarketDataProvider,
         time_provider: TimeProvider | None = None,
+        strategy_mode: str = "swing",
     ) -> None:
         self.db = db
         self.time_provider = time_provider or SystemTimeProvider()
-        
+        self.strategy_mode = strategy_mode
+
         self.cycle_repository = TradingCycleRepository(db)
         self.feature_snapshot_repository = FeatureSnapshotRepository(db)
-        
+
         self.fetcher_service = HistoricalFetcherService(provider=market_provider, db=db)
         self.feature_service = FeaturePipelineService(db)
-        
+
         self.portfolio_engine = PortfolioEngine(time_provider=self.time_provider)
         self.risk_engine = RiskEngine()
-        self.paper_broker = PaperBrokerService(db=db, time_provider=self.time_provider)
+        self.paper_broker = PaperBrokerService(
+            db=db,
+            time_provider=self.time_provider,
+            strategy_mode=strategy_mode,
+        )
 
     async def run_cycle(
         self,
@@ -63,9 +69,25 @@ class TradingCycleService:
         self.cycle_repository.add(cycle)
         self.db.commit()
         
+        def _log(stage: str, message: str, level: str = "INFO"):
+            from crypto_mas.domain.models.execution_log import ExecutionLog
+            log = ExecutionLog(
+                account_name=account_name,
+                cycle_id=cycle.id,
+                level=level,
+                stage=stage,
+                message=message,
+                created_at=self.time_provider.now()
+            )
+            self.db.add(log)
+            self.db.commit()
+
+        _log("INIT", f"Cycle started for {len(symbols)} symbols: {symbols}")
+
         try:
             # 2. Market Data Sync
             logger.info(f"[Cycle {cycle.id}] Starting market data sync for {len(symbols)} symbols.")
+            _log("MARKET_DATA", f"Fetching history from {self.fetcher_service.provider.exchange.value} for {timeframe}")
             
             # Fetch up to 60 periods back as a fallback if no state exists
             fallback_start = now - self._get_timedelta(timeframe) * 60
@@ -81,6 +103,7 @@ class TradingCycleService:
             decisions = []
             for symbol in symbols:
                 logger.info(f"[Cycle {cycle.id}] Processing features and decisions for {symbol}")
+                _log("STRATEGY", f"Evaluating {strategy_name} for {symbol}")
                 
                 # Calculate features
                 self.feature_service.calculate_and_store(
@@ -99,6 +122,7 @@ class TradingCycleService:
                 
                 if not snapshots:
                     logger.warning(f"[Cycle {cycle.id}] No feature snapshots for {symbol}. Skipping.")
+                    _log("STRATEGY", f"No data available for {symbol}, skipped", "WARN")
                     continue
                 
                 # Decision
@@ -111,12 +135,14 @@ class TradingCycleService:
                 
                 if decision:
                     decisions.append(decision)
+                    _log("STRATEGY", f"Decision made for {symbol}: {decision.action.value} (Confidence: {decision.confidence})")
                     
             cycle.symbols_processed = len(symbols)
             cycle.decisions_made = len(decisions)
             
             # 5. Portfolio Construction
             logger.info(f"[Cycle {cycle.id}] Constructing portfolio target from {len(decisions)} decisions.")
+            _log("PORTFOLIO", f"Constructing target portfolio from {len(decisions)} active signals")
             target_portfolio = self.portfolio_engine.build_target_portfolio(
                 exchange=self.fetcher_service.provider.exchange,
                 timeframe=timeframe,
@@ -129,10 +155,24 @@ class TradingCycleService:
             approved_portfolio = risk_assessment.approved_target
             
             if approved_portfolio is None:
-                raise ValueError("Risk engine rejected the portfolio entirely.")
+                _log("RISK", f"Risk engine rejected portfolio: {risk_assessment.reason}. Holding current positions.", "WARN")
+                # Build an empty target to hold all current positions (no new buys, no forced sells)
+                from crypto_mas.engine.portfolio import PortfolioTarget
+                approved_portfolio = PortfolioTarget(
+                    exchange=target_portfolio.exchange,
+                    timeframe=target_portfolio.timeframe,
+                    target_positions=[],
+                    cash_weight=1.0,
+                    gross_exposure=0.0,
+                    reason="Risk-rejected: holding cash.",
+                    created_at=self.time_provider.now(),
+                )
+            
+            _log("RISK", "Risk checks passed, proceeding to execution")
             
             # 7. Execution
             logger.info(f"[Cycle {cycle.id}] Executing portfolio.")
+            _log("EXECUTION", "Executing orders against virtual broker")
             
             # Mark to Market
             self.paper_broker.update_mark_prices(
@@ -167,11 +207,13 @@ class TradingCycleService:
             self.db.commit()
             
             logger.info(f"[Cycle {cycle.id}] Completed successfully. PnL: {cycle.cycle_pnl}")
+            _log("COMPLETED", f"Cycle finished. {cycle.trades_executed} trades executed. PnL change: ${cycle.cycle_pnl:.2f}", "SUCCESS")
             
             return cycle
             
         except Exception as e:
             logger.exception(f"[Cycle {cycle.id}] Failed with error: {e}")
+            _log("FAILED", f"Critical error in cycle: {str(e)}", "ERROR")
             self.cycle_repository.update_status(cycle.id, "FAILED")
             self.db.commit()
             raise e

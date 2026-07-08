@@ -31,7 +31,7 @@ class MACDStrategy(BaseStrategy):
         
         # We need macd in features! Let's check if we have them.
         # features JSON has "macd", "macd_signal", "macd_hist"
-        features = latest.features
+        features = latest.features_json
         
         macd = features.get("macd")
         macd_signal = features.get("macd_signal")
@@ -43,17 +43,24 @@ class MACDStrategy(BaseStrategy):
         action = DecisionAction.HOLD
         confidence = 0.0
         direction = SignalDirection.NEUTRAL
-        
-        if macd > macd_signal:
+
+        # Normalize histogram vs price to get a meaningful confidence
+        price = features.get("close") or 1.0
+        hist_pct = abs(macd_hist) / price if price > 0 else 0.0
+
+        # Minimum threshold: histogram must be at least 0.02% of price (filters noise)
+        MIN_HIST_PCT = 0.0002
+
+        if macd > macd_signal and macd_hist > 0 and hist_pct >= MIN_HIST_PCT:
             direction = SignalDirection.LONG
-            if macd_hist > 0:
-                action = DecisionAction.CONSIDER_LONG
-                confidence = 0.8
-        elif macd < macd_signal:
+            action = DecisionAction.CONSIDER_LONG
+            # Confidence scales with signal strength, capped at 0.95
+            confidence = min(0.5 + (hist_pct * 200), 0.95)
+        elif macd < macd_signal and macd_hist < 0 and hist_pct >= MIN_HIST_PCT:
             direction = SignalDirection.SHORT
-            if macd_hist < 0:
-                action = DecisionAction.CONSIDER_SHORT
-                confidence = 0.8
+            # For paper trading we don't short, but we track the direction
+            action = DecisionAction.HOLD
+            confidence = 0.0
 
         return TradingDecision(
             exchange=exchange,

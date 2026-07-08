@@ -36,6 +36,17 @@ const Layout: React.FC = () => {
             <PlaySquare size={20} />
             <span style={{ fontWeight: 500 }}>Backtesting</span>
           </NavLink>
+          
+          <NavLink to="/paper" style={({isActive}) => ({
+            display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', 
+            borderRadius: '12px', color: isActive ? 'white' : 'var(--text-muted)',
+            background: isActive ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
+            textDecoration: 'none', transition: 'all 0.2s',
+            border: isActive ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid transparent'
+          })}>
+            <History size={20} />
+            <span style={{ fontWeight: 500 }}>Live Paper Trade</span>
+          </NavLink>
 
           <NavLink to="/decisions" style={({isActive}) => ({
             display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', 

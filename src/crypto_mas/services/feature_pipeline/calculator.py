@@ -7,7 +7,7 @@ from crypto_mas.domain.models.candle import Candle
 
 class FeatureCalculator:
     def calculate(self, candles: list[Candle]) -> list[dict[str, Any]]:
-        if len(candles) < 50:
+        if len(candles) < 60:
             return []
 
         closes = [float(candle.close) for candle in candles]
@@ -20,6 +20,8 @@ class FeatureCalculator:
         rsi_14 = self._rsi(closes, period=14)
         atr_14 = self._atr(highs, lows, closes, period=14)
         roc_14 = self._roc(closes, period=14)
+        macd, macd_signal, macd_hist = self._macd(closes)
+        bb_upper, bb_middle, bb_lower = self._bollinger_bands(closes, period=20, num_std=2.0)
 
         snapshots: list[dict[str, Any]] = []
 
@@ -32,6 +34,12 @@ class FeatureCalculator:
                 "rsi_14": self._safe_float(rsi_14[index]),
                 "atr_14": self._safe_float(atr_14[index]),
                 "roc_14": self._safe_float(roc_14[index]),
+                "macd": self._safe_float(macd[index]),
+                "macd_signal": self._safe_float(macd_signal[index]),
+                "macd_hist": self._safe_float(macd_hist[index]),
+                "bb_upper": self._safe_float(bb_upper[index]),
+                "bb_middle": self._safe_float(bb_middle[index]),
+                "bb_lower": self._safe_float(bb_lower[index]),
             }
 
             snapshots.append(
@@ -167,6 +175,58 @@ class FeatureCalculator:
             result.append(((value - previous) / previous) * 100)
 
         return result
+
+    def _macd(self, values: list[float], fast_period: int = 12, slow_period: int = 26, signal_period: int = 9) -> tuple[list[float | None], list[float | None], list[float | None]]:
+        macd_line: list[float | None] = [None] * len(values)
+        macd_signal: list[float | None] = [None] * len(values)
+        macd_hist: list[float | None] = [None] * len(values)
+
+        ema_fast = self._ema(values, period=fast_period)
+        ema_slow = self._ema(values, period=slow_period)
+
+        for i in range(len(values)):
+            if ema_fast[i] is not None and ema_slow[i] is not None:
+                macd_line[i] = ema_fast[i] - ema_slow[i]
+
+        valid_macd_start = next((i for i, v in enumerate(macd_line) if v is not None), -1)
+        if valid_macd_start != -1:
+            valid_macd_values = [v for v in macd_line if v is not None]
+            signal_ema = self._ema(valid_macd_values, period=signal_period)
+            
+            for i, sig_val in enumerate(signal_ema):
+                actual_idx = valid_macd_start + i
+                macd_signal[actual_idx] = sig_val
+                
+                if macd_line[actual_idx] is not None and sig_val is not None:
+                    macd_hist[actual_idx] = macd_line[actual_idx] - sig_val
+
+        return macd_line, macd_signal, macd_hist
+
+    def _bollinger_bands(
+        self, values: list[float], period: int = 20, num_std: float = 2.0
+    ) -> tuple[list[float | None], list[float | None], list[float | None]]:
+        import math
+        upper: list[float | None] = []
+        middle: list[float | None] = []
+        lower: list[float | None] = []
+
+        for i in range(len(values)):
+            if i + 1 < period:
+                upper.append(None)
+                middle.append(None)
+                lower.append(None)
+                continue
+
+            window = values[i + 1 - period: i + 1]
+            sma = sum(window) / period
+            variance = sum((x - sma) ** 2 for x in window) / period
+            std = math.sqrt(variance)
+
+            upper.append(sma + num_std * std)
+            middle.append(sma)
+            lower.append(sma - num_std * std)
+
+        return upper, middle, lower
 
     @staticmethod
     def _safe_float(value: float | None) -> float | None:

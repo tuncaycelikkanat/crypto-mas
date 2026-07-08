@@ -25,10 +25,15 @@ from crypto_mas.services.paper_trading.schemas import (
 
 
 class PaperBrokerService:
+    # Stop-loss / take-profit percentages per mode
+    SL_PCT = {"scalping": 0.01, "swing": 0.03, "hodl": 0.05}
+    TP_PCT = {"scalping": 0.02, "swing": 0.06, "hodl": 0.12}
+
     def __init__(
         self,
         db: Session,
         time_provider: TimeProvider | None = None,
+        strategy_mode: str = "swing",
     ) -> None:
         self.account_repository = PaperAccountRepository(db)
         self.position_repository = PositionRepository(db)
@@ -37,6 +42,7 @@ class PaperBrokerService:
         self.order_repository = OrderRepository(db)
         self.log_repository = ExecutionLogRepository(db)
         self.time_provider = time_provider or SystemTimeProvider()
+        self.strategy_mode = strategy_mode
 
     def execute_target_portfolio(
         self,
@@ -167,6 +173,12 @@ class PaperBrokerService:
 
             quantity = self._money(target_notional / price)
 
+            # Calculate Stop-Loss and Take-Profit prices
+            sl_pct = Decimal(str(self.SL_PCT.get(self.strategy_mode, 0.03)))
+            tp_pct = Decimal(str(self.TP_PCT.get(self.strategy_mode, 0.06)))
+            stop_loss_price = self._money(price * (1 - sl_pct))
+            take_profit_price = self._money(price * (1 + tp_pct))
+
             position = self.position_repository.create_open_position(
                 account_name=account.name,
                 exchange=target.exchange.value,
@@ -175,6 +187,9 @@ class PaperBrokerService:
                 entry_price=price,
                 notional_value=target_notional,
                 opened_at=self.time_provider.now(),
+                stop_loss_price=stop_loss_price,
+                take_profit_price=take_profit_price,
+                strategy_mode=self.strategy_mode,
             )
 
             trade = Trade(
@@ -225,9 +240,9 @@ class PaperBrokerService:
                 account_name=account.name,
                 level="INFO",
                 stage="PAPER_BROKER",
-                message=f"Executed BUY for {target_position.symbol}.",
+                message=f"BUY {target_position.symbol} @ ${float(price):.2f} | SL=${float(stop_loss_price):.2f} TP=${float(take_profit_price):.2f}",
                 cycle_id=cycle_id,
-                payload={"notional": float(target_notional), "price": float(price), "quantity": float(quantity)}
+                payload={"notional": float(target_notional), "price": float(price), "quantity": float(quantity), "sl": float(stop_loss_price), "tp": float(take_profit_price)}
             )
 
         ending_equity = self._money(
@@ -257,7 +272,7 @@ class PaperBrokerService:
 
         return self._money(
             sum(
-                (position.notional_value for position in positions),
+                (position.current_price * position.quantity for position in positions),
                 Decimal("0"),
             )
         )
@@ -488,6 +503,73 @@ class PaperBrokerService:
                 current_price=price,
             )
 
+            # --- Stop-Loss / Take-Profit Check ---
+            sl_hit = (
+                updated_position.stop_loss_price is not None
+                and price <= updated_position.stop_loss_price
+            )
+            tp_hit = (
+                updated_position.take_profit_price is not None
+                and price >= updated_position.take_profit_price
+            )
+
+            if sl_hit or tp_hit:
+                close_reason = "STOP_LOSS" if sl_hit else "TAKE_PROFIT"
+                pnl_pct = float((price - updated_position.entry_price) / updated_position.entry_price * 100)
+                closed = self.position_repository.close_position(
+                    position=updated_position,
+                    exit_price=price,
+                    closed_at=self.time_provider.now(),
+                    close_reason=close_reason,
+                )
+
+                # Return cash to account
+                recovered_cash = self._money(closed.quantity * price)
+                new_cash = self._money(account.cash_balance + recovered_cash)
+                account.cash_balance = new_cash
+                self.db.commit()
+
+                # Log the closure trade
+                trade = Trade(
+                    account_name=account.name,
+                    exchange=exchange.value,
+                    symbol=closed.symbol,
+                    side="SELL",
+                    quantity=closed.quantity,
+                    price=price,
+                    notional=self._money(closed.quantity * price),
+                    realized_pnl=closed.realized_pnl,
+                    position_id=closed.id,
+                    cycle_id=cycle_id,
+                    reason=f"Auto-closed: {close_reason}",
+                    executed_at=self.time_provider.now(),
+                )
+                self.trade_repository.add(trade)
+
+                emoji = "🔴" if sl_hit else "🟢"
+                self._log_execution(
+                    account_name=account.name,
+                    level="SUCCESS" if tp_hit else "WARN",
+                    stage="SL_TP",
+                    message=f"{emoji} {close_reason}: {closed.symbol} @ ${float(price):.2f} | PnL: {pnl_pct:+.2f}%",
+                    cycle_id=cycle_id,
+                    payload={"reason": close_reason, "price": float(price), "realized_pnl": float(closed.realized_pnl)},
+                )
+
+                executed.append(
+                    PaperExecutionItem(
+                        symbol=closed.symbol,
+                        side=PaperOrderSide.SELL,
+                        status=PaperExecutionStatus.EXECUTED,
+                        target_weight=0.0,
+                        notional=float(recovered_cash),
+                        price=float(price),
+                        quantity=float(closed.quantity),
+                        reason=close_reason,
+                    )
+                )
+                continue
+
             executed.append(
                 PaperExecutionItem(
                     symbol=updated_position.symbol,
@@ -502,11 +584,11 @@ class PaperBrokerService:
             )
             self._log_execution(
                 account_name=account.name,
-                level="DEBUG",
+                level="INFO",
                 stage="PAPER_BROKER",
-                message=f"Updated mark price for {updated_position.symbol}.",
+                message=f"M2M {updated_position.symbol} @ ${float(updated_position.current_price):.2f} | uPnL: ${float(updated_position.unrealized_pnl):.2f}",
                 cycle_id=cycle_id,
-                payload={"price": float(updated_position.current_price)}
+                payload={"price": float(updated_position.current_price), "unrealized_pnl": float(updated_position.unrealized_pnl)}
             )
 
         open_positions_value = self._calculate_open_positions_value(account.name)

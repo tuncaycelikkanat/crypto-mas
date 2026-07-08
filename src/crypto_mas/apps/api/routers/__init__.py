@@ -10,6 +10,9 @@ from crypto_mas.apps.api.routers.risk import router as risk_router
 from crypto_mas.apps.api.routers.paper import router as paper_router
 from crypto_mas.apps.api.routers.cycle import router as cycle_router
 from crypto_mas.apps.api.routers.backtest import router as backtest_router
+from crypto_mas.apps.api.routers.bot import router as bot_router
+from crypto_mas.apps.api.routers.logs import router as logs_router
+from crypto_mas.apps.api.routers.analytics import router as analytics_router
 
 __all__ = [
     "health_router",
@@ -22,4 +25,7 @@ __all__ = [
     "paper_router",
     "cycle_router",
     "backtest_router",
+    "bot_router",
+    "logs_router",
+    "analytics_router",
 ]

@@ -24,8 +24,10 @@ class TrendSignalEngine:
         ema_50 = self._get_float(features, "ema_50")
         rsi_14 = self._get_float(features, "rsi_14")
         roc_14 = self._get_float(features, "roc_14")
+        macd = self._get_float(features, "macd")
+        macd_signal = self._get_float(features, "macd_signal")
 
-        if None in {close, ema_20, ema_50, rsi_14, roc_14}:
+        if None in {close, ema_20, ema_50, rsi_14, roc_14, macd, macd_signal}:
             return TradingSignal(
                 exchange=exchange,
                 symbol=symbol,
@@ -42,9 +44,14 @@ class TrendSignalEngine:
         assert ema_50 is not None
         assert rsi_14 is not None
         assert roc_14 is not None
+        assert macd is not None
+        assert macd_signal is not None
 
-        bullish = close > ema_20 > ema_50 and rsi_14 > 50 and roc_14 > 0
-        bearish = close < ema_20 < ema_50 and rsi_14 < 50 and roc_14 < 0
+        macd_bullish = macd > macd_signal
+        macd_bearish = macd < macd_signal
+
+        bullish = close > ema_20 > ema_50 and rsi_14 > 50 and roc_14 > 0 and macd_bullish
+        bearish = close < ema_20 < ema_50 and rsi_14 < 50 and roc_14 < 0 and macd_bearish
 
         if bullish:
             strength = self._calculate_strength(
@@ -53,6 +60,8 @@ class TrendSignalEngine:
                 ema_50=ema_50,
                 rsi_14=rsi_14,
                 roc_14=roc_14,
+                macd=macd,
+                macd_signal=macd_signal,
                 bullish=True,
             )
             return TradingSignal(
@@ -73,6 +82,8 @@ class TrendSignalEngine:
                 ema_50=ema_50,
                 rsi_14=rsi_14,
                 roc_14=roc_14,
+                macd=macd,
+                macd_signal=macd_signal,
                 bullish=False,
             )
             return TradingSignal(
@@ -116,13 +127,16 @@ class TrendSignalEngine:
         ema_50: float,
         rsi_14: float,
         roc_14: float,
+        macd: float,
+        macd_signal: float,
         bullish: bool,
     ) -> float:
         ema_spread = abs(ema_20 - ema_50) / close
         rsi_component = abs(rsi_14 - 50) / 50
         roc_component = abs(roc_14) / 10
+        macd_component = abs(macd - macd_signal) / close if close > 0 else 0
 
-        raw_strength = (ema_spread * 2) + (rsi_component * 0.5) + (roc_component * 0.5)
+        raw_strength = (ema_spread * 2) + (rsi_component * 0.4) + (roc_component * 0.3) + (macd_component * 10)
 
         if not bullish:
             raw_strength *= 0.9

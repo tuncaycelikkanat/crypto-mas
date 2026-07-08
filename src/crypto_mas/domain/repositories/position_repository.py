@@ -46,6 +46,9 @@ class PositionRepository:
         entry_price: Decimal,
         notional_value: Decimal,
         opened_at: datetime,
+        stop_loss_price: Decimal | None = None,
+        take_profit_price: Decimal | None = None,
+        strategy_mode: str | None = None,
     ) -> Position:
         position = Position(
             account_name=account_name,
@@ -59,8 +62,12 @@ class PositionRepository:
             notional_value=notional_value,
             unrealized_pnl=Decimal("0"),
             realized_pnl=Decimal("0"),
+            stop_loss_price=stop_loss_price,
+            take_profit_price=take_profit_price,
+            strategy_mode=strategy_mode,
             opened_at=opened_at,
             closed_at=None,
+            close_reason=None,
         )
 
         self.db.add(position)
@@ -97,6 +104,7 @@ class PositionRepository:
             position: Position,
             exit_price: Decimal,
             closed_at: datetime,
+            close_reason: str = "SIGNAL",
     ) -> Position:
         exit_price = self._money(exit_price)
 
@@ -114,6 +122,7 @@ class PositionRepository:
 
         position.status = "CLOSED"
         position.closed_at = closed_at
+        position.close_reason = close_reason
 
         self.db.commit()
         self.db.refresh(position)

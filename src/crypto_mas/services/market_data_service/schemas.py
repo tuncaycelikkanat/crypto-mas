@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class Exchange(StrEnum):
     BINANCE = "BINANCE"
+    MEXC = "MEXC"
     BYBIT = "BYBIT"
     OKX = "OKX"
     COINBASE = "COINBASE"

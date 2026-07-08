@@ -8,9 +8,9 @@ from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 class PortfolioEngine:
     def __init__(
         self,
-        max_positions: int = 3,
-        max_gross_exposure: float = 0.90,
-        min_confidence: float = 0.35,
+        max_positions: int = 10,
+        max_gross_exposure: float = 0.85,
+        min_confidence: float = 0.5,
         time_provider: TimeProvider | None = None,
     ) -> None:
         self.max_positions = max_positions

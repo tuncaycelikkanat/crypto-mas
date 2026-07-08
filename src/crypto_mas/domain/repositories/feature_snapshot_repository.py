@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
@@ -17,10 +17,10 @@ class FeatureSnapshotRepository:
         if not snapshots:
             return 0
 
-        stmt = insert(FeatureSnapshot).values(list(snapshots))
+        stmt = sqlite_insert(FeatureSnapshot).values(list(snapshots))
 
         stmt = stmt.on_conflict_do_update(
-            constraint="uq_feature_snapshots_exchange_symbol_tf_timestamp",
+            index_elements=["exchange", "symbol", "timeframe", "timestamp"],
             set_={
                 "available_at": stmt.excluded.available_at,
                 "features_json": stmt.excluded.features_json,
@@ -31,6 +31,7 @@ class FeatureSnapshotRepository:
         self.db.commit()
 
         return len(snapshots)
+
 
     def get_latest(
         self,
