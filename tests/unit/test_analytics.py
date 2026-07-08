@@ -73,3 +73,14 @@ def test_performance_analytics(db_session: Session) -> None:
     # Drawdown = (10500 - 10300) / 10500 = 200 / 10500 ≈ 0.019
     expected_dd = 200.0 / 10500.0
     assert abs(metrics.max_drawdown - expected_dd) < 0.001
+
+def test_performance_analytics_empty(db_session: Session) -> None:
+    analytics = PerformanceAnalytics(db_session)
+    metrics = analytics.calculate_for_account("empty-account", 10000.0)
+    
+    assert metrics.total_cycles == 0
+    assert metrics.total_trades == 0
+    assert metrics.win_rate == 0.0
+    assert metrics.total_pnl == 0.0
+    assert metrics.max_drawdown == 0.0
+    assert metrics.peak_equity == 10000.0

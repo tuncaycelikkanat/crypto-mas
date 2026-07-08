@@ -1,7 +1,7 @@
 from datetime import datetime, UTC
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
-from crypto_mas.engine.signal import SignalDirection, TradingSignal
+from crypto_mas.engine.signal import SignalDirection, SignalType, TradingSignal
 from crypto_mas.engine.scoring import AssetScore
 from crypto_mas.engine.regime import RegimeSnapshot, MarketRegime
 from crypto_mas.engine.strategy.base import BaseStrategy
@@ -15,7 +15,7 @@ class MACDStrategy(BaseStrategy):
     Avoid if trend is weak (MACD hist is very close to 0).
     """
 
-    def evaluate(
+    def decide(
         self,
         exchange: Exchange,
         symbol: str,
@@ -72,6 +72,7 @@ class MACDStrategy(BaseStrategy):
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,
+                signal_type=SignalType.TREND_FOLLOWING,
                 direction=direction,
                 strength=confidence,
                 indicators={"macd": macd, "macd_signal": macd_signal},
@@ -82,8 +83,13 @@ class MACDStrategy(BaseStrategy):
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,
+                direction=direction,
+                trend_score=confidence,
+                momentum_score=0.0,
+                volatility_penalty=0.0,
                 final_score=confidence,
                 components={},
+                reason="MACD Cross",
                 timestamp=datetime.now(UTC),
             ),
             regime=RegimeSnapshot(

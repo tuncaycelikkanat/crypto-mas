@@ -91,7 +91,7 @@ def run_mock_decision(
     )
 
     strategy = StrategyFactory.create("multi_agent")
-    decision = strategy.evaluate(
+    decision = strategy.decide(
         exchange=Exchange.MOCK,
         symbol="BTCUSDT",
         timeframe=Timeframe.FOUR_HOURS,

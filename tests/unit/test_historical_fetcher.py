@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, AsyncMock
 
 from crypto_mas.domain.models.backfill_state import BackfillState
 from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
-from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe, OHLCVCandle
+from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe, OHLCVCandle, HistoricalFetchResult
 from decimal import Decimal
 
 
@@ -87,3 +87,73 @@ async def test_fetch_and_store_range_pagination(mock_provider, mock_db_session, 
     assert result.fetched == 48  # 2 days * 24 hours
     assert mock_provider.fetch_ohlcv.call_count == 5  # 48 / 10 = 5 calls (10, 10, 10, 10, 8)
     assert mock_state_repo.upsert_state.call_count == 5
+
+@pytest.mark.asyncio
+async def test_fetch_exception(mock_provider, mock_db_session):
+    fetcher = HistoricalFetcherService(provider=mock_provider, db=mock_db_session)
+    mock_state_repo = MagicMock()
+    mock_state_repo.get_state.return_value = None
+    fetcher.state_repository = mock_state_repo
+    mock_provider.fetch_ohlcv.side_effect = Exception("API limit")
+    
+    result = await fetcher.fetch_and_store_range(
+        symbol="BTCUSDT",
+        timeframe=Timeframe.ONE_HOUR,
+        start_time=datetime(2023, 1, 1, tzinfo=UTC),
+        end_time=datetime(2023, 1, 2, tzinfo=UTC),
+    )
+    
+    assert result.fetched == 0
+
+@pytest.mark.asyncio
+async def test_integrity_failure(mock_provider, mock_db_session):
+    fetcher = HistoricalFetcherService(provider=mock_provider, db=mock_db_session)
+    
+    mock_state_repo = MagicMock()
+    mock_state_repo.get_state.return_value = None
+    fetcher.state_repository = mock_state_repo
+    
+    mock_provider.fetch_ohlcv.return_value = [
+        OHLCVCandle(
+            exchange=Exchange.BINANCE, symbol="BTCUSDT", timeframe=Timeframe.ONE_HOUR,
+            open_time=datetime(2023, 1, 1, tzinfo=UTC), open=Decimal("1"), high=Decimal("2"), low=Decimal("0.5"), close=Decimal("1.5"),
+            volume=Decimal("100"), close_time=datetime(2023, 1, 1, 1, tzinfo=UTC), quote_volume=Decimal("150"), trade_count=10, source="BINANCE"
+        )
+    ]
+    
+    mock_integrity = MagicMock()
+    mock_integrity.is_valid = False
+    mock_integrity.model_dump.return_value = {"error": "gap"}
+    fetcher.integrity_checker.validate = MagicMock(return_value=mock_integrity)
+    
+    result = await fetcher.fetch_and_store_range(
+        symbol="BTCUSDT", timeframe=Timeframe.ONE_HOUR,
+        start_time=datetime(2023, 1, 1, tzinfo=UTC), end_time=datetime(2023, 1, 2, tzinfo=UTC),
+    )
+    
+    assert result.fetched == 0
+
+@pytest.mark.asyncio
+async def test_backfill_universe_exception(mock_provider, mock_db_session):
+    fetcher = HistoricalFetcherService(provider=mock_provider, db=mock_db_session)
+    
+    # First symbol passes, second raises exception
+    async def mock_fetch_range(symbol, **kwargs):
+        if symbol == "FAILUSDT":
+            raise ValueError("Test error")
+        return HistoricalFetchResult(
+            exchange=Exchange.BINANCE, symbol=symbol, timeframe=Timeframe.ONE_HOUR,
+            fetched=10, processed_rows=10, start_time=datetime.now(UTC), end_time=datetime.now(UTC)
+        )
+        
+    fetcher.fetch_and_store_range = AsyncMock(side_effect=mock_fetch_range)
+    
+    results = await fetcher.backfill_universe(
+        symbols=["BTCUSDT", "FAILUSDT"],
+        timeframe=Timeframe.ONE_HOUR,
+        start_time=datetime(2023, 1, 1, tzinfo=UTC),
+        end_time=datetime(2023, 1, 2, tzinfo=UTC),
+    )
+    
+    assert len(results) == 1
+    assert results[0].symbol == "BTCUSDT"

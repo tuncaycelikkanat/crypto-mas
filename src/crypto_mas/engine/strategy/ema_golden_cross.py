@@ -6,7 +6,7 @@ Uses RSI > 50 as confirmation. Designed for long-term position holding.
 from datetime import datetime, UTC
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
-from crypto_mas.engine.signal import SignalDirection, TradingSignal
+from crypto_mas.engine.signal import SignalDirection, SignalType, TradingSignal
 from crypto_mas.engine.scoring import AssetScore
 from crypto_mas.engine.regime import RegimeSnapshot, MarketRegime
 from crypto_mas.engine.strategy.base import BaseStrategy
@@ -20,7 +20,7 @@ class EMAGoldenCrossStrategy(BaseStrategy):
     Holds for weeks/months. Low trade frequency, high conviction entries.
     """
 
-    def evaluate(
+    def decide(
         self,
         exchange: Exchange,
         symbol: str,
@@ -102,6 +102,7 @@ class EMAGoldenCrossStrategy(BaseStrategy):
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,
+                signal_type=SignalType.TREND_FOLLOWING,
                 direction=direction,
                 strength=confidence,
                 indicators={"ema_20": ema_20, "ema_50": ema_50, "rsi_14": rsi_14},
@@ -112,8 +113,13 @@ class EMAGoldenCrossStrategy(BaseStrategy):
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,
+                direction=direction,
+                trend_score=confidence,
+                momentum_score=0.0,
+                volatility_penalty=0.0,
                 final_score=confidence,
                 components={},
+                reason=reason,
                 timestamp=datetime.now(UTC),
             ),
             regime=RegimeSnapshot(

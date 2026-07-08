@@ -23,7 +23,7 @@ class RSIOversoldStrategy(BaseStrategy):
         self.OVERSOLD_THRESHOLD = oversold_threshold
         self.MIN_RECOVERY_PCT = min_recovery_pct
 
-    def evaluate(
+    def decide(
         self,
         exchange: Exchange,
         symbol: str,
@@ -47,8 +47,10 @@ class RSIOversoldStrategy(BaseStrategy):
         bb_upper = features.get("bb_upper")
 
         if rsi is None or close is None:
+            print(f"RSI Oversold skipping: rsi={rsi}, close={close}")
             return None
 
+        print(f"RSI Oversold Eval: rsi={rsi}, prev_rsi={prev_rsi}, close={close}, bb_lower={bb_lower}")
         action = DecisionAction.HOLD
         confidence = 0.0
         direction = SignalDirection.NEUTRAL

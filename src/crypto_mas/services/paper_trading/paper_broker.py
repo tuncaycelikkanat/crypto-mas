@@ -37,6 +37,7 @@ class PaperBrokerService:
         time_provider: TimeProvider | None = None,
         strategy_mode: str = "swing",
     ) -> None:
+        self.db = db
         self.account_repository = PaperAccountRepository(db)
         self.position_repository = PositionRepository(db)
         self.feature_snapshot_repository = FeatureSnapshotRepository(db)
@@ -358,7 +359,7 @@ class PaperBrokerService:
                 continue
 
             execution_price = self._money(price * (Decimal("1") - self.SLIPPAGE_RATE))
-            gross_notional = self._money(closed_position.quantity * execution_price)
+            gross_notional = self._money(position.quantity * execution_price)
             fee = self._money(gross_notional * self.COMMISSION_RATE)
             net_recovered = gross_notional - fee
             

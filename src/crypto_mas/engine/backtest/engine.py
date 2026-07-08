@@ -83,7 +83,7 @@ class BacktestEngine:
                 continue # Wait for window to fill
                 
             # Evaluate strategy
-            decision = strategy.evaluate(
+            decision = strategy.decide(
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,

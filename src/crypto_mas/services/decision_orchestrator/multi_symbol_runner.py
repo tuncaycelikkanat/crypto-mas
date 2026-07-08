@@ -38,7 +38,7 @@ class MultiSymbolDecisionRunner:
                 limit=snapshot_limit,
             )
 
-            decision = self.strategy.evaluate(
+            decision = self.strategy.decide(
                 exchange=exchange,
                 symbol=symbol.symbol,
                 timeframe=timeframe,
