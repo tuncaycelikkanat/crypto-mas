@@ -1,7 +1,8 @@
 from fastapi import APIRouter
+
+from crypto_mas.infrastructure.cache.redis_client import check_redis_connection
 from crypto_mas.infrastructure.config.settings import get_settings
 from crypto_mas.infrastructure.db.session import check_db_connection
-from crypto_mas.infrastructure.cache.redis_client import check_redis_connection
 
 settings = get_settings()
 router = APIRouter(prefix="/api/v1", tags=["Health"])

@@ -132,27 +132,7 @@ export const CoinDetails: React.FC = () => {
             </div>
           )}
 
-          {coinData.logs && coinData.logs.length > 0 && (
-            <div className="glass-card" style={{ padding: '24px' }}>
-              <h3 style={{ marginBottom: '16px' }}>Decision Logs</h3>
-              <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {coinData.logs.map((log: any, idx: number) => (
-                  <div key={idx} style={{ 
-                    padding: '12px', 
-                    background: 'rgba(255,255,255,0.02)', 
-                    borderRadius: '8px',
-                    borderLeft: `4px solid ${log.level === 'error' ? 'var(--danger)' : log.level === 'warn' ? 'var(--warning)' : 'var(--primary)'}`
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)' }}>{log.stage || 'GENERAL'}</span>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(log.created_at).toLocaleTimeString()}</span>
-                    </div>
-                    <div style={{ fontSize: '0.95rem' }}>{log.message}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+
         </div>
       )}
     </div>

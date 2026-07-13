@@ -1,5 +1,6 @@
 from crypto_mas.services.config_service.schemas import TradingConfig
 
+
 def test_trading_config_defaults():
     config = TradingConfig()
     

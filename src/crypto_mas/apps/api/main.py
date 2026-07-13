@@ -2,27 +2,28 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from crypto_mas.apps.api.routers import (
+    analytics_router,
+    backtest_router,
+    bot_router,
+    cycle_router,
+    decision_router,
+    features_router,
+    health_router,
+    logs_router,
+    market_router,
+    paper_router,
+    portfolio_router,
+    risk_router,
+    scanner_router,
+    signals_router,
+)
+from crypto_mas.domain.models.config_version import ConfigVersion
 from crypto_mas.infrastructure.config.settings import get_settings
 from crypto_mas.infrastructure.db.session import SessionLocal
-from crypto_mas.domain.models.config_version import ConfigVersion
 from crypto_mas.services.config_service.config_service import ConfigService
 from crypto_mas.services.config_service.schemas import TradingConfig
 from crypto_mas.services.scheduler_service import SchedulerService
-from crypto_mas.apps.api.routers import (
-    health_router,
-    market_router,
-    features_router,
-    signals_router,
-    decision_router,
-    portfolio_router,
-    risk_router,
-    paper_router,
-    cycle_router,
-    backtest_router,
-    bot_router,
-    logs_router,
-    analytics_router,
-)
 
 settings = get_settings()
 
@@ -71,3 +72,4 @@ app.include_router(backtest_router)
 app.include_router(bot_router)
 app.include_router(logs_router)
 app.include_router(analytics_router)
+app.include_router(scanner_router)

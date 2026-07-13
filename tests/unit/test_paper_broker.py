@@ -1,13 +1,14 @@
+from datetime import UTC, datetime
 from decimal import Decimal
-from datetime import datetime, UTC
 from unittest.mock import MagicMock
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
+from crypto_mas.infrastructure.time.time_provider import TimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
-from crypto_mas.infrastructure.time.time_provider import TimeProvider
 from crypto_mas.services.paper_trading.schemas import PaperExecutionStatus
+
 
 def get_mocked_broker():
     db_mock = MagicMock()

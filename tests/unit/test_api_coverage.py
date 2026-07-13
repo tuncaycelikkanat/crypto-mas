@@ -1,6 +1,6 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, patch, AsyncMock
-import pytest
 
 from crypto_mas.apps.api.main import app
 from crypto_mas.infrastructure.db.session import get_db_session

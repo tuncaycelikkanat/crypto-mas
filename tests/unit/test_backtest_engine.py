@@ -1,8 +1,11 @@
+from datetime import UTC, datetime
 from decimal import Decimal
-from datetime import datetime, UTC
+
 import pytest
-from crypto_mas.engine.backtest.engine import BacktestEngine
+
 from crypto_mas.domain.models.candle import Candle
+from crypto_mas.engine.backtest.engine import BacktestEngine
+
 
 @pytest.fixture
 def backtest_engine():
@@ -34,11 +37,12 @@ def test_backtest_engine_calculates_pnl_correctly(backtest_engine, monkeypatch):
             self.step = 0
             
         def decide(self, exchange, symbol, timeframe, snapshots):
-            from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
-            from crypto_mas.engine.signal import TradingSignal, SignalDirection
+            from datetime import UTC, datetime
+
+            from crypto_mas.engine.regime import MarketRegime, RegimeSnapshot
             from crypto_mas.engine.scoring import AssetScore
-            from crypto_mas.engine.regime import RegimeSnapshot, MarketRegime
-            from datetime import datetime, UTC
+            from crypto_mas.engine.signal import SignalDirection, TradingSignal
+            from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
             
             action = DecisionAction.HOLD
             if self.step == 0:

@@ -11,7 +11,7 @@ from crypto_mas.infrastructure.db.session import SessionLocal, get_db_session
 from crypto_mas.services.backtesting.engine import BacktestEngineService
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
-router = APIRouter(prefix="/backtest", tags=["Backtesting"])
+router = APIRouter(prefix="/api/v1/backtest", tags=["Backtesting"])
 
 class RunBacktestRequest(BaseModel):
     exchange: Exchange
@@ -66,7 +66,7 @@ async def run_backtest_task(
             end_time=end_time,
             initial_balance=initial_balance,
         )
-    except Exception as e:
+    except Exception:
         pass  # Errors are logged inside the service
     finally:
         db.close()
@@ -127,3 +127,56 @@ def get_backtest_status(
         max_drawdown=result.max_drawdown,
         error_message=result.error_message,
     )
+
+@router.get("", response_model=list[BacktestStatusResponse])
+def get_all_backtests(
+    db: Annotated[Session, Depends(get_db_session)],
+    limit: int = 50
+) -> list[BacktestStatusResponse]:
+    repo = BacktestResultRepository(db)
+    results = repo.list_all(limit=limit)
+    
+    return [
+        BacktestStatusResponse(
+            job_id=r.job_id,
+            status=r.status,
+            exchange=r.exchange,
+            timeframe=r.timeframe,
+            strategy_name=r.strategy_name,
+            symbols=r.symbols,
+            start_time=r.start_time,
+            end_time=r.end_time,
+            initial_balance=r.initial_balance,
+            final_equity=r.final_equity,
+            total_trades=r.total_trades,
+            win_rate=r.win_rate,
+            max_drawdown=r.max_drawdown,
+            error_message=r.error_message,
+        )
+        for r in results
+    ]
+
+@router.post("/{job_id}/cancel")
+def cancel_backtest(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict:
+    repo = BacktestResultRepository(db)
+    result = repo.get_by_job_id(job_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Backtest not found")
+    if result.status == "RUNNING":
+        repo.update_status(job_id, "CANCELLED")
+        return {"message": "Cancellation requested"}
+    return {"message": "Job is not running"}
+
+@router.delete("")
+def clear_all_backtests(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> dict:
+    from sqlalchemy import text
+    db.execute(text("DELETE FROM backtest_results"))
+    db.execute(text("DELETE FROM paper_accounts WHERE name LIKE 'backtest-%'"))
+    db.execute(text("DELETE FROM execution_logs WHERE account_name LIKE 'backtest-%'"))
+    db.commit()
+    return {"message": "All backtest data cleared successfully"}

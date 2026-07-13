@@ -1,10 +1,10 @@
-from datetime import datetime, UTC
-from decimal import Decimal
+from datetime import UTC, datetime
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
-from crypto_mas.engine.signal import TradingSignal, SignalDirection
-from crypto_mas.engine.scoring.scoring import AssetScore, ScoringEngine
+from crypto_mas.engine.scoring.scoring import ScoringEngine
+from crypto_mas.engine.signal import SignalDirection, TradingSignal
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
 
 def get_dummy_signal(direction: SignalDirection) -> TradingSignal:
     return TradingSignal(

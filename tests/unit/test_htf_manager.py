@@ -1,8 +1,10 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
 import pytest
-from crypto_mas.engine.regime.htf_manager import HTFRegimeManager
+
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
-from crypto_mas.engine.regime.regime import MarketRegime
+from crypto_mas.engine.regime.htf_manager import HTFRegimeManager
+
 
 @pytest.fixture
 def manager():

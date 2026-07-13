@@ -1,7 +1,7 @@
-import json
 from unittest.mock import MagicMock
 
 from crypto_mas.services.config_service.config_service import ConfigService
+
 
 def test_get_config_from_redis():
     db_mock = MagicMock()

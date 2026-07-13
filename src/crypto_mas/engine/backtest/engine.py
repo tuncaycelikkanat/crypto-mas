@@ -1,13 +1,13 @@
 
-from datetime import datetime, UTC
-from typing import List, Dict, Any, Type
 import logging
+from datetime import datetime
+from typing import Any
 
 from crypto_mas.domain.models.candle import Candle
-from crypto_mas.services.feature_pipeline.calculator import FeatureCalculator
+from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.strategy.base import BaseStrategy
 from crypto_mas.engine.strategy.schemas import DecisionAction
-from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
+from crypto_mas.services.feature_pipeline.calculator import FeatureCalculator
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 logger = logging.getLogger("backtest_engine")
@@ -31,7 +31,7 @@ class BacktestEngine:
         self.fee_rate = fee_rate
         self.slippage_pct = slippage_pct
         
-        self.positions: Dict[str, Position] = {}
+        self.positions: dict[str, Position] = {}
         self.trades = [] # List of executed trades
         
         self.feature_calculator = FeatureCalculator()
@@ -39,11 +39,11 @@ class BacktestEngine:
     def run(
         self, 
         symbol: str, 
-        candles: List[Candle], 
+        candles: list[Candle], 
         strategy: BaseStrategy, 
         timeframe: Timeframe = Timeframe.FIFTEEN_MINUTES,
         exchange: Exchange = Exchange.BINANCE
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Runs the backtest over the provided historical candles using the specified strategy.
         """
@@ -176,7 +176,7 @@ class BacktestEngine:
             "reason": reason
         })
         
-    def _generate_report(self, symbol: str, strategy_name: str) -> Dict[str, Any]:
+    def _generate_report(self, symbol: str, strategy_name: str) -> dict[str, Any]:
         closed_trades = [t for t in self.trades if t['type'] == 'SELL']
         
         winning_trades = [t for t in closed_trades if t['realized_pnl'] > 0]

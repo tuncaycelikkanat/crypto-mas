@@ -1,15 +1,16 @@
 from typing import Any
-from fastapi import APIRouter, Depends
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from crypto_mas.infrastructure.db.session import SessionLocal
+from crypto_mas.domain.repositories.candle_repository import CandleRepository
+from crypto_mas.domain.repositories.execution_log_repository import ExecutionLogRepository
+from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
 from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
 from crypto_mas.domain.repositories.position_repository import PositionRepository
 from crypto_mas.domain.repositories.trade_repository import TradeRepository
 from crypto_mas.domain.repositories.trading_cycle_repository import TradingCycleRepository
-from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
-from crypto_mas.domain.repositories.candle_repository import CandleRepository
-from crypto_mas.domain.repositories.execution_log_repository import ExecutionLogRepository
+from crypto_mas.infrastructure.db.session import SessionLocal
 from crypto_mas.services.scheduler_service import SchedulerService
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics"])
@@ -21,6 +22,26 @@ def get_db():
     finally:
         db.close()
 
+from sqlalchemy import text
+
+
+@router.post("/reset")
+def reset_analytics(db: Session = Depends(get_db)) -> dict[str, Any]:
+    # Delete all analytics/trading history
+    db.execute(text("DELETE FROM execution_logs"))
+    db.execute(text("DELETE FROM trades"))
+    db.execute(text("DELETE FROM positions"))
+    db.execute(text("DELETE FROM trading_cycles"))
+    
+    # Reset paper account back to initial balance
+    account_repo = PaperAccountRepository(db)
+    account = account_repo.get_by_name("default-paper")
+    if account:
+        account.cash_balance = account.initial_balance
+        account.equity = account.initial_balance
+        
+    db.commit()
+    return {"status": "success", "message": "All analytics and PnL reset successfully"}
 
 @router.get("/summary")
 def get_summary(db: Session = Depends(get_db)) -> dict[str, Any]:
@@ -212,3 +233,72 @@ def get_coin_details(symbol: str, db: Session = Depends(get_db)) -> dict[str, An
         "features": features,
         "logs": symbol_logs[-20:]
     }
+
+@router.get("/logs")
+def get_all_logs(
+    db: Session = Depends(get_db),
+    limit: int = Query(default=200, ge=1, le=1000),
+    stage: str | None = Query(default=None),
+    symbol: str | None = Query(default=None),
+    level: str | None = Query(default=None),
+) -> dict[str, Any]:
+    log_repo = ExecutionLogRepository(db)
+    all_logs = log_repo.list_recent("default-paper", limit=limit * 3)  # Fetch extra to allow filtering
+    
+    logs_data = []
+    for log in reversed(all_logs):  # chronological
+        # Apply filters
+        if stage and log.stage.upper() != stage.upper():
+            continue
+        if level and log.level.upper() != level.upper():
+            continue
+        if symbol and symbol.upper() not in (log.message or "").upper() and symbol.upper() not in str(log.payload_json or "").upper():
+            continue
+        
+        logs_data.append({
+            "id": log.id,
+            "cycle_id": log.cycle_id,
+            "level": log.level,
+            "stage": log.stage,
+            "message": log.message,
+            "created_at": log.created_at.isoformat(),
+            "payload": log.payload_json,
+        })
+        
+        if len(logs_data) >= limit:
+            break
+        
+    return {"logs": logs_data, "count": len(logs_data)}
+
+@router.delete("/logs")
+def clear_all_logs(db: Session = Depends(get_db)) -> dict[str, Any]:
+    log_repo = ExecutionLogRepository(db)
+    log_repo.clear_all("default-paper")
+    return {"status": "ok", "message": "Logs cleared"}
+
+@router.get("/cycles")
+def get_cycles(db: Session = Depends(get_db), limit: int = Query(default=50, ge=1, le=500)) -> dict[str, Any]:
+    cycle_repo = TradingCycleRepository(db)
+    cycles = cycle_repo.list_recent("default-paper", limit=limit)
+    cycles = sorted(cycles, key=lambda c: c.started_at)
+    
+    result = []
+    for c in cycles:
+        duration = None
+        if c.finished_at and c.started_at:
+            duration = round((c.finished_at - c.started_at).total_seconds(), 1)
+        result.append({
+            "id": c.id,
+            "status": c.status,
+            "started_at": c.started_at.isoformat(),
+            "finished_at": c.finished_at.isoformat() if c.finished_at else None,
+            "duration_secs": duration,
+            "symbols_processed": c.symbols_processed,
+            "decisions_made": c.decisions_made,
+            "trades_executed": c.trades_executed,
+            "starting_equity": float(c.starting_equity) if c.starting_equity else None,
+            "ending_equity": float(c.ending_equity) if c.ending_equity else None,
+            "cycle_pnl": float(c.cycle_pnl) if c.cycle_pnl else 0.0,
+        })
+        
+    return {"cycles": result, "count": len(result)}

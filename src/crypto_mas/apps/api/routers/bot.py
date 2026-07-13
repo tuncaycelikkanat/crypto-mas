@@ -1,4 +1,5 @@
 from typing import Any
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -14,6 +15,7 @@ class StartBotRequest(BaseModel):
     symbols: list[str] = ["BTCUSDT", "ETHUSDT"]
     mode: str = "swing"   # scalping | swing | hodl
     exchange: str = "BINANCE"
+    risk_level: int = 50
 
 
 @router.get("/status")
@@ -29,6 +31,7 @@ def start_bot(request: StartBotRequest) -> dict[str, Any]:
         symbols=request.symbols,
         mode=request.mode,
         exchange=request.exchange,
+        risk_level=request.risk_level,
     )
 
 
@@ -44,3 +47,12 @@ def stop_bot(bot_id: str) -> dict[str, Any]:
 @router.put("/symbols/{bot_id}")
 def update_bot_symbols(bot_id: str, request: UpdateSymbolsRequest) -> dict[str, Any]:
     return scheduler.update_symbols(bot_id, request.symbols)
+
+
+class UpdateRiskRequest(BaseModel):
+    risk_level: int
+
+
+@router.put("/risk/{bot_id}")
+def update_bot_risk(bot_id: str, request: UpdateRiskRequest) -> dict[str, Any]:
+    return scheduler.update_risk(bot_id, request.risk_level)

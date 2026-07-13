@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta, UTC
-import pytest
-from crypto_mas.infrastructure.time.time_provider import SimulatedTimeProvider, FixedTimeProvider
+from datetime import UTC, datetime, timedelta
+
+from crypto_mas.infrastructure.time.time_provider import SimulatedTimeProvider
+
 
 def test_simulated_time_provider():
     # Test without tzinfo

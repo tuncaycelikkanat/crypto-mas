@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock
-from crypto_mas.domain.repositories.config_version_repository import ConfigVersionRepository
+
 from crypto_mas.domain.models.config_version import ConfigVersion
+from crypto_mas.domain.repositories.config_version_repository import ConfigVersionRepository
+
 
 def test_add_config_version():
     session_mock = MagicMock()

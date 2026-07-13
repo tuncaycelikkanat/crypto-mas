@@ -1,12 +1,13 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
-from crypto_mas.engine.signal import SignalDirection, SignalType, TradingSignal
+from crypto_mas.engine.regime import MarketRegime, RegimeSnapshot
 from crypto_mas.engine.scoring import AssetScore
-from crypto_mas.engine.regime import RegimeSnapshot, MarketRegime
+from crypto_mas.engine.signal import SignalDirection, SignalType, TradingSignal
 from crypto_mas.engine.strategy.base import BaseStrategy
 from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
 
 class MACDStrategy(BaseStrategy):
     """
@@ -21,6 +22,7 @@ class MACDStrategy(BaseStrategy):
         symbol: str,
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
+        risk_level: int = 50,
     ) -> TradingDecision | None:
         if not snapshots or len(snapshots) < 2:
             return None
@@ -48,8 +50,10 @@ class MACDStrategy(BaseStrategy):
         price = features.get("close") or 1.0
         hist_pct = abs(macd_hist) / price if price > 0 else 0.0
 
-        # Minimum threshold: histogram must be at least 0.02% of price (filters noise)
-        MIN_HIST_PCT = 0.0002
+        # Dynamic threshold based on risk_level (0-100)
+        # Risk 0 -> 0.0005, Risk 50 -> 0.0002, Risk 100 -> 0.00005
+        # We can map it linearly: 0.0005 - (risk_level / 100) * 0.00045
+        MIN_HIST_PCT = 0.0005 - (risk_level / 100.0) * 0.00045
 
         if macd > macd_signal and macd_hist > 0 and hist_pct >= MIN_HIST_PCT:
             direction = SignalDirection.LONG

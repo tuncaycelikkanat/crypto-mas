@@ -1,10 +1,10 @@
-from datetime import datetime, UTC
-from decimal import Decimal
+from datetime import UTC, datetime
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.strategy.ema_golden_cross import EMAGoldenCrossStrategy
 from crypto_mas.engine.strategy.schemas import DecisionAction
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
 
 def test_ema_golden_cross_buy_signal():
     strategy = EMAGoldenCrossStrategy()

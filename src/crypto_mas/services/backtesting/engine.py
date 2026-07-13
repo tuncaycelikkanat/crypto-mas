@@ -1,8 +1,8 @@
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.backtest_result import BacktestResult
 from crypto_mas.domain.models.trading_cycle import TradingCycle
@@ -82,16 +82,40 @@ class BacktestEngineService:
             # Step 3: Setup simulated time and TradingCycleService
             time_provider = SimulatedTimeProvider(start_time=start_time)
             
+            # Set up InMemory caching for ultra-fast backtesting
+            from crypto_mas.domain.repositories.candle_repository import CandleRepository
+            from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
+            from crypto_mas.services.backtesting.memory_cache import InMemoryCandleRepository, InMemoryFeatureSnapshotRepository
+            
+            candle_db = CandleRepository(self.db)
+            feature_db = FeatureSnapshotRepository(self.db)
+            
+            mem_candles = InMemoryCandleRepository(candle_db)
+            mem_features = InMemoryFeatureSnapshotRepository(feature_db)
+            
             cycle_service = TradingCycleService(
                 db=self.db,
                 market_provider=provider,
                 time_provider=time_provider,
+                strategy_mode=strategy_name,
+                candle_repo=mem_candles,
+                feature_repo=mem_features
             )
             
             # Step 4: Time loop
             total_trades = 0
+            cycle_count = 0
             
             while time_provider.now() <= end_time:
+                cycle_count += 1
+                if cycle_count % 10 == 0:
+                    self.db.refresh(result)
+                    if result.status == "CANCELLED":
+                        logger.info(f"[{job_id}] Backtest cancelled by user.")
+                        result.completed_at = datetime.now(UTC)
+                        self.db.commit()
+                        return result
+
                 logger.debug(f"[{job_id}] Simulating time: {time_provider.now()}")
                 
                 cycle = await cycle_service.run_cycle(

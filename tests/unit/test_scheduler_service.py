@@ -1,6 +1,7 @@
 import pytest
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 from crypto_mas.services.scheduler_service import SchedulerService
+
 
 def test_scheduler_singleton():
     scheduler1 = SchedulerService()

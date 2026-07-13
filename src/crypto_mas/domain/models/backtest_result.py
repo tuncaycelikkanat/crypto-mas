@@ -1,8 +1,9 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, Float, Integer, String, JSON
+from sqlalchemy import JSON, Column, DateTime, Float, Integer, String
 
 from crypto_mas.infrastructure.db.base import Base
+
 
 class BacktestResult(Base):
     __tablename__ = "backtest_results"

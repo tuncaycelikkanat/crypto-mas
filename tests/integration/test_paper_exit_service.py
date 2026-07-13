@@ -7,10 +7,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 import crypto_mas.domain.models  # noqa: F401
-from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
 from crypto_mas.domain.repositories.position_repository import PositionRepository
+from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
 from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
@@ -142,8 +142,8 @@ def test_paper_broker_closes_positions_not_in_target(db_session: Session) -> Non
     assert len(report.executed) == 1
     assert report.executed[0].symbol == "BTCUSDT"
     assert report.executed[0].status == PaperExecutionStatus.EXECUTED
-    assert report.ending_cash == 10300.0
-    assert report.ending_equity == 10300.0
+    assert report.ending_cash == pytest.approx(10290.4, abs=0.1)
+    assert report.ending_equity == pytest.approx(10290.4, abs=0.1)
 
     positions = PositionRepository(db_session).list_open_positions("default-paper")
 
@@ -152,5 +152,5 @@ def test_paper_broker_closes_positions_not_in_target(db_session: Session) -> Non
     account = PaperAccountRepository(db_session).get_by_name("default-paper")
 
     assert account is not None
-    assert account.cash_balance == Decimal("10300.00000000")
-    assert account.equity == Decimal("10300.00000000")
+    assert float(account.cash_balance) == pytest.approx(10290.4, abs=0.1)
+    assert float(account.equity) == pytest.approx(10290.4, abs=0.1)

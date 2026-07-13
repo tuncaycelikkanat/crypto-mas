@@ -1,10 +1,12 @@
-from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
-from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
-from crypto_mas.services.market_data_service.schemas import Timeframe, Exchange
 from crypto_mas.engine.strategy.schemas import DecisionAction
+from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
+
 
 @pytest.fixture
 def mock_db():

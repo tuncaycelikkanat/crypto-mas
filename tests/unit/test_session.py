@@ -1,5 +1,7 @@
-from unittest.mock import patch, MagicMock
-from crypto_mas.infrastructure.db.session import get_db_session, check_db_connection
+from unittest.mock import MagicMock, patch
+
+from crypto_mas.infrastructure.db.session import check_db_connection, get_db_session
+
 
 @patch("crypto_mas.infrastructure.db.session.SessionLocal")
 def test_get_db_session(mock_session_local):

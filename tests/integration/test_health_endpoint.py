@@ -6,7 +6,7 @@ client = TestClient(app)
 
 
 def test_health_endpoint() -> None:
-    response = client.get("/health")
+    response = client.get("/api/v1/health")
 
     assert response.status_code == 200
 
@@ -18,7 +18,7 @@ def test_health_endpoint() -> None:
 
 
 def test_version_endpoint() -> None:
-    response = client.get("/version")
+    response = client.get("/api/v1/version")
 
     assert response.status_code == 200
 
@@ -29,7 +29,7 @@ def test_version_endpoint() -> None:
 
 
 def test_config_endpoint_does_not_expose_secrets() -> None:
-    response = client.get("/config")
+    response = client.get("/api/v1/config")
 
     assert response.status_code == 200
 

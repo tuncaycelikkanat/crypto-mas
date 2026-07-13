@@ -1,10 +1,12 @@
-from decimal import Decimal
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
 import pytest
+
+from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.strategy.rsi_oversold import RSIOversoldStrategy
 from crypto_mas.engine.strategy.schemas import DecisionAction
-from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
 
 @pytest.fixture
 def rsi_strategy():

@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock
-from crypto_mas.domain.repositories.backtest_result_repository import BacktestResultRepository
+
 from crypto_mas.domain.models.backtest_result import BacktestResult
+from crypto_mas.domain.repositories.backtest_result_repository import BacktestResultRepository
+
 
 def test_add_backtest_result():
     session_mock = MagicMock()

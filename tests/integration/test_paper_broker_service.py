@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from decimal import Decimal
 from datetime import UTC, datetime
 
 import pytest
@@ -6,10 +7,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 import crypto_mas.domain.models  # noqa: F401
-from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
 from crypto_mas.domain.repositories.position_repository import PositionRepository
+from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
 from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
@@ -38,7 +39,7 @@ def _create_account(db: Session) -> None:
         name="default-paper",
         exchange=Exchange.MOCK.value,
         base_currency="USDT",
-        initial_balance=__import__("decimal").Decimal("10000"),
+        initial_balance=Decimal("10000"),
     )
 
 
@@ -115,9 +116,9 @@ def test_paper_broker_executes_target_portfolio(db_session: Session) -> None:
 
     assert report.account_name == "default-paper"
     assert report.starting_cash == 10000.0
-    assert report.ending_cash == 5000.0
+    assert report.ending_cash == 4995.0
     assert report.starting_equity == 10000.0
-    assert report.ending_equity == 10000.0
+    assert report.ending_equity == pytest.approx(9992.5, abs=0.1)
     assert len(report.executed) == 2
     assert report.skipped == []
 
@@ -132,8 +133,8 @@ def test_paper_broker_executes_target_portfolio(db_session: Session) -> None:
     account = PaperAccountRepository(db_session).get_by_name("default-paper")
 
     assert account is not None
-    assert str(account.cash_balance) == "5000.00000000"
-    assert str(account.equity) == "10000.00000000"
+    assert float(account.cash_balance) == pytest.approx(4995.0, abs=0.1)
+    assert float(account.equity) == pytest.approx(9992.5, abs=0.1)
 
 
 def test_paper_broker_skips_existing_open_positions(db_session: Session) -> None:

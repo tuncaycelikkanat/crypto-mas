@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
@@ -7,8 +7,9 @@ from crypto_mas.engine.scoring.scoring import AssetScore
 from crypto_mas.engine.signal import SignalDirection, SignalType, TradingSignal
 from crypto_mas.engine.strategy.multi_agent import MultiAgentStrategy
 from crypto_mas.engine.strategy.schemas import DecisionAction
-from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.infrastructure.time.time_provider import TimeProvider
+from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
 
 def test_multi_agent_long_consideration():
     # Setup mocks

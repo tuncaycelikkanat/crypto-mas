@@ -1,8 +1,9 @@
 from crypto_mas.engine.strategy.base import BaseStrategy
+from crypto_mas.engine.strategy.ema_golden_cross import EMAGoldenCrossStrategy
+from crypto_mas.engine.strategy.hft_momentum import HFTMomentumStrategy
 from crypto_mas.engine.strategy.macd_cross import MACDStrategy
 from crypto_mas.engine.strategy.multi_agent import MultiAgentStrategy
 from crypto_mas.engine.strategy.rsi_oversold import RSIOversoldStrategy
-from crypto_mas.engine.strategy.ema_golden_cross import EMAGoldenCrossStrategy
 from crypto_mas.infrastructure.time.time_provider import TimeProvider
 
 
@@ -13,6 +14,7 @@ class StrategyFactory:
             "macd_cross":       MACDStrategy,
             "rsi_oversold":     RSIOversoldStrategy,
             "ema_golden_cross": EMAGoldenCrossStrategy,
+            "hft_momentum":     HFTMomentumStrategy,
             "multi_agent":      lambda: MultiAgentStrategy(time_provider=time_provider),
         }
 

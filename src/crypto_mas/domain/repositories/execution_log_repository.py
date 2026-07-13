@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -31,3 +31,9 @@ class ExecutionLogRepository:
             .limit(limit)
         )
         return self.session.scalars(stmt).all()
+
+    def clear_all(self, account_name: str) -> None:
+        from sqlalchemy import delete
+        stmt = delete(ExecutionLog).where(ExecutionLog.account_name == account_name)
+        self.session.execute(stmt)
+        self.session.commit()

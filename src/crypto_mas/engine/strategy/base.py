@@ -12,6 +12,7 @@ class BaseStrategy(Protocol):
         symbol: str,
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
+        risk_level: int = 50,
     ) -> TradingDecision | None:
         """
         Calculates a trading decision given historical feature snapshots.

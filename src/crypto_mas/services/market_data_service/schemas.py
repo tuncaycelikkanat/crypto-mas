@@ -22,6 +22,8 @@ class Timeframe(StrEnum):
     ONE_HOUR = "1h"
     FOUR_HOURS = "4h"
     ONE_DAY = "1d"
+    ONE_WEEK = "1w"
+    ONE_MONTH = "1M"
 
 
 class MarketSymbol(BaseModel):

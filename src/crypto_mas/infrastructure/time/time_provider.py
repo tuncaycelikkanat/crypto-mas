@@ -25,6 +25,7 @@ class FixedTimeProvider:
 
 from datetime import timedelta
 
+
 class SimulatedTimeProvider:
     def __init__(self, start_time: datetime) -> None:
         if start_time.tzinfo is None:

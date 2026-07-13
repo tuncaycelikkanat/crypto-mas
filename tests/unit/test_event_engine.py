@@ -1,8 +1,9 @@
-import pytest
-import asyncio
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from crypto_mas.engine.strategy.event_engine import EventEngine
+
 
 @pytest.mark.asyncio
 async def test_process_websocket_message_invalid():

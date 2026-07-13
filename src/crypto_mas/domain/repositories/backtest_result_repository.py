@@ -1,10 +1,10 @@
 from collections.abc import Sequence
-from datetime import datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.backtest_result import BacktestResult
+
 
 class BacktestResultRepository:
     def __init__(self, session: Session) -> None:

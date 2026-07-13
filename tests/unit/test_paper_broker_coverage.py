@@ -1,11 +1,13 @@
 from decimal import Decimal
 from unittest.mock import MagicMock
+
 import pytest
 
-from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
+from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
-from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
+from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
+
 
 def test_execute_target_portfolio_account_not_found():
     db_mock = MagicMock()

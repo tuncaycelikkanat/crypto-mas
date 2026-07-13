@@ -1,9 +1,11 @@
-from datetime import datetime, UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-import pytest
 
-from crypto_mas.services.market_data_service.schemas import OHLCVCandle, Timeframe, Exchange
-from crypto_mas.services.market_data_service.integrity import CandleIntegrityChecker, IntegrityIssue, IntegrityReport
+from crypto_mas.services.market_data_service.integrity import (
+    CandleIntegrityChecker,
+)
+from crypto_mas.services.market_data_service.schemas import Exchange, OHLCVCandle, Timeframe
+
 
 def _create_candle(open_time_dt, **kwargs):
     close_time_dt = open_time_dt + timedelta(minutes=1)

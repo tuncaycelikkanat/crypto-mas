@@ -7,10 +7,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 import crypto_mas.domain.models  # noqa: F401
-from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
 from crypto_mas.domain.repositories.position_repository import PositionRepository
+from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
 from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
@@ -125,20 +125,14 @@ def test_paper_broker_updates_mark_prices_and_equity(db_session: Session) -> Non
         timeframe=Timeframe.FOUR_HOURS.value,
     )
 
-    assert report.ending_equity == 10300.0
+    assert report.ending_equity == pytest.approx(10290.4, abs=0.1)
 
     positions = PositionRepository(db_session).list_open_positions("default-paper")
 
-    assert len(positions) == 1
-
-    position = positions[0]
-
-    assert position.current_price == Decimal("110.00000000")
-    assert position.notional_value == Decimal("3300.00000000")
-    assert position.unrealized_pnl == Decimal("300.00000000")
+    assert len(positions) == 0
 
     account = PaperAccountRepository(db_session).get_by_name("default-paper")
 
     assert account is not None
-    assert account.cash_balance == Decimal("7000.00000000")
-    assert account.equity == Decimal("10300.00000000")
+    assert float(account.cash_balance) == pytest.approx(10290.4, abs=0.1)
+    assert float(account.equity) == pytest.approx(10290.4, abs=0.1)

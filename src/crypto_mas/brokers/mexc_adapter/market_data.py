@@ -1,9 +1,9 @@
+import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal
 
-import asyncio
-from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
 import httpx
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from crypto_mas.infrastructure.config.settings import get_settings
 from crypto_mas.services.market_data_service.interfaces import MarketDataProvider

@@ -1,15 +1,14 @@
-import asyncio
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
-from typing import AsyncGenerator
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from crypto_mas.domain.models.backtest_result import BacktestResult
 from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.services.backtesting.engine import BacktestEngineService
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
 
 @pytest.fixture
 def db_session() -> AsyncGenerator[Session, None]:
@@ -39,6 +38,7 @@ async def test_run_backtest(db_session: Session) -> None:
         exchange=exchange,
         symbols=symbols,
         timeframe=timeframe,
+        strategy_name="macd_cross",
         start_time=start_time,
         end_time=end_time,
         initial_balance=1000.0,

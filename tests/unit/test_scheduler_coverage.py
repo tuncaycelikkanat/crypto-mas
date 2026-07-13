@@ -1,6 +1,9 @@
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
+
 from crypto_mas.services.scheduler_service import SchedulerService
+
 
 @pytest.fixture(autouse=True)
 def reset_singleton():

@@ -1,9 +1,10 @@
 from unittest.mock import MagicMock, patch
 
+from crypto_mas.domain.models.symbol import Symbol
+from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
 from crypto_mas.services.decision_orchestrator.multi_symbol_runner import MultiSymbolDecisionRunner
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
-from crypto_mas.engine.strategy.schemas import TradingDecision, DecisionAction
-from crypto_mas.domain.models.symbol import Symbol
+
 
 @patch("crypto_mas.services.decision_orchestrator.multi_symbol_runner.SymbolRepository")
 @patch("crypto_mas.services.decision_orchestrator.multi_symbol_runner.FeatureSnapshotRepository")

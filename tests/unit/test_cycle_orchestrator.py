@@ -1,13 +1,14 @@
-import pytest
-from datetime import datetime, timedelta
-from typing import Generator
+from collections.abc import Generator
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from crypto_mas.domain.models.paper_account import PaperAccount
 from crypto_mas.infrastructure.db.base import Base
+
 
 @pytest.fixture()
 def db_session() -> Generator[Session, None, None]:
@@ -28,8 +29,7 @@ from crypto_mas.domain.models.trading_cycle import TradingCycle
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
-from unittest.mock import AsyncMock, MagicMock
-from crypto_mas.domain.models.paper_account import PaperAccount
+
 
 @pytest.fixture
 def test_account(db_session: Session) -> PaperAccount:

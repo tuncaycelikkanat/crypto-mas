@@ -9,9 +9,9 @@ from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
 class FeaturePipelineService:
-    def __init__(self, db: Session) -> None:
-        self.candle_repository = CandleRepository(db)
-        self.feature_snapshot_repository = FeatureSnapshotRepository(db)
+    def __init__(self, db: Session, candle_repo=None, feature_repo=None) -> None:
+        self.candle_repository = candle_repo or CandleRepository(db)
+        self.feature_snapshot_repository = feature_repo or FeatureSnapshotRepository(db)
         self.calculator = FeatureCalculator()
 
     def calculate_and_store(

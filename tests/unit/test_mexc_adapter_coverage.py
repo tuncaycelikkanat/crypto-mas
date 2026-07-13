@@ -1,9 +1,11 @@
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-from datetime import datetime, UTC
 
 from crypto_mas.brokers.mexc_adapter.market_data import MexcMarketDataProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
 
 @pytest.mark.asyncio
 @patch("crypto_mas.brokers.mexc_adapter.market_data.httpx.AsyncClient")

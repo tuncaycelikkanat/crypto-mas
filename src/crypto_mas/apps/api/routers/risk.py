@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from crypto_mas.engine.portfolio.portfolio import PortfolioEngine
-from crypto_mas.engine.risk.risk import RiskEngine
 from crypto_mas.engine.risk import RiskLimits
+from crypto_mas.engine.risk.risk import RiskEngine
 from crypto_mas.infrastructure.db.session import get_db_session
 from crypto_mas.services.decision_orchestrator.multi_symbol_runner import MultiSymbolDecisionRunner
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe

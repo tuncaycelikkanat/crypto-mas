@@ -1,9 +1,10 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock
 
-from crypto_mas.domain.repositories.position_repository import PositionRepository
 from crypto_mas.domain.models.position import Position
+from crypto_mas.domain.repositories.position_repository import PositionRepository
+
 
 def test_update_mark_price():
     db_mock = MagicMock()

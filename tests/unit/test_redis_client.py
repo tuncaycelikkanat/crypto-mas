@@ -1,5 +1,7 @@
-from unittest.mock import patch, MagicMock
-from crypto_mas.infrastructure.cache.redis_client import get_redis_client, check_redis_connection
+from unittest.mock import MagicMock, patch
+
+from crypto_mas.infrastructure.cache.redis_client import check_redis_connection, get_redis_client
+
 
 @patch("crypto_mas.infrastructure.cache.redis_client.Redis")
 def test_get_redis_client(mock_redis):

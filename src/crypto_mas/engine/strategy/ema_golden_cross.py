@@ -3,12 +3,12 @@ EMA Golden Cross Strategy — Hodl Mode (Daily timeframe)
 Generates CONSIDER_LONG when EMA50 crosses above EMA200.
 Uses RSI > 50 as confirmation. Designed for long-term position holding.
 """
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
-from crypto_mas.engine.signal import SignalDirection, SignalType, TradingSignal
+from crypto_mas.engine.regime import MarketRegime, RegimeSnapshot
 from crypto_mas.engine.scoring import AssetScore
-from crypto_mas.engine.regime import RegimeSnapshot, MarketRegime
+from crypto_mas.engine.signal import SignalDirection, SignalType, TradingSignal
 from crypto_mas.engine.strategy.base import BaseStrategy
 from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
@@ -26,6 +26,7 @@ class EMAGoldenCrossStrategy(BaseStrategy):
         symbol: str,
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
+        risk_level: int = 50,
     ) -> TradingDecision | None:
         if not snapshots or len(snapshots) < 5:
             return None

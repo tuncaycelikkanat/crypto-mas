@@ -1,10 +1,12 @@
-from datetime import datetime, UTC
-from decimal import Decimal
+from datetime import UTC, datetime
+
 import pytest
-from crypto_mas.engine.risk.risk import RiskEngine
-from crypto_mas.engine.risk import RiskLimits, RiskDecisionStatus
+
 from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
+from crypto_mas.engine.risk import RiskDecisionStatus, RiskLimits
+from crypto_mas.engine.risk.risk import RiskEngine
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
 
 @pytest.fixture
 def risk_engine():

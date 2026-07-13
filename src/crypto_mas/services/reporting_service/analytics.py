@@ -1,8 +1,10 @@
 from dataclasses import dataclass
-from sqlalchemy.orm import Session
+
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.trading_cycle import TradingCycle
+
 
 @dataclass
 class PerformanceMetrics:

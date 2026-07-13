@@ -1,0 +1,161 @@
+"""
+Top Gainers / Scanner Service
+
+Fetches real-time top gainers from Binance 24h ticker and provides:
+  - Top movers by % change
+  - Top by volume spike (RVOL) - highest volume relative to normal
+  - Active pumpwatch: coins with high RVOL AND positive price change
+"""
+import logging
+from typing import Any
+
+import httpx
+
+logger = logging.getLogger("crypto_mas.gainers")
+
+BINANCE_TICKER_URL = "https://api.binance.com/api/v3/ticker/24hr"
+MEXC_TICKER_URL = "https://api.mexc.com/api/v3/ticker/24hr"
+
+
+async def fetch_gainers(
+    exchange: str = "BINANCE",
+    limit: int = 20,
+    min_volume_usdt: float = 500_000,   # Minimum 24h volume ($500k) to filter out dust
+    quote_asset: str = "USDT",
+    only_pump: bool = False,             # If True, only return positive movers
+) -> dict[str, Any]:
+    """
+    Returns top gainers sorted by 24h price change %.
+    Includes computed RVOL proxy and pump score.
+    """
+    url = BINANCE_TICKER_URL if exchange.upper() == "BINANCE" else MEXC_TICKER_URL
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            tickers = resp.json()
+    except Exception as exc:
+        logger.error(f"Failed to fetch tickers from {exchange}: {exc}")
+        return {"error": str(exc), "gainers": [], "losers": [], "pumpwatch": []}
+
+    # Filter to USDT pairs with sufficient volume
+    usdt_tickers = []
+    for t in tickers:
+        symbol = t.get("symbol", "")
+        if not symbol.endswith(quote_asset):
+            continue
+        try:
+            vol_usdt = float(t.get("quoteVolume", 0))
+            change_pct = float(t.get("priceChangePercent", 0))
+            last_price = float(t.get("lastPrice", 0))
+            high_24h   = float(t.get("highPrice", 0))
+            low_24h    = float(t.get("lowPrice", 0))
+            volume     = float(t.get("volume", 0))
+        except (ValueError, TypeError):
+            continue
+
+        if vol_usdt < min_volume_usdt or last_price == 0:
+            continue
+
+        if only_pump and change_pct <= 0:
+            continue
+
+        # Pump score: combination of price change + volume
+        # High change + high volume → high score
+        pump_score = abs(change_pct) * (vol_usdt / 1_000_000) ** 0.3
+
+        usdt_tickers.append({
+            "symbol":        symbol,
+            "last_price":    last_price,
+            "change_pct":    round(change_pct, 2),
+            "volume_usdt":   round(vol_usdt, 0),
+            "volume_coins":  round(volume, 4),
+            "high_24h":      high_24h,
+            "low_24h":       low_24h,
+            "range_pct":     round((high_24h - low_24h) / low_24h * 100, 2) if low_24h > 0 else 0,
+            "pump_score":    round(pump_score, 2),
+        })
+
+    # Sort by change %
+    gainers = sorted(usdt_tickers, key=lambda x: x["change_pct"], reverse=True)[:limit]
+    losers  = sorted(usdt_tickers, key=lambda x: x["change_pct"])[:limit]
+
+    # Pumpwatch: top by pump_score (positive change only)
+    pumpwatch = sorted(
+        [t for t in usdt_tickers if t["change_pct"] > 0],
+        key=lambda x: x["pump_score"],
+        reverse=True
+    )[:limit]
+
+    return {
+        "exchange":  exchange.upper(),
+        "total_pairs_scanned": len(usdt_tickers),
+        "gainers":   gainers,
+        "losers":    losers,
+        "pumpwatch": pumpwatch,
+    }
+
+
+async def fetch_hidden_gems(
+    exchange: str = "BINANCE",
+    limit: int = 50,
+    min_volume_usdt: float = 50_000,     # Don't want complete dust
+    max_volume_usdt: float = 5_000_000,  # Don't want huge caps where whales hide
+    quote_asset: str = "USDT",
+) -> dict[str, Any]:
+    """
+    Returns top "hidden gems" sorted by gem_score.
+    Criteria:
+      - Price change is flat (-3% to +3%)
+      - Volume is relatively high for the low price change
+    """
+    url = BINANCE_TICKER_URL if exchange.upper() == "BINANCE" else MEXC_TICKER_URL
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            tickers = resp.json()
+    except Exception as exc:
+        logger.error(f"Failed to fetch tickers for hidden gems from {exchange}: {exc}")
+        return {"error": str(exc), "hidden_gems": []}
+
+    usdt_tickers = []
+    for t in tickers:
+        symbol = t.get("symbol", "")
+        if not symbol.endswith(quote_asset):
+            continue
+        try:
+            vol_usdt = float(t.get("quoteVolume", 0))
+            change_pct = float(t.get("priceChangePercent", 0))
+            last_price = float(t.get("lastPrice", 0))
+        except (ValueError, TypeError):
+            continue
+
+        if vol_usdt < min_volume_usdt or vol_usdt > max_volume_usdt or last_price == 0:
+            continue
+
+        # Sleeping criteria: price hasn't moved much
+        if change_pct < -3.0 or change_pct > 3.0:
+            continue
+
+        # Gem score: High volume despite being flat
+        # Add 0.1 to avoid division by zero
+        gem_score = (vol_usdt / 1_000) / (abs(change_pct) + 0.1)
+
+        usdt_tickers.append({
+            "symbol":        symbol,
+            "last_price":    last_price,
+            "change_pct":    round(change_pct, 2),
+            "volume_usdt":   round(vol_usdt, 0),
+            "gem_score":     round(gem_score, 2),
+        })
+
+    hidden_gems = sorted(usdt_tickers, key=lambda x: x["gem_score"], reverse=True)[:limit]
+
+    return {
+        "exchange":  exchange.upper(),
+        "total_pairs_scanned": len(usdt_tickers),
+        "hidden_gems": hidden_gems,
+    }

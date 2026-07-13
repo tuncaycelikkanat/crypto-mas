@@ -1,12 +1,12 @@
 import sys
-from datetime import datetime, UTC
 
 sys.path.append("/home/tuncay/Notes/Projects/crypto-mas/src")
 
-from crypto_mas.infrastructure.db.session import SessionLocal
 from crypto_mas.domain.repositories.candle_repository import CandleRepository
 from crypto_mas.engine.backtest.engine import BacktestEngine
 from crypto_mas.engine.strategy.rsi_oversold import RSIOversoldStrategy
+from crypto_mas.infrastructure.db.session import SessionLocal
+
 
 def run():
     db = SessionLocal()

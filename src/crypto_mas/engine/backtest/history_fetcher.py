@@ -1,11 +1,9 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta, UTC
-from typing import List
+from datetime import UTC, datetime, timedelta
 
-from crypto_mas.infrastructure.db.session import SessionLocal
 from crypto_mas.domain.repositories.candle_repository import CandleRepository
-from crypto_mas.domain.models.candle import Candle
+from crypto_mas.infrastructure.db.session import SessionLocal
 from crypto_mas.services.market_data_service.provider_factory import get_market_data_provider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 

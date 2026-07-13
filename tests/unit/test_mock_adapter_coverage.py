@@ -1,7 +1,10 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, UTC, timedelta
+
 from crypto_mas.brokers.mock_adapter.market_data import MockMarketDataProvider
 from crypto_mas.services.market_data_service.schemas import Timeframe
+
 
 @pytest.mark.asyncio
 async def test_mock_adapter():

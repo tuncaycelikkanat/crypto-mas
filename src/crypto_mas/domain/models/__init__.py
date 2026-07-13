@@ -1,3 +1,5 @@
+from crypto_mas.domain.models.backfill_state import BackfillState
+from crypto_mas.domain.models.backtest_result import BacktestResult
 from crypto_mas.domain.models.candle import Candle
 from crypto_mas.domain.models.config_version import ConfigVersion
 from crypto_mas.domain.models.execution_log import ExecutionLog
@@ -9,8 +11,6 @@ from crypto_mas.domain.models.symbol import Symbol
 from crypto_mas.domain.models.system_event import SystemEvent
 from crypto_mas.domain.models.trade import Trade
 from crypto_mas.domain.models.trading_cycle import TradingCycle
-from crypto_mas.domain.models.backfill_state import BackfillState
-from crypto_mas.domain.models.backtest_result import BacktestResult
 
 __all__ = [
     "Candle",

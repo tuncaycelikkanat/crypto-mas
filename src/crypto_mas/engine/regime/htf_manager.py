@@ -1,5 +1,5 @@
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
-from crypto_mas.engine.regime import MarketRegime
+
 
 class HTFRegimeManager:
     """

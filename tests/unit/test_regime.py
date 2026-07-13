@@ -1,9 +1,9 @@
-from datetime import datetime, UTC
-from decimal import Decimal
+from datetime import UTC, datetime
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
-from crypto_mas.engine.regime.regime import MarketRegime, RegimeSnapshot, RegimeEngine
+from crypto_mas.engine.regime.regime import MarketRegime, RegimeEngine
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
 
 def test_compute_regime_insufficient_snapshots():
     snapshots = []

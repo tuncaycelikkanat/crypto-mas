@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import create_engine
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from crypto_mas.domain.models.trading_cycle import TradingCycle
 from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.services.reporting_service.analytics import PerformanceAnalytics
+
 
 @pytest.fixture
 def db_session() -> Session:

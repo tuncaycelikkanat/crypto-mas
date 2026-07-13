@@ -1,9 +1,9 @@
-from datetime import datetime, UTC
-from decimal import Decimal
+from datetime import UTC, datetime
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
-from crypto_mas.engine.signal.trend import TrendSignalEngine, SignalDirection
+from crypto_mas.engine.signal.trend import SignalDirection, TrendSignalEngine
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
 
 def test_trend_signal_generator_bullish():
     generator = TrendSignalEngine()

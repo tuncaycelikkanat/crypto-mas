@@ -1,11 +1,16 @@
-import pytest
 from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, AsyncMock
-
-from crypto_mas.domain.models.backfill_state import BackfillState
-from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
-from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe, OHLCVCandle, HistoricalFetchResult
 from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
+from crypto_mas.services.market_data_service.schemas import (
+    Exchange,
+    HistoricalFetchResult,
+    OHLCVCandle,
+    Timeframe,
+)
 
 
 @pytest.fixture

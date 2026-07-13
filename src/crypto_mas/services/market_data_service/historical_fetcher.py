@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -9,7 +9,6 @@ from crypto_mas.domain.repositories.candle_repository import CandleRepository
 from crypto_mas.services.market_data_service.integrity import CandleIntegrityChecker
 from crypto_mas.services.market_data_service.interfaces import MarketDataProvider
 from crypto_mas.services.market_data_service.schemas import HistoricalFetchResult, Timeframe
-
 
 logger = logging.getLogger(__name__)
 

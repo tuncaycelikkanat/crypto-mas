@@ -1,5 +1,4 @@
 from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
-from crypto_mas.domain.models.paper_account import PaperAccount
 from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe

@@ -3,17 +3,17 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from crypto_mas.engine.portfolio import PortfolioTarget
+from crypto_mas.domain.models.execution_log import ExecutionLog
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.domain.models.order import Order
 from crypto_mas.domain.models.trade import Trade
-from crypto_mas.domain.models.execution_log import ExecutionLog
+from crypto_mas.domain.repositories.execution_log_repository import ExecutionLogRepository
 from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
 from crypto_mas.domain.repositories.order_repository import OrderRepository
 from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
 from crypto_mas.domain.repositories.position_repository import PositionRepository
 from crypto_mas.domain.repositories.trade_repository import TradeRepository
-from crypto_mas.domain.repositories.execution_log_repository import ExecutionLogRepository
+from crypto_mas.engine.portfolio import PortfolioTarget
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange
 from crypto_mas.services.paper_trading.schemas import (
@@ -25,8 +25,8 @@ from crypto_mas.services.paper_trading.schemas import (
 
 
 class PaperBrokerService:
-    SL_PCT = {"scalping": 0.01, "swing": 0.03, "hodl": 0.05}
-    TP_PCT = {"scalping": 0.02, "swing": 0.06, "hodl": 0.12}
+    SL_PCT = {"scalping": 0.008, "swing": 0.03, "hodl": 0.05}
+    TP_PCT = {"scalping": 0.006, "swing": 0.06, "hodl": 0.12}
     
     COMMISSION_RATE = Decimal("0.001") # 0.1%
     SLIPPAGE_RATE = Decimal("0.0005")  # 0.05%
@@ -180,11 +180,38 @@ class PaperBrokerService:
             execution_price = self._money(price * (Decimal("1") + self.SLIPPAGE_RATE))
             quantity = self._money(target_notional / execution_price)
 
-            # Calculate Stop-Loss and Take-Profit prices
-            sl_pct = Decimal(str(self.SL_PCT.get(self.strategy_mode, 0.03)))
-            tp_pct = Decimal(str(self.TP_PCT.get(self.strategy_mode, 0.06)))
-            stop_loss_price = self._money(price * (1 - sl_pct))
-            take_profit_price = self._money(price * (1 + tp_pct))
+            # ── Dynamic SL/TP: ATR-based (falls back to fixed %) ──
+            # ATR multipliers per mode: scalping tight, hodl wide
+            ATR_SL_MULT = {"scalping": 1.5, "swing": 2.0, "hodl": 3.0}
+            ATR_TP_MULT = {"scalping": 3.0, "swing": 4.0, "hodl": 6.0}
+
+            stop_loss_price  = None
+            take_profit_price = None
+
+            try:
+                atr_feature = self.feature_snapshot_repository.get_latest(
+                    exchange=target.exchange.value,
+                    symbol=target_position.symbol,
+                    timeframe="15m" if self.strategy_mode == "scalping" else (
+                        "4h" if self.strategy_mode == "swing" else "1d"
+                    ),
+                )
+                if atr_feature and atr_feature.features_json:
+                    atr_val = atr_feature.features_json.get("atr_14")
+                    if atr_val and atr_val > 0:
+                        atr_d = Decimal(str(atr_val))
+                        sl_mult = Decimal(str(ATR_SL_MULT.get(self.strategy_mode, 2.0)))
+                        tp_mult = Decimal(str(ATR_TP_MULT.get(self.strategy_mode, 4.0)))
+                        stop_loss_price   = self._money(price - atr_d * sl_mult)
+                        take_profit_price = self._money(price + atr_d * tp_mult)
+            except Exception:
+                pass
+
+            if stop_loss_price is None:  # Fallback to static %
+                sl_pct = Decimal(str(self.SL_PCT.get(self.strategy_mode, 0.03)))
+                tp_pct = Decimal(str(self.TP_PCT.get(self.strategy_mode, 0.06)))
+                stop_loss_price   = self._money(price * (1 - sl_pct))
+                take_profit_price = self._money(price * (1 + tp_pct))
 
             position = self.position_repository.create_open_position(
                 account_name=account.name,
@@ -210,7 +237,7 @@ class PaperBrokerService:
                 realized_pnl=Decimal("0") - fee, # Initial PnL is the fee paid
                 position_id=position.id,
                 cycle_id=cycle_id,
-                reason=f"Paper BUY executed (Fee: {float(fee):.2f})",
+                reason=f"Paper BUY executed (Fee: {float(fee):.4f})",
                 executed_at=self.time_provider.now(),
             )
             self.trade_repository.add(trade)
@@ -240,14 +267,14 @@ class PaperBrokerService:
                     notional=float(target_notional),
                     price=float(execution_price),
                     quantity=float(quantity),
-                    reason=f"Paper BUY executed with slippage/fee. Fee: ${float(fee):.2f}",
+                    reason=f"Paper BUY executed with slippage/fee. Fee: ${float(fee):.4f}",
                 )
             )
             self._log_execution(
                 account_name=account.name,
                 level="INFO",
                 stage="PAPER_BROKER",
-                message=f"BUY {target_position.symbol} @ ${float(price):.2f} | SL=${float(stop_loss_price):.2f} TP=${float(take_profit_price):.2f}",
+                message=f"BUY {target_position.symbol} @ ${float(price):.4f} | SL=${float(stop_loss_price):.4f} TP=${float(take_profit_price):.4f}",
                 cycle_id=cycle_id,
                 payload={"notional": float(target_notional), "price": float(price), "quantity": float(quantity), "sl": float(stop_loss_price), "tp": float(take_profit_price)}
             )
@@ -385,7 +412,7 @@ class PaperBrokerService:
                 realized_pnl=closed_position.realized_pnl,
                 position_id=closed_position.id,
                 cycle_id=cycle_id,
-                reason=f"Paper SELL executed (Fee: ${float(fee):.2f})",
+                reason=f"Paper SELL executed (Fee: ${float(fee):.4f})",
                 executed_at=self.time_provider.now(),
             )
             self.trade_repository.add(trade)
@@ -535,7 +562,7 @@ class PaperBrokerService:
                         account_name=account.name,
                         level="INFO",
                         stage="TRAILING_SL",
-                        message=f"Trailing SL moved UP for {updated_position.symbol} to ${float(potential_sl):.2f} (Locking profit)",
+                        message=f"Trailing SL moved UP for {updated_position.symbol} to ${float(potential_sl):.4f} (Locking profit)",
                         cycle_id=cycle_id,
                     )
 
@@ -586,7 +613,7 @@ class PaperBrokerService:
                     realized_pnl=closed.realized_pnl,
                     position_id=closed.id,
                     cycle_id=cycle_id,
-                    reason=f"Auto-closed: {close_reason} (Fee: ${float(fee):.2f})",
+                    reason=f"Auto-closed: {close_reason} (Fee: ${float(fee):.4f})",
                     executed_at=self.time_provider.now(),
                 )
                 self.trade_repository.add(trade)
@@ -596,7 +623,7 @@ class PaperBrokerService:
                     account_name=account.name,
                     level="SUCCESS" if tp_hit else "WARN",
                     stage="SL_TP",
-                    message=f"{emoji} {close_reason}: {closed.symbol} @ ${float(execution_price):.2f} | PnL: {pnl_pct:+.2f}%",
+                    message=f"{emoji} {close_reason}: {closed.symbol} @ ${float(execution_price):.4f} | PnL: {pnl_pct:+.2f}%",
                     cycle_id=cycle_id,
                     payload={"reason": close_reason, "price": float(execution_price), "realized_pnl": float(closed.realized_pnl)},
                 )
@@ -631,7 +658,7 @@ class PaperBrokerService:
                 account_name=account.name,
                 level="INFO",
                 stage="PAPER_BROKER",
-                message=f"M2M {updated_position.symbol} @ ${float(updated_position.current_price):.2f} | uPnL: ${float(updated_position.unrealized_pnl):.2f}",
+                message=f"M2M {updated_position.symbol} @ ${float(updated_position.current_price):.4f} | uPnL: ${float(updated_position.unrealized_pnl):.4f}",
                 cycle_id=cycle_id,
                 payload={"price": float(updated_position.current_price), "unrealized_pnl": float(updated_position.unrealized_pnl)}
             )

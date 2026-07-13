@@ -1,10 +1,10 @@
-import pytest
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
-from datetime import datetime, UTC
 
-from crypto_mas.domain.repositories.symbol_repository import SymbolRepository
 from crypto_mas.domain.models.symbol import Symbol
-from crypto_mas.services.market_data_service.schemas import MarketSymbol, Exchange
+from crypto_mas.domain.repositories.symbol_repository import SymbolRepository
+from crypto_mas.services.market_data_service.schemas import Exchange, MarketSymbol
+
 
 def test_bulk_upsert_empty():
     db_mock = MagicMock()

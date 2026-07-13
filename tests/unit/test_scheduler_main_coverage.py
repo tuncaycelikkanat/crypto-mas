@@ -1,8 +1,9 @@
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from crypto_mas.apps.scheduler.main import scheduled_trading_cycle, main
+import pytest
+
+from crypto_mas.apps.scheduler.main import main, scheduled_trading_cycle
+
 
 @pytest.mark.asyncio
 async def test_scheduled_trading_cycle_success():
