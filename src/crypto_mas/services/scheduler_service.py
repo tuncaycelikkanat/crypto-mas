@@ -23,21 +23,14 @@ MODE_CONFIG: dict[str, tuple[str, str, int]] = {
 
 
 class SchedulerService:
-    _instance = None
-    _scheduler: AsyncIOScheduler | None = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._scheduler = AsyncIOScheduler(timezone=UTC)
-            
-            # Phase 4: Event Driven Architecture
-            cls._instance._ws_client = BinanceWebsocketClient()
-            cls._instance._event_engine = EventEngine()
-            cls._instance._ws_client.add_callback(cls._instance._event_engine.process_websocket_message)
-            cls._instance._event_bots = {} # Track event-driven bots
-            
-        return cls._instance
+    def __init__(self):
+        self._scheduler = AsyncIOScheduler(timezone=UTC)
+        
+        # Phase 4: Event Driven Architecture
+        self._ws_client = BinanceWebsocketClient()
+        self._event_engine = EventEngine()
+        self._ws_client.add_callback(self._event_engine.process_websocket_message)
+        self._event_bots = {} # Track event-driven bots
 
     def start(self):
         if not self._scheduler.running:
@@ -189,7 +182,6 @@ class SchedulerService:
                         if sym not in old_symbols:
                             self._ws_client.add_subscription(sym, "trade")
                             
-                    logger.info(f"Bot {bot_id} updated | new symbols: {len(symbols)}")
                     logger.info(f"Bot {bot_id} updated | new symbols: {len(symbols)}")
         return self.get_status()
 

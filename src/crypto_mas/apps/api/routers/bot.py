@@ -1,12 +1,14 @@
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from crypto_mas.services.scheduler_service import SchedulerService
 
 router = APIRouter(prefix="/api/v1/bot", tags=["Trading Bot"])
-scheduler = SchedulerService()
+
+def get_scheduler(request: Request) -> SchedulerService:
+    return request.app.state.scheduler
 
 
 class StartBotRequest(BaseModel):
@@ -19,12 +21,12 @@ class StartBotRequest(BaseModel):
 
 
 @router.get("/status")
-def get_bot_status() -> dict[str, Any]:
+def get_bot_status(scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
     return scheduler.get_status()
 
 
 @router.post("/start")
-def start_bot(request: StartBotRequest) -> dict[str, Any]:
+def start_bot(request: StartBotRequest, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
     return scheduler.start_bot(
         bot_id=request.bot_id,
         interval_seconds=request.interval_seconds,
@@ -40,12 +42,12 @@ class UpdateSymbolsRequest(BaseModel):
 
 
 @router.post("/stop/{bot_id}")
-def stop_bot(bot_id: str) -> dict[str, Any]:
+def stop_bot(bot_id: str, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
     return scheduler.stop_bot(bot_id)
 
 
 @router.put("/symbols/{bot_id}")
-def update_bot_symbols(bot_id: str, request: UpdateSymbolsRequest) -> dict[str, Any]:
+def update_bot_symbols(bot_id: str, request: UpdateSymbolsRequest, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
     return scheduler.update_symbols(bot_id, request.symbols)
 
 
@@ -54,5 +56,5 @@ class UpdateRiskRequest(BaseModel):
 
 
 @router.put("/risk/{bot_id}")
-def update_bot_risk(bot_id: str, request: UpdateRiskRequest) -> dict[str, Any]:
+def update_bot_risk(bot_id: str, request: UpdateRiskRequest, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
     return scheduler.update_risk(bot_id, request.risk_level)

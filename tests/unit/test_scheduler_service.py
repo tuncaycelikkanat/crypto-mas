@@ -3,11 +3,6 @@ import pytest
 from crypto_mas.services.scheduler_service import SchedulerService
 
 
-def test_scheduler_singleton():
-    scheduler1 = SchedulerService()
-    scheduler2 = SchedulerService()
-    
-    assert scheduler1 is scheduler2
 
 def test_scheduler_status():
     scheduler = SchedulerService()

@@ -27,6 +27,10 @@ class BacktestResult(Base):
     total_trades = Column(Integer, nullable=True, default=0)
     win_rate = Column(Float, nullable=True)
     max_drawdown = Column(Float, nullable=True)
+    sharpe_ratio = Column(Float, nullable=True)
+    sortino_ratio = Column(Float, nullable=True)
+    calmar_ratio = Column(Float, nullable=True)
+    profit_factor = Column(Float, nullable=True)
     
     error_message = Column(String, nullable=True)
     

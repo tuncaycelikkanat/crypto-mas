@@ -140,14 +140,25 @@ def get_trade_history(db: Session = Depends(get_db)) -> dict[str, Any]:
 
 
 @router.get("/coins")
-def get_active_coins() -> dict[str, Any]:
+def get_active_coins(db: Session = Depends(get_db)) -> dict[str, Any]:
     scheduler = SchedulerService()
     status = scheduler.get_status()
     
     all_symbols = set()
     for bot in status.get("bots", []):
         for sym in bot.get("symbols", []):
-            all_symbols.add(sym)
+            if sym not in ["AUTO_GAINERS", "HIDDEN_GEMS"]:
+                all_symbols.add(sym)
+                
+    # Parse dynamic symbols from recent INIT logs
+    log_repo = ExecutionLogRepository(db)
+    recent_logs = log_repo.list_recent("default-paper", limit=300)
+    init_logs = [log for log in reversed(recent_logs) if log.stage == "INIT"][-5:]
+    for log in init_logs:
+        if log.payload_json and "symbols" in log.payload_json:
+            for sym in log.payload_json["symbols"]:
+                if sym not in ["AUTO_GAINERS", "HIDDEN_GEMS"]:
+                    all_symbols.add(sym)
             
     return {
         "symbols": sorted(list(all_symbols)),

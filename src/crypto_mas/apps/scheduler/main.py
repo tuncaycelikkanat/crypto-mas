@@ -7,14 +7,12 @@ from apscheduler.triggers.cron import CronTrigger
 
 from crypto_mas.infrastructure.config.settings import get_settings
 from crypto_mas.infrastructure.db.session import SessionLocal
+from crypto_mas.infrastructure.logging.setup import setup_logging
 from crypto_mas.services.market_data_service.provider_factory import get_market_data_provider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+setup_logging(env="dev")  # Production'da env var'dan okunabilir
 logger = logging.getLogger("crypto_mas.scheduler")
 
 settings = get_settings()

@@ -8,7 +8,7 @@ from crypto_mas.apps.scheduler.main import main, scheduled_trading_cycle
 @pytest.mark.asyncio
 async def test_scheduled_trading_cycle_success():
     with patch("crypto_mas.apps.scheduler.main.SessionLocal") as mock_session_class, \
-         patch("crypto_mas.apps.scheduler.main.get_market_data_provider") as mock_provider, \
+         patch("crypto_mas.apps.scheduler.main.get_market_data_provider") as _, \
          patch("crypto_mas.apps.scheduler.main.TradingCycleService") as mock_service_class, \
          patch("crypto_mas.apps.scheduler.main.settings") as mock_settings:
         

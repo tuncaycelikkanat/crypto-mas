@@ -1,5 +1,9 @@
 from contextlib import asynccontextmanager
 
+from crypto_mas.infrastructure.logging.setup import setup_logging
+
+setup_logging(env="dev")  # Production'da env var'dan okunabilir
+
 from fastapi import FastAPI
 
 from crypto_mas.apps.api.routers import (
@@ -47,11 +51,13 @@ async def lifespan(app: FastAPI):
             db.commit()
 
     # Start Scheduler
-    SchedulerService().start()
+    scheduler_service = SchedulerService()
+    app.state.scheduler = scheduler_service
+    scheduler_service.start()
 
     yield
     # Shutdown
-    SchedulerService().shutdown()
+    scheduler_service.shutdown()
 
 app = FastAPI(
     title="Crypto MAS API",

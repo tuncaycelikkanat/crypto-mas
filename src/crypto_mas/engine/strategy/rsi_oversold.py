@@ -29,6 +29,7 @@ class RSIOversoldStrategy(BaseStrategy):
         symbol: str,
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
+        risk_level: int = 50,
     ) -> TradingDecision | None:
         if not snapshots or len(snapshots) < 3:
             return None

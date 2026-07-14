@@ -3,6 +3,9 @@ from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
+# BTC-correlated asset group for concentration risk control
+BTC_CORRELATED = {"BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "AVAXUSDT"}
+
 
 class PortfolioEngine:
     def __init__(
@@ -10,11 +13,13 @@ class PortfolioEngine:
         max_positions: int = 10,
         max_gross_exposure: float = 0.85,
         min_confidence: float = 0.5,
+        max_correlated_group_weight: float = 0.40,
         time_provider: TimeProvider | None = None,
     ) -> None:
         self.max_positions = max_positions
         self.max_gross_exposure = max_gross_exposure
         self.min_confidence = min_confidence
+        self.max_correlated_group_weight = max_correlated_group_weight
         self.time_provider = time_provider or SystemTimeProvider()
 
     def build_target_portfolio(
@@ -52,26 +57,57 @@ class PortfolioEngine:
 
         total_score = sum(decision.score.final_score for decision in selected)
 
-        if total_score <= 0:
-            equal_weight = self.max_gross_exposure / len(selected)
-            positions = [
+        risk_per_trade = 0.01   # 1% of portfolio per position
+        stop_loss_mult = 2.0
+
+        positions = []
+        for decision in selected:
+            # Approximate ATR% from volatility_penalty (which = atr/close * 2)
+            atr_pct = decision.score.volatility_penalty / 2.0
+
+            # ATR-based weight
+            if atr_pct > 0:
+                atr_weight = risk_per_trade / (atr_pct * stop_loss_mult)
+            else:
+                atr_weight = self.max_gross_exposure / len(selected)
+
+            # Score-proportional weight
+            if total_score > 0:
+                score_weight = self.max_gross_exposure * decision.score.final_score / total_score
+            else:
+                score_weight = self.max_gross_exposure / len(selected)
+
+            # Blend: 60% score-proportional, 40% ATR-based, hard cap per position
+            target_weight = 0.60 * score_weight + 0.40 * atr_weight
+            target_weight = min(target_weight, 0.25)
+
+            positions.append(
                 self._to_target_position(
                     decision=decision,
-                    target_weight=equal_weight,
-                    reason="Equal weighted because total score is zero.",
+                    target_weight=target_weight,
+                    reason="Weight: 60% score-proportional + 40% ATR-based, capped at 0.25.",
                 )
-                for decision in selected
-            ]
-        else:
+            )
+
+        # Correlation group control: scale down BTC-correlated group if overweight
+        corr_total = sum(
+            p.target_weight for p in positions if p.symbol in BTC_CORRELATED
+        )
+        if corr_total > self.max_correlated_group_weight and corr_total > 0:
+            scale = self.max_correlated_group_weight / corr_total
             positions = [
                 self._to_target_position(
                     decision=decision,
-                    target_weight=(
-                        self.max_gross_exposure * decision.score.final_score / total_score
+                    target_weight=p.target_weight * scale
+                    if p.symbol in BTC_CORRELATED
+                    else p.target_weight,
+                    reason=(
+                        f"Weight scaled by {scale:.3f} due to BTC-correlated group cap."
+                        if p.symbol in BTC_CORRELATED
+                        else p.reason
                     ),
-                    reason="Weight allocated proportionally to final_score.",
                 )
-                for decision in selected
+                for p, decision in zip(positions, selected)
             ]
 
         gross_exposure = round(sum(position.target_weight for position in positions), 6)

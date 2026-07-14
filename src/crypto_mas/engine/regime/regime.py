@@ -1,7 +1,6 @@
-from typing import Any
-
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.regime import MarketRegime, RegimeSnapshot
+from crypto_mas.engine.utils import get_float
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
@@ -19,14 +18,14 @@ class RegimeEngine:
         latest = snapshots[-1]
         features = latest.features_json
 
-        close = self._get_float(features, "close")
-        ema_20 = self._get_float(features, "ema_20")
-        ema_50 = self._get_float(features, "ema_50")
-        atr_14 = self._get_float(features, "atr_14")
-        roc_14 = self._get_float(features, "roc_14")
-        bb_upper = self._get_float(features, "bb_upper")
-        bb_middle = self._get_float(features, "bb_middle")
-        bb_lower = self._get_float(features, "bb_lower")
+        close = get_float(features, "close")
+        ema_20 = get_float(features, "ema_20")
+        ema_50 = get_float(features, "ema_50")
+        atr_14 = get_float(features, "atr_14")
+        roc_14 = get_float(features, "roc_14")
+        bb_upper = get_float(features, "bb_upper")
+        bb_middle = get_float(features, "bb_middle")
+        bb_lower = get_float(features, "bb_lower")
 
         if None in {close, ema_20, ema_50, atr_14, roc_14, bb_upper, bb_middle, bb_lower}:
             return RegimeSnapshot(
@@ -115,17 +114,6 @@ class RegimeEngine:
             timestamp=latest.timestamp,
         )
 
-    @staticmethod
-    def _get_float(features: dict[str, Any], key: str) -> float | None:
-        value = features.get(key)
-
-        if value is None:
-            return None
-
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
 
     @staticmethod
     def _trend_confidence(

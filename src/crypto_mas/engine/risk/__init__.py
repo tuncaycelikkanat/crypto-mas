@@ -22,6 +22,8 @@ class RiskLimits(BaseModel):
     max_gross_exposure: float = Field(default=0.50, ge=0.0, le=1.0)
     max_position_weight: float = Field(default=0.10, ge=0.0, le=1.0)
     min_cash_weight: float = Field(default=0.50, ge=0.0, le=1.0)
+    max_portfolio_drawdown: float = Field(default=0.15, ge=0.0, le=1.0)
+    max_correlated_group_weight: float = Field(default=0.40, ge=0.0, le=1.0)
 
 
 class RiskAssessment(BaseModel):

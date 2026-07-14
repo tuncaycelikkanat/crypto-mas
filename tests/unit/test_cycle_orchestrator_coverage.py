@@ -35,6 +35,9 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
     service.fetcher_service = AsyncMock()
     service.feature_service = MagicMock()
     
+    # Mock db query to return None so it doesn't trigger "Open Position Exists"
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+    
     # Force BTC crash
     btc_snapshot_mock = MagicMock()
     btc_snapshot_mock.features_json = {"roc_14": -3.0}
@@ -68,7 +71,10 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
     decision_mock.reason = "Test"
     mock_strategy.decide.return_value = decision_mock
     
-    with patch("crypto_mas.services.trading_cycle_service.cycle_orchestrator.StrategyFactory.create", return_value=mock_strategy):
+    with patch("crypto_mas.services.trading_cycle_service.cycle_orchestrator.StrategyFactory.create", return_value=mock_strategy), \
+         patch("crypto_mas.services.trading_cycle_service.cycle_orchestrator.PositionRepository") as mock_pos_repo:
+        
+        mock_pos_repo.return_value.has_recent_stop_loss.return_value = False
         # We need to mock Risk and Portfolio
         service.portfolio_engine = MagicMock()
         target_portfolio_mock = MagicMock()
@@ -114,7 +120,7 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
             timeframe=Timeframe.FIFTEEN_MINUTES,
         )
         assert decision_mock.action == DecisionAction.HOLD
-        assert "REJECTED by HTF Bear Trend" in decision_mock.reason
+        assert "REJECTED by HTF 4h Bear Trend" in decision_mock.reason
         
         # Next test htf_short_allowed = False
         decision_mock.action = DecisionAction.CONSIDER_SHORT
@@ -125,4 +131,4 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
             timeframe=Timeframe.FIFTEEN_MINUTES,
         )
         assert decision_mock.action == DecisionAction.HOLD
-        assert "REJECTED by HTF Bull Trend" in decision_mock.reason
+        assert "REJECTED by HTF 4h Bull Trend" in decision_mock.reason

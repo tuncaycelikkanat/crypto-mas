@@ -105,6 +105,10 @@ class MockMarketDataProvider(MarketDataProvider):
                 return timedelta(hours=4)
             case Timeframe.ONE_DAY:
                 return timedelta(days=1)
+            case Timeframe.ONE_WEEK:
+                return timedelta(days=7)
+            case Timeframe.ONE_MONTH:
+                return timedelta(days=30)
 
     @staticmethod
     def _align_to_timeframe(value: datetime, timeframe: Timeframe) -> datetime:
@@ -135,3 +139,8 @@ class MockMarketDataProvider(MarketDataProvider):
 
             case Timeframe.ONE_DAY:
                 return value.replace(hour=0, minute=0)
+            case Timeframe.ONE_WEEK:
+                days_since_monday = value.weekday()
+                return (value - timedelta(days=days_since_monday)).replace(hour=0, minute=0)
+            case Timeframe.ONE_MONTH:
+                return value.replace(day=1, hour=0, minute=0)

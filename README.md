@@ -140,14 +140,16 @@ src/crypto_mas/
 │   ├── market_data_service/   # Provider abstraction + historical fetcher
 │   ├── feature_pipeline/      # Indicator calculation + snapshot storage
 │   ├── decision_orchestrator/ # Multi-symbol decision runner
-│   └── oms/                   # Order Management System (in progress)
+│   └── oms/                   # Order Management System (interface + paper impl)
 │
-├── agents/           # Decision-making units. Each agent has one job.
-│   ├── signal_agent/          # Trend signal generation
-│   ├── scoring_agent/         # Signal strength scoring
-│   ├── regime_agent/          # Market regime detection
-│   ├── portfolio_manager_agent/ # Target portfolio construction
-│   └── risk_engine_agent/     # Risk limit enforcement
+├── engine/           # Decision-making units. Each engine has one job.
+│   ├── signal/                # Trend signal generation (TrendSignalEngine)
+│   ├── scoring/               # Signal strength scoring (ScoringEngine)
+│   ├── regime/                # Market regime detection (RegimeEngine)
+│   ├── portfolio/             # Target portfolio construction (PortfolioEngine)
+│   ├── risk/                  # Risk limit enforcement (RiskEngine + profiles)
+│   ├── backtest/              # Backtest simulation engine
+│   └── strategy/              # Strategy wrappers (multi_agent, ema_golden_cross…)
 │
 ├── brokers/          # Exchange adapter implementations.
 │   ├── binance_adapter/       # Live Binance market data
@@ -157,8 +159,8 @@ src/crypto_mas/
 │
 └── apps/             # Entry points.
     ├── api/           # FastAPI HTTP interface
-    ├── scheduler/     # Periodic job runner (in progress)
-    └── worker/        # Async task executor (in progress)
+    ├── scheduler/     # Periodic job runner
+    └── worker/        # Async background task executor
 ```
 
 ---

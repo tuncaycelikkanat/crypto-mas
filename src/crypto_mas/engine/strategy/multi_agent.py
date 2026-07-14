@@ -66,6 +66,7 @@ class MultiAgentStrategy(BaseStrategy):
             direction=signal.direction,
             final_score=score.final_score,
             regime=regime.regime,
+            risk_level=risk_level,
         )
 
         confidence = self._calculate_confidence(
@@ -92,24 +93,28 @@ class MultiAgentStrategy(BaseStrategy):
         direction: SignalDirection,
         final_score: float,
         regime: MarketRegime,
+        risk_level: int = 50,
     ) -> DecisionAction:
+        # Dynamic threshold: risk=0→0.50, risk=50→0.375, risk=100→0.25
+        threshold = max(0.20, 0.50 - (risk_level / 100) * 0.25)
+
         if regime == MarketRegime.HIGH_VOLATILITY:
             return DecisionAction.AVOID
 
         if direction == SignalDirection.LONG:
             if regime == MarketRegime.BEAR_TREND:
-                return DecisionAction.AVOID
+                threshold += 0.15  # Require stronger signal instead of outright AVOID
 
-            if final_score >= 0.35:
+            if final_score >= threshold:
                 return DecisionAction.CONSIDER_LONG
 
             return DecisionAction.HOLD
 
         if direction == SignalDirection.SHORT:
             if regime == MarketRegime.BULL_TREND:
-                return DecisionAction.AVOID
+                threshold += 0.15  # Require stronger signal instead of outright AVOID
 
-            if final_score >= 0.35:
+            if final_score >= threshold:
                 return DecisionAction.CONSIDER_SHORT
 
             return DecisionAction.HOLD

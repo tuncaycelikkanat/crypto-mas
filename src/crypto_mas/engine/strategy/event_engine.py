@@ -59,6 +59,9 @@ class EventEngine:
         self._last_report_time: dict[str, float] = defaultdict(float)
 
         self.metrics_store = RealtimeMetricsStore()
+        
+        # Cache for RVOL baseline (baseline_notional, timestamp)
+        self._rvol_cache: dict[str, tuple[float, float]] = {}
 
     # ── Public interface ─────────────────────────────────────────
     async def process_websocket_message(self, stream: str, payload: dict[str, Any]):
@@ -180,6 +183,13 @@ class EventEngine:
         volume_sma_20 feature (candle-based). If no snapshot is available,
         fall back to a conservative 3× the raw notional threshold.
         """
+        now = time.time()
+        if symbol in self._rvol_cache:
+            baseline, cache_time = self._rvol_cache[symbol]
+            if now - cache_time < 900:  # 15 minutes TTL
+                if baseline > 0:
+                    return round(window_notional / baseline, 2)
+                    
         try:
             from crypto_mas.domain.repositories.feature_snapshot_repository import (
                 FeatureSnapshotRepository,
@@ -203,6 +213,7 @@ class EventEngine:
                         # 15m candle has 900s; our window is 60s → scale factor ~1/15
                         candle_notional_60s = vol_sma * last_price / 15.0
                         if candle_notional_60s > 0:
+                            self._rvol_cache[symbol] = (candle_notional_60s, now)
                             return round(window_notional / candle_notional_60s, 2)
             finally:
                 db.close()

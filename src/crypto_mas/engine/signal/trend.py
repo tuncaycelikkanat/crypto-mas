@@ -1,7 +1,6 @@
-from typing import Any
-
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.signal import SignalDirection, SignalType, TradingSignal
+from crypto_mas.engine.utils import get_float
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
@@ -19,13 +18,13 @@ class TrendSignalEngine:
         latest = snapshots[-1]
         features = latest.features_json
 
-        close = self._get_float(features, "close")
-        ema_20 = self._get_float(features, "ema_20")
-        ema_50 = self._get_float(features, "ema_50")
-        rsi_14 = self._get_float(features, "rsi_14")
-        roc_14 = self._get_float(features, "roc_14")
-        macd = self._get_float(features, "macd")
-        macd_signal = self._get_float(features, "macd_signal")
+        close = get_float(features, "close")
+        ema_20 = get_float(features, "ema_20")
+        ema_50 = get_float(features, "ema_50")
+        rsi_14 = get_float(features, "rsi_14")
+        roc_14 = get_float(features, "roc_14")
+        macd = get_float(features, "macd")
+        macd_signal = get_float(features, "macd_signal")
 
         if None in {close, ema_20, ema_50, rsi_14, roc_14, macd, macd_signal}:
             return TradingSignal(
@@ -108,17 +107,6 @@ class TrendSignalEngine:
             timestamp=latest.timestamp,
         )
 
-    @staticmethod
-    def _get_float(features: dict[str, Any], key: str) -> float | None:
-        value = features.get(key)
-
-        if value is None:
-            return None
-
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
 
     @staticmethod
     def _calculate_strength(

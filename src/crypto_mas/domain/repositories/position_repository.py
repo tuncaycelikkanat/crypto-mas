@@ -37,6 +37,27 @@ class PositionRepository:
 
         return self.db.scalars(stmt).first()
 
+    def has_recent_stop_loss(
+        self,
+        account_name: str,
+        exchange: str,
+        symbol: str,
+        time_now: datetime,
+        cooldown_minutes: int = 30,
+    ) -> bool:
+        from datetime import timedelta
+        cutoff_time = time_now - timedelta(minutes=cooldown_minutes)
+        stmt = (
+            select(Position)
+            .where(Position.account_name == account_name)
+            .where(Position.exchange == exchange)
+            .where(Position.symbol == symbol)
+            .where(Position.status == "CLOSED")
+            .where(Position.close_reason == "STOP_LOSS")
+            .where(Position.closed_at >= cutoff_time)
+        )
+        return self.db.scalars(stmt).first() is not None
+
     def create_open_position(
         self,
         account_name: str,

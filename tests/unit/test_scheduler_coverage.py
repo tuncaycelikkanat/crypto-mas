@@ -5,11 +5,7 @@ import pytest
 from crypto_mas.services.scheduler_service import SchedulerService
 
 
-@pytest.fixture(autouse=True)
-def reset_singleton():
-    SchedulerService._instance = None
-    yield
-    SchedulerService._instance = None
+
 
 def test_is_bot_running_scheduler_not_running():
     service = SchedulerService()
@@ -32,7 +28,7 @@ def test_start_bot_already_running():
     service._scheduler.get_jobs.return_value = [job_mock]
     
     status = service.start_bot("bot_1")
-    assert status == {"bots": [{"bot_id": "bot_1", "status": "RUNNING", "next_run_time": "2023-01-01T00:00:00+00:00", "trigger": "interval", "symbols": ["BTCUSDT"], "mode": "swing", "exchange": "BINANCE"}]}
+    assert status == {"bots": [{"bot_id": "bot_1", "status": "RUNNING", "next_run_time": "2023-01-01T00:00:00+00:00", "trigger": "interval", "symbols": ["BTCUSDT"], "mode": "swing", "exchange": "BINANCE", "risk_level": 50}]}
 
 def test_start_bot_symbols_none():
     service = SchedulerService()

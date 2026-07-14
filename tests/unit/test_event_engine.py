@@ -32,23 +32,25 @@ async def test_process_trade_spike():
     engine = EventEngine()
     
     with patch.object(engine, '_trigger_cycle') as mock_trigger:
-        # Trigger spike by making buy vol large
-        await engine._process_trade("BTCUSDT", {"p": "60000", "q": "1.0", "m": False}) # 60000 buy vol
-        
-        mock_trigger.assert_called_once_with("BTCUSDT")
+        with patch.object(engine, '_get_rvol', return_value=3.0):
+            # Trigger spike by making buy vol large
+            await engine._process_trade("BTCUSDT", {"p": "60000", "q": "1.0", "m": False}) # 60000 buy vol
+            
+            mock_trigger.assert_called_once_with("BTCUSDT")
 
 @pytest.mark.asyncio
 async def test_process_trade_cooldown():
     engine = EventEngine()
     
     with patch.object(engine, '_trigger_cycle') as mock_trigger:
-        # First spike
-        await engine._process_trade("BTCUSDT", {"p": "60000", "q": "1.0", "m": False})
-        assert mock_trigger.call_count == 1
-        
-        # Second spike immediately after
-        await engine._process_trade("BTCUSDT", {"p": "60000", "q": "1.0", "m": False})
-        assert mock_trigger.call_count == 1 # Shouldn't trigger again
+        with patch.object(engine, '_get_rvol', return_value=3.0):
+            # First spike
+            await engine._process_trade("BTCUSDT", {"p": "60000", "q": "1.0", "m": False})
+            assert mock_trigger.call_count == 1
+            
+            # Second spike immediately after
+            await engine._process_trade("BTCUSDT", {"p": "60000", "q": "1.0", "m": False})
+            assert mock_trigger.call_count == 1 # Shouldn't trigger again
 
 @pytest.mark.asyncio
 async def test_process_depth():

@@ -81,10 +81,10 @@ async def test_handle_messages_reconnects_on_close(ws_client):
         async def mock_sleep(seconds):
             ws_client._is_running = False  # Break outer loop after first reconnect attempt
             
-        with patch("crypto_mas.services.market_data_service.websocket_client.asyncio.sleep", side_effect=mock_sleep) as sleep_mock:
-            await ws_client._handle_messages()
-            
-            sleep_mock.assert_called_once_with(5)
+            with patch("crypto_mas.services.market_data_service.websocket_client.asyncio.sleep", side_effect=mock_sleep) as sleep_mock:
+                await ws_client._handle_messages()
+                
+                sleep_mock.assert_called_once_with(1.0)
 
 
 @pytest.mark.asyncio

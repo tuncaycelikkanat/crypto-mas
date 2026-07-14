@@ -15,6 +15,7 @@ class BinanceWebsocketClient:
         self._loop = None
         self._callbacks: list[Callable[[dict], Coroutine]] = []
         self._subscriptions: set[str] = set()
+        self.reconnect_delay = 1.0
         
     def _run_task(self, coro: Coroutine):
         if self._loop and self._loop.is_running():
@@ -74,6 +75,7 @@ class BinanceWebsocketClient:
                 logger.info(f"Connecting to Binance WS: {url}")
                 async with websockets.connect(url) as websocket:
                     self._connection = websocket
+                    self.reconnect_delay = 1.0
                     logger.info("Binance WS Connected.")
                     
                     # Send initial subscriptions if we have any
@@ -117,11 +119,13 @@ class BinanceWebsocketClient:
                             logger.debug(f"Binance WS Subscription result: {data}")
                                 
             except websockets.ConnectionClosed:
-                logger.warning("Binance WS Connection closed. Reconnecting in 5s...")
-                await asyncio.sleep(5)
+                logger.warning(f"Binance WS Connection closed. Reconnecting in {self.reconnect_delay}s...")
+                await asyncio.sleep(self.reconnect_delay)
+                self.reconnect_delay = min(self.reconnect_delay * 2, 60.0)
             except Exception as e:
                 logger.error(f"Binance WS Error: {e}")
-                await asyncio.sleep(5)
+                await asyncio.sleep(self.reconnect_delay)
+                self.reconnect_delay = min(self.reconnect_delay * 2, 60.0)
 
     def start(self):
         if not self._is_running:

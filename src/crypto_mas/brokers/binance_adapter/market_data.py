@@ -5,6 +5,7 @@ from decimal import Decimal
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from crypto_mas.infrastructure.api_client.circuit_breaker import resilient
 from crypto_mas.infrastructure.config.settings import get_settings
 from crypto_mas.services.market_data_service.interfaces import MarketDataProvider
 from crypto_mas.services.market_data_service.schemas import (
@@ -24,6 +25,7 @@ class BinanceMarketDataProvider(MarketDataProvider):
     def exchange(self) -> Exchange:
         return Exchange.BINANCE
 
+    @resilient("binance_api", max_attempts=3)
     async def fetch_symbols(self) -> list[MarketSymbol]:
         url = f"{self.base_url}/api/v3/exchangeInfo"
 
@@ -68,6 +70,7 @@ class BinanceMarketDataProvider(MarketDataProvider):
 
         return symbols
 
+    @resilient("binance_api", max_attempts=3)
     @retry(
         wait=wait_exponential(multiplier=1, min=2, max=10),
         stop=stop_after_attempt(5),

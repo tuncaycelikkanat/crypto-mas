@@ -1,1 +1,5 @@
-websockets==16.0
+# Dependencies are managed via pyproject.toml using uv.
+# To install: uv sync
+# To add a dependency: uv add <package>
+# To add a dev dependency: uv add --dev <package>
+uv

@@ -22,10 +22,14 @@ def test_health_check():
     response = client.get("/api/v1/version")
     assert response.status_code == 200
 
+from crypto_mas.apps.api.routers.bot import get_scheduler
+
 @patch("crypto_mas.apps.api.routers.bot.SchedulerService")
 def test_bot_endpoints(mock_scheduler):
     mock_instance = mock_scheduler.return_value
     mock_instance.get_status.return_value = {"bots": []}
+    
+    app.dependency_overrides[get_scheduler] = lambda: mock_instance
     
     # Status
     response = client.get("/api/v1/bot/status")
