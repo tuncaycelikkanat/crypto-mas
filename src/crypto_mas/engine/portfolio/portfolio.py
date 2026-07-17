@@ -31,7 +31,7 @@ class PortfolioEngine:
         candidates = [
             decision
             for decision in decisions
-            if decision.action == DecisionAction.CONSIDER_LONG
+            if decision.action in (DecisionAction.CONSIDER_LONG, DecisionAction.CONSIDER_SHORT)
             and decision.confidence >= self.min_confidence
             and decision.score.final_score > 0
         ]
@@ -51,7 +51,7 @@ class PortfolioEngine:
                 target_positions=[],
                 cash_weight=1.0,
                 gross_exposure=0.0,
-                reason="No eligible long candidates found.",
+                reason="No eligible candidates found.",
                 created_at=self.time_provider.now(),
             )
 
@@ -132,8 +132,10 @@ class PortfolioEngine:
         target_weight: float,
         reason: str,
     ) -> TargetPosition:
+        side = "LONG" if decision.action == DecisionAction.CONSIDER_LONG else "SHORT"
         return TargetPosition(
             symbol=decision.symbol,
+            side=side,
             target_weight=round(max(0.0, min(target_weight, 1.0)), 6),
             confidence=decision.confidence,
             final_score=decision.score.final_score,

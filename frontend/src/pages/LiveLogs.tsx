@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
   Terminal, RefreshCw, Filter, Search, Copy, CheckCheck,
   ChevronRight, ChevronDown, Circle, Zap, Shield,
-  TrendingUp, Package, AlertTriangle, CheckCircle, XCircle,
+  TrendingUp, Package, CheckCircle, XCircle,
   BarChart2, Clock, Layers, X
 } from 'lucide-react';
 

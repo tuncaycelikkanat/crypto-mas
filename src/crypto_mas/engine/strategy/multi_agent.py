@@ -30,6 +30,7 @@ class MultiAgentStrategy(BaseStrategy):
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
         risk_level: int = 50,
+        use_regime_shield: bool = True,
     ) -> TradingDecision | None:
         signal = self.signal_agent.generate(
             exchange=exchange,
@@ -67,6 +68,7 @@ class MultiAgentStrategy(BaseStrategy):
             final_score=score.final_score,
             regime=regime.regime,
             risk_level=risk_level,
+            use_regime_shield=use_regime_shield,
         )
 
         confidence = self._calculate_confidence(
@@ -94,15 +96,17 @@ class MultiAgentStrategy(BaseStrategy):
         final_score: float,
         regime: MarketRegime,
         risk_level: int = 50,
+        use_regime_shield: bool = True,
     ) -> DecisionAction:
-        # Dynamic threshold: risk=0→0.50, risk=50→0.375, risk=100→0.25
-        threshold = max(0.20, 0.50 - (risk_level / 100) * 0.25)
+        # Dynamic threshold: risk=0→0.50, risk=50→0.375, risk=100→0.25 (allows negative threshold if risk > 200)
+        threshold = max(-1.0, 0.50 - (risk_level / 100) * 0.25)
 
-        if regime == MarketRegime.HIGH_VOLATILITY:
-            return DecisionAction.AVOID
+        if use_regime_shield:
+            if regime == MarketRegime.HIGH_VOLATILITY:
+                return DecisionAction.AVOID
 
         if direction == SignalDirection.LONG:
-            if regime == MarketRegime.BEAR_TREND:
+            if use_regime_shield and regime == MarketRegime.BEAR_TREND:
                 threshold += 0.15  # Require stronger signal instead of outright AVOID
 
             if final_score >= threshold:
@@ -111,7 +115,7 @@ class MultiAgentStrategy(BaseStrategy):
             return DecisionAction.HOLD
 
         if direction == SignalDirection.SHORT:
-            if regime == MarketRegime.BULL_TREND:
+            if use_regime_shield and regime == MarketRegime.BULL_TREND:
                 threshold += 0.15  # Require stronger signal instead of outright AVOID
 
             if final_score >= threshold:

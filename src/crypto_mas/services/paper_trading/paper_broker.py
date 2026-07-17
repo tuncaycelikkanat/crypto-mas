@@ -72,11 +72,12 @@ class PaperBrokerService:
                 symbol=target_position.symbol,
             )
 
+            side_enum = PaperOrderSide.BUY if target_position.side == "LONG" else PaperOrderSide.SELL
             if existing_position is not None:
                 skipped.append(
                     PaperExecutionItem(
                         symbol=target_position.symbol,
-                        side=PaperOrderSide.BUY,
+                        side=side_enum,
                         status=PaperExecutionStatus.SKIPPED,
                         target_weight=target_position.target_weight,
                         notional=0.0,
@@ -89,7 +90,7 @@ class PaperBrokerService:
                     account_name=account.name,
                     level="INFO",
                     stage="PAPER_BROKER",
-                    message=f"Skipped BUY for {target_position.symbol}: Open position already exists.",
+                    message=f"Skipped {side_enum.value} for {target_position.symbol}: Open position already exists.",
                     cycle_id=cycle_id,
                     payload={"target_weight": target_position.target_weight}
                 )
@@ -107,7 +108,7 @@ class PaperBrokerService:
                 skipped.append(
                     PaperExecutionItem(
                         symbol=target_position.symbol,
-                        side=PaperOrderSide.BUY,
+                        side=side_enum,
                         status=PaperExecutionStatus.SKIPPED,
                         target_weight=target_position.target_weight,
                         notional=0.0,
@@ -120,7 +121,7 @@ class PaperBrokerService:
                     account_name=account.name,
                     level="WARNING",
                     stage="PAPER_BROKER",
-                    message=f"Skipped BUY for {target_position.symbol}: Latest close price not available.",
+                    message=f"Skipped {side_enum.value} for {target_position.symbol}: Latest close price not available.",
                     cycle_id=cycle_id,
                     payload={"target_weight": target_position.target_weight}
                 )
@@ -132,7 +133,7 @@ class PaperBrokerService:
                 skipped.append(
                     PaperExecutionItem(
                         symbol=target_position.symbol,
-                        side=PaperOrderSide.BUY,
+                        side=side_enum,
                         status=PaperExecutionStatus.SKIPPED,
                         target_weight=target_position.target_weight,
                         notional=float(target_notional),
@@ -145,7 +146,7 @@ class PaperBrokerService:
                     account_name=account.name,
                     level="INFO",
                     stage="PAPER_BROKER",
-                    message=f"Skipped BUY for {target_position.symbol}: Target notional is zero.",
+                    message=f"Skipped {side_enum.value} for {target_position.symbol}: Target notional is zero.",
                     cycle_id=cycle_id,
                     payload={"target_weight": target_position.target_weight, "price": float(price)}
                 )
@@ -158,7 +159,7 @@ class PaperBrokerService:
                 skipped.append(
                     PaperExecutionItem(
                         symbol=target_position.symbol,
-                        side=PaperOrderSide.BUY,
+                        side=side_enum,
                         status=PaperExecutionStatus.REJECTED,
                         target_weight=target_position.target_weight,
                         notional=float(total_cost),
@@ -171,13 +172,16 @@ class PaperBrokerService:
                     account_name=account.name,
                     level="WARNING",
                     stage="PAPER_BROKER",
-                    message=f"Rejected BUY for {target_position.symbol}: Insufficient cash.",
+                    message=f"Rejected {side_enum.value} for {target_position.symbol}: Insufficient cash.",
                     cycle_id=cycle_id,
                     payload={"total_cost": float(total_cost), "available_cash": float(available_cash)}
                 )
                 continue
 
-            execution_price = self._money(price * (Decimal("1") + self.SLIPPAGE_RATE))
+            if target_position.side == "LONG":
+                execution_price = self._money(price * (Decimal("1") + self.SLIPPAGE_RATE))
+            else:
+                execution_price = self._money(price * (Decimal("1") - self.SLIPPAGE_RATE))
             quantity = self._money(target_notional / execution_price)
 
             # ── Dynamic SL/TP: ATR-based (falls back to fixed %) ──
@@ -195,6 +199,7 @@ class PaperBrokerService:
                     timeframe="15m" if self.strategy_mode == "scalping" else (
                         "4h" if self.strategy_mode == "swing" else "1d"
                     ),
+                    end_time=now,
                 )
                 if atr_feature and atr_feature.features_json:
                     atr_val = atr_feature.features_json.get("atr_14")
@@ -202,16 +207,24 @@ class PaperBrokerService:
                         atr_d = Decimal(str(atr_val))
                         sl_mult = Decimal(str(ATR_SL_MULT.get(self.strategy_mode, 2.0)))
                         tp_mult = Decimal(str(ATR_TP_MULT.get(self.strategy_mode, 4.0)))
-                        stop_loss_price   = self._money(price - atr_d * sl_mult)
-                        take_profit_price = self._money(price + atr_d * tp_mult)
+                        if target_position.side == "LONG":
+                            stop_loss_price   = self._money(price - atr_d * sl_mult)
+                            take_profit_price = self._money(price + atr_d * tp_mult)
+                        else:
+                            stop_loss_price   = self._money(price + atr_d * sl_mult)
+                            take_profit_price = self._money(price - atr_d * tp_mult)
             except Exception:
                 pass
 
             if stop_loss_price is None:  # Fallback to static %
                 sl_pct = Decimal(str(self.SL_PCT.get(self.strategy_mode, 0.03)))
                 tp_pct = Decimal(str(self.TP_PCT.get(self.strategy_mode, 0.06)))
-                stop_loss_price   = self._money(price * (1 - sl_pct))
-                take_profit_price = self._money(price * (1 + tp_pct))
+                if target_position.side == "LONG":
+                    stop_loss_price   = self._money(price * (1 - sl_pct))
+                    take_profit_price = self._money(price * (1 + tp_pct))
+                else:
+                    stop_loss_price   = self._money(price * (1 + sl_pct))
+                    take_profit_price = self._money(price * (1 - tp_pct))
 
             position = self.position_repository.create_open_position(
                 account_name=account.name,
@@ -224,20 +237,21 @@ class PaperBrokerService:
                 stop_loss_price=stop_loss_price,
                 take_profit_price=take_profit_price,
                 strategy_mode=self.strategy_mode,
+                side=target_position.side,
             )
 
             trade = Trade(
                 account_name=account.name,
                 exchange=target.exchange.value,
                 symbol=target_position.symbol,
-                side="BUY",
+                side=side_enum.value,
                 quantity=quantity,
                 price=execution_price,
                 notional=target_notional, # Cost basis
                 realized_pnl=Decimal("0") - fee, # Initial PnL is the fee paid
                 position_id=position.id,
                 cycle_id=cycle_id,
-                reason=f"Paper BUY executed (Fee: {float(fee):.4f})",
+                reason=f"Paper {side_enum.value} executed (Fee: {float(fee):.4f})",
                 executed_at=self.time_provider.now(),
             )
             self.trade_repository.add(trade)
@@ -246,7 +260,7 @@ class PaperBrokerService:
                 account_name=account.name,
                 exchange=target.exchange.value,
                 symbol=target_position.symbol,
-                side="BUY",
+                side=side_enum.value,
                 status="FILLED",
                 requested_quantity=quantity,
                 filled_quantity=quantity,
@@ -261,20 +275,20 @@ class PaperBrokerService:
             executed.append(
                 PaperExecutionItem(
                     symbol=target_position.symbol,
-                    side=PaperOrderSide.BUY,
+                    side=side_enum,
                     status=PaperExecutionStatus.EXECUTED,
                     target_weight=target_position.target_weight,
                     notional=float(target_notional),
                     price=float(execution_price),
                     quantity=float(quantity),
-                    reason=f"Paper BUY executed with slippage/fee. Fee: ${float(fee):.4f}",
+                    reason=f"Paper {side_enum.value} executed with slippage/fee. Fee: ${float(fee):.4f}",
                 )
             )
             self._log_execution(
                 account_name=account.name,
                 level="INFO",
                 stage="PAPER_BROKER",
-                message=f"BUY {target_position.symbol} @ ${float(price):.4f} | SL=${float(stop_loss_price):.4f} TP=${float(take_profit_price):.4f}",
+                message=f"{side_enum.value} {target_position.symbol} @ ${float(price):.4f} | SL=${float(stop_loss_price):.4f} TP=${float(take_profit_price):.4f}",
                 cycle_id=cycle_id,
                 payload={"notional": float(target_notional), "price": float(price), "quantity": float(quantity), "sl": float(stop_loss_price), "tp": float(take_profit_price)}
             )
@@ -333,11 +347,12 @@ class PaperBrokerService:
         skipped: list[PaperExecutionItem] = []
 
         for position in open_positions:
-            if position.symbol in target_symbols:
+            target_pos = next((p for p in target.target_positions if p.symbol == position.symbol), None)
+            if target_pos and target_pos.side == position.side:
                 skipped.append(
                     PaperExecutionItem(
                         symbol=position.symbol,
-                        side=PaperOrderSide.SELL,
+                        side=PaperOrderSide.SELL if position.side == "LONG" else PaperOrderSide.BUY,
                         status=PaperExecutionStatus.SKIPPED,
                         target_weight=0.0,
                         notional=float(position.notional_value),
@@ -350,7 +365,7 @@ class PaperBrokerService:
                     account_name=account.name,
                     level="INFO",
                     stage="PAPER_BROKER",
-                    message=f"Skipped SELL for {position.symbol}: Position is still in target portfolio.",
+                    message=f"Skipped close for {position.symbol}: Position is still in target portfolio with same side.",
                     cycle_id=cycle_id,
                 )
                 continue
@@ -359,33 +374,38 @@ class PaperBrokerService:
                 exchange=target.exchange.value,
                 symbol=position.symbol,
                 timeframe=target.timeframe.value,
+                end_time=self.time_provider.now(),
             )
 
             price = self._extract_close_price(latest_snapshot)
+            side_enum = PaperOrderSide.SELL if position.side == "LONG" else PaperOrderSide.BUY
 
             if price is None or price <= Decimal("0"):
                 skipped.append(
                     PaperExecutionItem(
                         symbol=position.symbol,
-                        side=PaperOrderSide.SELL,
+                        side=side_enum,
                         status=PaperExecutionStatus.SKIPPED,
                         target_weight=0.0,
                         notional=float(position.notional_value),
                         price=None,
                         quantity=float(position.quantity),
-                        reason="Latest close price not available for paper SELL.",
+                        reason=f"Latest close price not available for paper {side_enum.value}.",
                     )
                 )
                 self._log_execution(
                     account_name=account.name,
                     level="WARNING",
                     stage="PAPER_BROKER",
-                    message=f"Skipped SELL for {position.symbol}: Latest close price not available.",
+                    message=f"Skipped {side_enum.value} for {position.symbol}: Latest close price not available.",
                     cycle_id=cycle_id,
                 )
                 continue
 
-            execution_price = self._money(price * (Decimal("1") - self.SLIPPAGE_RATE))
+            if position.side == "LONG":
+                execution_price = self._money(price * (Decimal("1") - self.SLIPPAGE_RATE))
+            else:
+                execution_price = self._money(price * (Decimal("1") + self.SLIPPAGE_RATE))
             gross_notional = self._money(position.quantity * execution_price)
             fee = self._money(gross_notional * self.COMMISSION_RATE)
             net_recovered = gross_notional - fee
@@ -405,14 +425,14 @@ class PaperBrokerService:
                 account_name=account.name,
                 exchange=target.exchange.value,
                 symbol=closed_position.symbol,
-                side="SELL",
+                side=side_enum.value,
                 quantity=closed_position.quantity,
                 price=execution_price,
                 notional=gross_notional,
                 realized_pnl=closed_position.realized_pnl,
                 position_id=closed_position.id,
                 cycle_id=cycle_id,
-                reason=f"Paper SELL executed (Fee: ${float(fee):.4f})",
+                reason=f"Paper {side_enum.value} executed (Fee: ${float(fee):.4f})",
                 executed_at=self.time_provider.now(),
             )
             self.trade_repository.add(trade)
@@ -421,7 +441,7 @@ class PaperBrokerService:
                 account_name=account.name,
                 exchange=target.exchange.value,
                 symbol=closed_position.symbol,
-                side="SELL",
+                side=side_enum.value,
                 status="FILLED",
                 requested_quantity=closed_position.quantity,
                 filled_quantity=closed_position.quantity,
@@ -436,20 +456,20 @@ class PaperBrokerService:
             executed.append(
                 PaperExecutionItem(
                     symbol=closed_position.symbol,
-                    side=PaperOrderSide.SELL,
+                    side=side_enum,
                     status=PaperExecutionStatus.EXECUTED,
                     target_weight=0.0,
                     notional=float(net_recovered),
                     price=float(execution_price),
                     quantity=float(closed_position.quantity),
-                    reason="Paper SELL executed because position is not in target portfolio.",
+                    reason=f"Paper {side_enum.value} executed because position is not in target portfolio.",
                 )
             )
             self._log_execution(
                 account_name=account.name,
                 level="INFO",
                 stage="PAPER_BROKER",
-                message=f"Executed SELL for {closed_position.symbol}.",
+                message=f"Executed {side_enum.value} for {closed_position.symbol}.",
                 cycle_id=cycle_id,
                 payload={"notional": float(closed_position.notional_value), "price": float(price), "quantity": float(closed_position.quantity)}
             )
@@ -516,15 +536,16 @@ class PaperBrokerService:
                 exchange=exchange.value,
                 symbol=position.symbol,
                 timeframe=timeframe,
+                end_time=self.time_provider.now(),
             )
 
             price = self._extract_close_price(latest_snapshot)
 
             if price is None or price <= Decimal("0"):
-                skipped.append(
+                executed.append(
                     PaperExecutionItem(
                         symbol=position.symbol,
-                        side=PaperOrderSide.BUY,
+                        side=PaperOrderSide.BUY if position.side == "LONG" else PaperOrderSide.SELL,
                         status=PaperExecutionStatus.SKIPPED,
                         target_weight=0.0,
                         notional=float(position.notional_value),
@@ -549,42 +570,75 @@ class PaperBrokerService:
 
             # --- Trailing Stop-Loss Update ---
             sl_pct = Decimal(str(self.SL_PCT.get(self.strategy_mode, 0.03)))
-            potential_sl = self._money(price * (Decimal("1") - sl_pct))
             
-            # Only trail the stop loss UPWARDS, and only if the price has moved favorably (above entry)
-            if updated_position.stop_loss_price is None or potential_sl > updated_position.stop_loss_price:
-                if price > updated_position.entry_price:
-                    updated_position = self.position_repository.update_stop_loss(
-                        position=updated_position,
-                        stop_loss_price=potential_sl,
-                    )
-                    self._log_execution(
-                        account_name=account.name,
-                        level="INFO",
-                        stage="TRAILING_SL",
-                        message=f"Trailing SL moved UP for {updated_position.symbol} to ${float(potential_sl):.4f} (Locking profit)",
-                        cycle_id=cycle_id,
-                    )
+            if updated_position.side == "LONG":
+                potential_sl = self._money(price * (Decimal("1") - sl_pct))
+                
+                # Only trail the stop loss UPWARDS, and only if the price has moved favorably (above entry)
+                if updated_position.stop_loss_price is None or potential_sl > updated_position.stop_loss_price:
+                    if price > updated_position.entry_price:
+                        updated_position = self.position_repository.update_stop_loss(
+                            position=updated_position,
+                            stop_loss_price=potential_sl,
+                        )
+                        self._log_execution(
+                            account_name=account.name,
+                            level="INFO",
+                            stage="TRAILING_SL",
+                            message=f"Trailing SL moved UP for {updated_position.symbol} to ${float(potential_sl):.4f} (Locking profit)",
+                            cycle_id=cycle_id,
+                        )
 
-            # --- Stop-Loss / Take-Profit Check ---
-            sl_hit = (
-                updated_position.stop_loss_price is not None
-                and price <= updated_position.stop_loss_price
-            )
-            tp_hit = (
-                updated_position.take_profit_price is not None
-                and price >= updated_position.take_profit_price
-            )
+                # --- Stop-Loss / Take-Profit Check ---
+                sl_hit = (
+                    updated_position.stop_loss_price is not None
+                    and price <= updated_position.stop_loss_price
+                )
+                tp_hit = (
+                    updated_position.take_profit_price is not None
+                    and price >= updated_position.take_profit_price
+                )
+            else:
+                potential_sl = self._money(price * (Decimal("1") + sl_pct))
+                
+                # Trail the stop loss DOWNWARDS, only if the price has moved favorably (below entry)
+                if updated_position.stop_loss_price is None or potential_sl < updated_position.stop_loss_price:
+                    if price < updated_position.entry_price:
+                        updated_position = self.position_repository.update_stop_loss(
+                            position=updated_position,
+                            stop_loss_price=potential_sl,
+                        )
+                        self._log_execution(
+                            account_name=account.name,
+                            level="INFO",
+                            stage="TRAILING_SL",
+                            message=f"Trailing SL moved DOWN for {updated_position.symbol} to ${float(potential_sl):.4f} (Locking profit)",
+                            cycle_id=cycle_id,
+                        )
+
+                # --- Stop-Loss / Take-Profit Check ---
+                sl_hit = (
+                    updated_position.stop_loss_price is not None
+                    and price >= updated_position.stop_loss_price
+                )
+                tp_hit = (
+                    updated_position.take_profit_price is not None
+                    and price <= updated_position.take_profit_price
+                )
 
             if sl_hit or tp_hit:
                 close_reason = "STOP_LOSS" if sl_hit else "TAKE_PROFIT"
                 
-                execution_price = self._money(price * (Decimal("1") - self.SLIPPAGE_RATE))
+                if position.side == "LONG":
+                    execution_price = self._money(price * (Decimal("1") - self.SLIPPAGE_RATE))
+                    pnl_pct = float((execution_price - position.entry_price) / position.entry_price * 100)
+                else:
+                    execution_price = self._money(price * (Decimal("1") + self.SLIPPAGE_RATE))
+                    pnl_pct = float((position.entry_price - execution_price) / position.entry_price * 100)
+
                 gross_notional = self._money(position.quantity * execution_price)
                 fee = self._money(gross_notional * self.COMMISSION_RATE)
                 net_recovered = gross_notional - fee
-
-                pnl_pct = float((execution_price - position.entry_price) / position.entry_price * 100)
                 
                 closed = self.position_repository.close_position(
                     position=updated_position,
@@ -602,11 +656,12 @@ class PaperBrokerService:
                 self.db.commit()
 
                 # Log the closure trade
+                side_enum = PaperOrderSide.SELL if position.side == "LONG" else PaperOrderSide.BUY
                 trade = Trade(
                     account_name=account.name,
                     exchange=exchange.value,
                     symbol=closed.symbol,
-                    side="SELL",
+                    side=side_enum.value,
                     quantity=closed.quantity,
                     price=execution_price,
                     notional=gross_notional,
@@ -631,7 +686,7 @@ class PaperBrokerService:
                 executed.append(
                     PaperExecutionItem(
                         symbol=closed.symbol,
-                        side=PaperOrderSide.SELL,
+                        side=side_enum,
                         status=PaperExecutionStatus.EXECUTED,
                         target_weight=0.0,
                         notional=float(net_recovered),

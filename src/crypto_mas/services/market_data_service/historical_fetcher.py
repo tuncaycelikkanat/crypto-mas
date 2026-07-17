@@ -34,18 +34,23 @@ class HistoricalFetcherService:
     ) -> HistoricalFetchResult:
         
         # Kaldığı yerden devam etme (Resume) mantığı
-        state = self.state_repository.get_state(self.provider.exchange.value, symbol, timeframe.value)
-        if state and state.last_fetched_at:
-            last_fetched = state.last_fetched_at
+        latest_candles = self.candle_repository.list_by_symbol(
+            exchange=self.provider.exchange.value,
+            symbol=symbol,
+            timeframe=timeframe.value,
+            start_time=start_time,
+            end_time=end_time,
+            limit=1
+        )
+        
+        if latest_candles:
+            last_fetched = latest_candles[0].open_time
             if last_fetched.tzinfo is None:
                 from datetime import UTC
                 last_fetched = last_fetched.replace(tzinfo=UTC)
-                
-            if last_fetched > start_time:
-                logger.info(f"[{symbol}] Resuming backfill from {last_fetched}")
-                current_start = last_fetched + timedelta(milliseconds=1)
-            else:
-                current_start = start_time
+            
+            logger.info(f"[{symbol}] Resuming backfill in range from {last_fetched}")
+            current_start = last_fetched + timedelta(milliseconds=1)
         else:
             current_start = start_time
 

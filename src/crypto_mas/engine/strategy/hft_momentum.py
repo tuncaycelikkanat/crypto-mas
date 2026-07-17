@@ -52,6 +52,19 @@ class HFTMomentumStrategy(BaseStrategy):
         volume_spike    = store.get_metric(symbol, "volume_spike", False)
         window_notional = store.get_metric(symbol, "window_notional", 0.0)
 
+        # Fallback for Backtesting (when RealtimeMetricsStore is empty)
+        if last_price == 0.0 and snapshots:
+            latest = sorted(snapshots, key=lambda s: s.timestamp)[-1].features_json
+            last_price = latest.get("close") or 0.0
+            vol = latest.get("volume") or 0.0
+            vol_sma = latest.get("volume_sma_20") or 1.0
+            rvol_live = vol / vol_sma if vol_sma > 0 else 1.0
+            volume_spike = rvol_live >= 3.0
+            vwap = latest.get("vwap") or last_price
+            rsi = latest.get("rsi_14") or 50.0
+            imbalance = 0.5 + (rsi - 50) / 100.0  # Proxy based on RSI
+            cvd = 1000.0 if rsi > 50 else -1000.0
+
         # ── Gate: must have a real volume spike ──────────────────
         if not volume_spike or last_price == 0.0:
             return None

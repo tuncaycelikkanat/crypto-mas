@@ -1,4 +1,7 @@
 from contextlib import asynccontextmanager
+import uvloop
+
+uvloop.install()
 
 from crypto_mas.infrastructure.logging.setup import setup_logging
 

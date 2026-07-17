@@ -123,7 +123,7 @@ def test_decide_regime_none():
 
 def test_decide_action_long_bear_trend():
     action = MultiAgentStrategy._decide_action(SignalDirection.LONG, 0.5, MarketRegime.BEAR_TREND)
-    assert action == DecisionAction.AVOID
+    assert action == DecisionAction.HOLD  # threshold = 0.375 + 0.15 = 0.525 > 0.5
 
 def test_decide_action_long_hold():
     action = MultiAgentStrategy._decide_action(SignalDirection.LONG, 0.2, MarketRegime.BULL_TREND)
@@ -131,7 +131,7 @@ def test_decide_action_long_hold():
 
 def test_decide_action_short_bull_trend():
     action = MultiAgentStrategy._decide_action(SignalDirection.SHORT, 0.5, MarketRegime.BULL_TREND)
-    assert action == DecisionAction.AVOID
+    assert action == DecisionAction.HOLD  # threshold = 0.375 + 0.15 = 0.525 > 0.5
 
 def test_decide_action_short_consider():
     action = MultiAgentStrategy._decide_action(SignalDirection.SHORT, 0.5, MarketRegime.BEAR_TREND)

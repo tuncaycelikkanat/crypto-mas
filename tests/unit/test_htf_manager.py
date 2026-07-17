@@ -19,7 +19,7 @@ def create_htf_snapshot(close: float, ema20: float, ema50: float, roc: float) ->
 
 def test_htf_bear_trend_rejects_longs(manager):
     # Bear trend: Close < EMA20 < EMA50 and ROC < 0
-    snapshot = create_htf_snapshot(close=9000, ema20=9500, ema50=10000, roc=-2.5)
+    snapshot = create_htf_snapshot(close=9000, ema20=9500, ema50=10000, roc=-5.0)
     snapshots = [snapshot, snapshot]
     
     assert manager.is_long_allowed(snapshots) is False

@@ -70,12 +70,13 @@ class PositionRepository:
         stop_loss_price: Decimal | None = None,
         take_profit_price: Decimal | None = None,
         strategy_mode: str | None = None,
+        side: str = "LONG",
     ) -> Position:
         position = Position(
             account_name=account_name,
             exchange=exchange,
             symbol=symbol,
-            side="LONG",
+            side=side,
             status="OPEN",
             quantity=quantity,
             entry_price=entry_price,
@@ -104,7 +105,10 @@ class PositionRepository:
     ) -> Position:
         current_price = self._money(current_price)
 
-        raw_unrealized_pnl = (current_price - position.entry_price) * position.quantity
+        if position.side == "LONG":
+            raw_unrealized_pnl = (current_price - position.entry_price) * position.quantity
+        else:
+            raw_unrealized_pnl = (position.entry_price - current_price) * position.quantity
         unrealized_pnl = self._zero_if_tiny(raw_unrealized_pnl)
 
         position.current_price = current_price
@@ -139,7 +143,10 @@ class PositionRepository:
     ) -> Position:
         exit_price = self._money(exit_price)
 
-        raw_realized_pnl = (exit_price - position.entry_price) * position.quantity
+        if position.side == "LONG":
+            raw_realized_pnl = (exit_price - position.entry_price) * position.quantity
+        else:
+            raw_realized_pnl = (position.entry_price - exit_price) * position.quantity
         realized_pnl = self._zero_if_tiny(raw_realized_pnl)
 
         position.current_price = exit_price

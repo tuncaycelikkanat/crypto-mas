@@ -31,6 +31,10 @@ class BacktestEngineService:
         start_time: datetime,
         end_time: datetime,
         initial_balance: float = 10000.0,
+        risk_level: int = 100,
+        use_btc_shield: bool = True,
+        use_htf_shield: bool = True,
+        use_regime_shield: bool = True,
     ) -> BacktestResult:
         # Create backtest result record
         result = BacktestResult(
@@ -43,6 +47,12 @@ class BacktestEngineService:
             start_time=start_time,
             end_time=end_time,
             initial_balance=initial_balance,
+            config_json={
+                "risk_level": risk_level,
+                "use_btc_shield": use_btc_shield,
+                "use_htf_shield": use_htf_shield,
+                "use_regime_shield": use_regime_shield,
+            }
         )
         self.repository.add(result)
         self.db.commit()
@@ -50,23 +60,71 @@ class BacktestEngineService:
         try:
             logger.info(f"[{job_id}] Backtest started from {start_time} to {end_time}")
             
-            # Step 1: Pre-fetch market data
-            # To simulate properly without fetching from API every tick, we backfill first.
+            # Intercept magic symbol lists like AUTO_GAINERS for backtests
+            if len(symbols) == 1 and symbols[0].startswith("AUTO_"):
+                logger.warning(f"[{job_id}] Magic symbol '{symbols[0]}' is not supported for historical backtests without full exchange scans. Defaulting to Top 5 crypto assets.")
+                symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
+            # Step 1: Market data provider & fetcher
             provider = get_market_data_provider(exchange)
             fetcher = HistoricalFetcherService(provider=provider, db=self.db)
+            
+            # Insert INIT log so the UI has immediate feedback
+            from crypto_mas.domain.models.execution_log import ExecutionLog
+            init_log = ExecutionLog(
+                account_name=f"backtest-{job_id}",
+                cycle_id=0,
+                level="INFO",
+                stage="INIT",
+                message=f"Starting historical data fetch for {len(symbols)} symbols. This may take 1-2 minutes...",
+                created_at=datetime.now(UTC)
+            )
+            self.db.add(init_log)
+            self.db.commit()
             
             # Also backfill an extra 60 periods before start_time so features can warm up!
             delta = TradingCycleService._get_timedelta(timeframe)
             warmup_start = start_time - delta * 60
             
-            logger.info(f"[{job_id}] Backfilling historical data...")
+            # Add BTC to fetch list for shield
+            fetch_symbols = list(set(symbols + ["BTCUSDT"])) if use_btc_shield else list(symbols)
+            
+            logger.info(f"[{job_id}] Backfilling historical data for {timeframe.value}...")
             await fetcher.backfill_universe(
-                symbols=symbols,
+                symbols=fetch_symbols,
                 timeframe=timeframe,
                 start_time=warmup_start,
                 end_time=end_time,
             )
-            logger.info(f"[{job_id}] Backfill completed.")
+            
+            htf_map = {
+                Timeframe.ONE_MINUTE: Timeframe.FOUR_HOURS,
+                Timeframe.FIFTEEN_MINUTES: Timeframe.FOUR_HOURS,
+                Timeframe.ONE_HOUR: Timeframe.ONE_DAY,
+                Timeframe.FOUR_HOURS: Timeframe.ONE_WEEK,
+                Timeframe.ONE_DAY: Timeframe.ONE_MONTH,
+            }
+            htf = htf_map.get(timeframe)
+            if htf and use_htf_shield:
+                logger.info(f"[{job_id}] Backfilling HTF ({htf.value}) historical data...")
+                htf_warmup_start = start_time - TradingCycleService._get_timedelta(htf) * 60
+                await fetcher.backfill_universe(
+                    symbols=fetch_symbols,
+                    timeframe=htf,
+                    start_time=htf_warmup_start,
+                    end_time=end_time,
+                )
+                
+            # Insert log to indicate fetch completion
+            fetch_log = ExecutionLog(
+                account_name=f"backtest-{job_id}",
+                cycle_id=0,
+                level="INFO",
+                stage="PROGRESS",
+                message="Data fetch completed! Building in-memory feature vectors...",
+                created_at=datetime.now(UTC)
+            )
+            self.db.add(fetch_log)
+            self.db.commit()
             
             # Step 2: Create isolated paper account
             account_name = f"backtest-{job_id}"
@@ -93,14 +151,64 @@ class BacktestEngineService:
             mem_candles = InMemoryCandleRepository(candle_db)
             mem_features = InMemoryFeatureSnapshotRepository(feature_db)
             
+            strategy_mode = "swing"
+            if strategy_name == "hft_momentum":
+                strategy_mode = "scalping"
+            elif strategy_name == "ema_golden_cross":
+                strategy_mode = "hodl"
+
             cycle_service = TradingCycleService(
                 db=self.db,
                 market_provider=provider,
                 time_provider=time_provider,
-                strategy_mode=strategy_name,
+                strategy_mode=strategy_mode,
                 candle_repo=mem_candles,
                 feature_repo=mem_features
             )
+            
+            # --- 🚀 VECTORIZED PRE-CALCULATION FOR ULTRA-FAST BACKTEST ---
+            # Also patch the broker service to use in-memory snapshots so it doesn't query SQLite 432,000 times!
+            cycle_service.paper_broker.feature_snapshot_repository = mem_features
+            
+            # Pre-calculate all features instantly using Pandas/pandas-ta
+            # and inject them into memory, bypassing the cycle's loop calculations.
+            from crypto_mas.services.feature_pipeline.service import FeaturePipelineService
+            feature_svc = FeaturePipelineService(self.db, candle_repo=mem_candles)
+            
+            for sym in fetch_symbols:
+                # 1. Base timeframe
+                candles = mem_candles.list_by_symbol(exchange.value, sym, timeframe.value)
+                if candles:
+                    snapshots = feature_svc.calculator.calculate(candles)
+                    if snapshots:
+                        mem_features.bulk_upsert(snapshots)
+                
+                # 2. HTF (Higher Timeframe)
+                htf_map = {
+                    Timeframe.ONE_MINUTE: Timeframe.FOUR_HOURS,
+                    Timeframe.FIFTEEN_MINUTES: Timeframe.FOUR_HOURS,
+                    Timeframe.ONE_HOUR: Timeframe.ONE_DAY,
+                    Timeframe.FOUR_HOURS: Timeframe.ONE_WEEK,
+                    Timeframe.ONE_DAY: Timeframe.ONE_MONTH,
+                }
+                htf = htf_map.get(timeframe)
+                if htf:
+                    htf_candles = mem_candles.list_by_symbol(exchange.value, sym, htf.value)
+                    if htf_candles:
+                        htf_snapshots = feature_svc.calculator.calculate(htf_candles)
+                        if htf_snapshots:
+                            mem_features.bulk_upsert(htf_snapshots)
+
+            # Patch feature_service in cycle_service so it doesn't recalculate on every tick!
+            # It just returns fake metadata since the data is already in memory.
+            def _mock_calc_and_store(*args, **kwargs):
+                return {"exchange": exchange.value, "symbol": kwargs.get("symbol"), "timeframe": kwargs.get("timeframe"), "processed_rows": 0}
+            cycle_service.feature_service.calculate_and_store = _mock_calc_and_store
+            
+            # Patch fetcher_service so it doesn't try to download missing candles during the simulation loop!
+            async def _mock_backfill_universe(*args, **kwargs):
+                return
+            cycle_service.fetcher_service.backfill_universe = _mock_backfill_universe
             
             # Step 4: Time loop
             total_trades = 0
@@ -108,6 +216,21 @@ class BacktestEngineService:
             
             while time_provider.now() <= end_time:
                 cycle_count += 1
+                if cycle_count % 100 == 0:
+                    self.db.commit()  # Batch commit to release SQLite write locks!
+
+                if cycle_count % 1440 == 0:
+                    hb_log = ExecutionLog(
+                        account_name=account_name,
+                        cycle_id=0,
+                        level="INFO",
+                        stage="PROGRESS",
+                        message=f"Simulated {cycle_count} cycles. Current time: {time_provider.now().strftime('%Y-%m-%d %H:%M')}",
+                        created_at=datetime.now(UTC)
+                    )
+                    self.db.add(hb_log)
+                    self.db.commit()
+
                 if cycle_count % 10 == 0:
                     self.db.refresh(result)
                     if result.status == "CANCELLED":
@@ -124,10 +247,19 @@ class BacktestEngineService:
                     timeframe=timeframe,
                     strategy_name=strategy_name,
                     trigger=f"BACKTEST-{job_id}",
+                    risk_level=risk_level,
+                    use_btc_shield=use_btc_shield,
+                    use_htf_shield=use_htf_shield,
+                    use_regime_shield=use_regime_shield,
+                    cycle_index=cycle_count,
                 )
                 
                 total_trades += cycle.trades_executed
                 time_provider.tick(delta)
+                
+                # Yield control to the event loop so Ctrl+C and other requests are not blocked
+                import asyncio
+                await asyncio.sleep(0)
                 
             # Step 5: Final metrics
             account = account_repo.get_by_name(account_name)
@@ -156,6 +288,13 @@ class BacktestEngineService:
             self.db.commit()
             
             logger.info(f"[{job_id}] Backtest completed successfully. Final Equity: {result.final_equity}, Win Rate: {result.win_rate}, Max DD: {result.max_drawdown}")
+            
+            # 7. Archive Data
+            try:
+                self._archive_backtest_data(job_id, account_name, result)
+            except Exception as e:
+                logger.error(f"[{job_id}] Failed to archive backtest data: {e}")
+                
             return result
             
         except Exception as e:
@@ -165,3 +304,74 @@ class BacktestEngineService:
             result.completed_at = datetime.now(UTC)
             self.db.commit()
             raise e
+
+    def _archive_backtest_data(self, job_id: str, account_name: str, result: BacktestResult):
+        import json
+        from pathlib import Path
+        
+        archive_dir = Path(f"data/backtests/{job_id}")
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 1. Config
+        with open(archive_dir / "config.json", "w") as f:
+            json.dump(result.config_json or {}, f, indent=2)
+            
+        # 2. Stats
+        stats = {
+            "initial_balance": result.initial_balance,
+            "final_equity": result.final_equity,
+            "total_trades": result.total_trades,
+            "win_rate": result.win_rate,
+            "max_drawdown": result.max_drawdown,
+            "start_time": result.start_time.isoformat(),
+            "end_time": result.end_time.isoformat(),
+            "strategy": result.strategy_name,
+            "symbols": result.symbols,
+        }
+        with open(archive_dir / "stats.json", "w") as f:
+            json.dump(stats, f, indent=2)
+            
+        # 3. Trades
+        from crypto_mas.domain.models.trade import Trade
+        trades = self.db.execute(select(Trade).where(Trade.account_name == account_name)).scalars().all()
+        trades_data = []
+        for t in trades:
+            trades_data.append({
+                "symbol": t.symbol,
+                "side": t.side,
+                "quantity": float(t.quantity),
+                "price": float(t.price),
+                "realized_pnl": float(t.realized_pnl),
+                "reason": t.reason,
+                "executed_at": t.executed_at.isoformat() if t.executed_at else None,
+            })
+        with open(archive_dir / "trades.json", "w") as f:
+            json.dump(trades_data, f, indent=2)
+            
+        # 4. Market Data (Candles)
+        from crypto_mas.domain.models.candle import Candle
+        market_data = {}
+        for sym in result.symbols:
+            candles = self.db.execute(
+                select(Candle)
+                .where(Candle.exchange == result.exchange)
+                .where(Candle.symbol == sym)
+                .where(Candle.timeframe == result.timeframe)
+                .where(Candle.open_time >= result.start_time)
+                .where(Candle.open_time <= result.end_time)
+                .order_by(Candle.open_time.asc())
+            ).scalars().all()
+            
+            market_data[sym] = [{
+                "time": c.open_time.isoformat(),
+                "open": float(c.open),
+                "high": float(c.high),
+                "low": float(c.low),
+                "close": float(c.close),
+                "volume": float(c.volume)
+            } for c in candles]
+            
+        with open(archive_dir / "market_data.json", "w") as f:
+            json.dump(market_data, f, indent=2)
+            
+        logger.info(f"[{job_id}] Successfully archived data to {archive_dir}")

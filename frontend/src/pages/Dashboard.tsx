@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
   TrendingUp, TrendingDown, DollarSign, BarChart2,
-  Layers, RefreshCw, Server, Database, Bot, Activity
+  Layers, RefreshCw
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer

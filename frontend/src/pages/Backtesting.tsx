@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Play, Terminal as TerminalIcon, CheckCircle, XCircle, Activity } from 'lucide-react';
+import { Play, Terminal as TerminalIcon, CheckCircle, XCircle, Activity, History } from 'lucide-react';
+import { BacktestHistory } from './BacktestHistory';
 
 const STAGE_META: Record<string, { color: string; label: string }> = {
   INIT:       { color: '#60a5fa', label: 'Init'       },
@@ -37,6 +38,7 @@ const Backtesting: React.FC = () => {
   const [jobs, setJobs] = useState<any[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [logs, setLogs] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'run' | 'history'>('run');
   
   const [exchange, setExchange] = useState("BINANCE");
   const [configMode, setConfigMode] = useState<'scalping' | 'swing' | 'hodl'>('swing');
@@ -46,6 +48,10 @@ const Backtesting: React.FC = () => {
   const [startDate, setStartDate] = useState(new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [initialBalance, setInitialBalance] = useState(10000);
+  const [riskLevel, setRiskLevel] = useState(100);
+  const [useBtcShield, setUseBtcShield] = useState(true);
+  const [useHtfShield, setUseHtfShield] = useState(true);
+  const [useRegimeShield, setUseRegimeShield] = useState(true);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -115,7 +121,11 @@ const Backtesting: React.FC = () => {
         strategy_name: configMode === 'scalping' ? 'hft_momentum' : (configMode === 'swing' ? 'macd_cross' : 'ema_golden_cross'),
         start_time: new Date(startDate).toISOString(),
         end_time: new Date(endDate).toISOString(),
-        initial_balance: Number(initialBalance)
+        initial_balance: Number(initialBalance),
+        risk_level: riskLevel,
+        use_btc_shield: useBtcShield,
+        use_htf_shield: useHtfShield,
+        use_regime_shield: useRegimeShield,
       };
 
       const res = await axios.post('/api/v1/backtest/run', payload);
@@ -143,12 +153,21 @@ const Backtesting: React.FC = () => {
   };
 
   const handleClearAll = async () => {
-    if(!window.confirm("Bütün backtest geçmişi silinecek. Emin misin?")) return;
+    if(!window.confirm("Çalışan testler iptal edilecek ve ekran temizlenecek. Geçmiş kayıtlar silinmeyecektir. Onaylıyor musunuz?")) return;
     try {
-      await axios.delete('/api/v1/backtest');
-      setJobs([]);
+      // Find running jobs and cancel them
+      const runningJobs = jobs.filter(j => j.status === 'RUNNING' || j.status === 'PENDING');
+      for (const job of runningJobs) {
+        await axios.post(`/api/v1/backtest/${job.job_id}/cancel`);
+      }
+      
+      // Clear screen states
       setSelectedJobId(null);
       setLogs([]);
+      
+      // Refresh jobs
+      const res = await axios.get('/api/v1/backtest');
+      setJobs(res.data);
     } catch(e) {
       console.error(e);
     }
@@ -163,10 +182,32 @@ const Backtesting: React.FC = () => {
           <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Backtesting Engine</h1>
           <p className="text-muted">Simulate your strategies against historical data.</p>
         </div>
-        <button onClick={handleClearAll} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--danger)', color: 'var(--danger)' }}>
-          <XCircle size={16} /> Tümünü Temizle
-        </button>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '8px' }}>
+            <button 
+              className={`btn ${activeTab === 'run' ? 'primary' : ''}`}
+              style={{ background: activeTab === 'run' ? 'var(--primary)' : 'transparent', color: activeTab === 'run' ? '#fff' : '#94a3b8', border: 'none', boxShadow: 'none' }}
+              onClick={() => setActiveTab('run')}
+            >
+              Run Test
+            </button>
+            <button 
+              className={`btn ${activeTab === 'history' ? 'primary' : ''}`}
+              style={{ background: activeTab === 'history' ? 'var(--primary)' : 'transparent', color: activeTab === 'history' ? '#fff' : '#94a3b8', border: 'none', boxShadow: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}
+              onClick={() => setActiveTab('history')}
+            >
+              <History size={16} /> History & Compare
+            </button>
+          </div>
+          <button onClick={handleClearAll} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--danger)', color: 'var(--danger)' }}>
+            <XCircle size={16} /> Tümünü Temizle
+          </button>
+        </div>
       </div>
+
+      {activeTab === 'history' ? (
+        <BacktestHistory />
+      ) : (
 
       <div className="grid-cols-3" style={{ alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', gridColumn: 'span 1' }}>
@@ -224,6 +265,46 @@ const Backtesting: React.FC = () => {
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)' }}>Initial Balance ($)</label>
                 <input type="number" className="form-input" value={initialBalance} onChange={(e) => setInitialBalance(Number(e.target.value))} required />
+              </div>
+
+              {/* Risk Management Selector */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-muted)' }}>Risk Level (0-200)</label>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="200" 
+                  value={riskLevel} 
+                  onChange={(e) => setRiskLevel(parseInt(e.target.value, 10))}
+                  style={{ width: '100%', marginBottom: '8px', cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                  <span>0 (Güvenli)</span>
+                  <span>100 (Degen)</span>
+                  <span>200 (YOLO/Max Risk)</span>
+                </div>
+                <div style={{ textAlign: 'center', marginTop: '4px', fontWeight: 'bold', color: 'var(--primary)', fontSize: '0.9rem' }}>
+                  Current: {riskLevel}
+                </div>
+              </div>
+
+              {/* Shields (Kalkanlar) */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <label style={{ display: 'block', marginBottom: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>🛡️ Kalkanlar (Risk Filtreleri)</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    <input type="checkbox" checked={useBtcShield} onChange={(e) => setUseBtcShield(e.target.checked)} />
+                    BTC Crash Shield <span className="text-muted">(Ani BTC çöküşlerinde alımları durdurur)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    <input type="checkbox" checked={useHtfShield} onChange={(e) => setUseHtfShield(e.target.checked)} />
+                    HTF Trend Shield <span className="text-muted">(Üst zaman dilimi trendiyle uyumlu işlem açar)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    <input type="checkbox" checked={useRegimeShield} onChange={(e) => setUseRegimeShield(e.target.checked)} />
+                    Market Regime Shield <span className="text-muted">(Yüksek volatilitede işlemleri engeller)</span>
+                  </label>
+                </div>
               </div>
               <button type="submit" className="btn-primary" disabled={loading} style={{ marginTop: '16px' }}>
                 {loading ? 'Starting...' : 'Run Simulation'}
@@ -373,6 +454,7 @@ const Backtesting: React.FC = () => {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,11 @@
 import asyncio
 import logging
+import signal
+import sys
+import uvloop
+
+uvloop.install()
+
 from datetime import UTC
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler

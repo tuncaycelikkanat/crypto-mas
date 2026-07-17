@@ -68,6 +68,10 @@ class TradingCycleService:
         strategy_name: str = "multi_agent",
         trigger: str = "MANUAL",
         risk_level: int = 50,
+        use_btc_shield: bool = True,
+        use_htf_shield: bool = True,
+        use_regime_shield: bool = True,
+        cycle_index: int | None = None,
     ) -> TradingCycle:
         now = self.time_provider.now()
         strategy = StrategyFactory.create(strategy_name, time_provider=self.time_provider)
@@ -122,9 +126,14 @@ class TradingCycleService:
             started_at=now,
         )
         self.cycle_repository.add(cycle)
-        self.db.commit()
+        if not trigger.startswith("BACKTEST-"):
+            self.db.commit()
         
+        display_id = cycle_index if cycle_index is not None else cycle.id
+
         def _log(stage: str, message: str, level: str = "INFO", payload: dict | None = None):
+            if trigger.startswith("BACKTEST-") and level not in ("ERROR", "SUCCESS"):
+                return
             from crypto_mas.domain.models.execution_log import ExecutionLog
             log = ExecutionLog(
                 account_name=account_name,
@@ -137,8 +146,9 @@ class TradingCycleService:
             )
             self.db.add(log)
 
-        _log("INIT", f"Cycle started for {len(symbols)} symbols: {symbols}", payload={
+        _log("INIT", f"Cycle {display_id} started for {len(symbols)} symbols: {symbols}", payload={
             "cycle_id": cycle.id,
+            "display_id": display_id,
             "account": account_name,
             "symbols": symbols,
             "strategy": strategy_name,
@@ -147,7 +157,7 @@ class TradingCycleService:
         })
 
         try:
-            btc_is_crashing, htf = await self._fetch_data_for_symbols(symbols, timeframe, now, cycle, _log)
+            btc_is_crashing, htf = await self._fetch_data_for_symbols(symbols, timeframe, now, cycle, _log, use_btc_shield, display_id=display_id)
             
             decisions = self._run_strategies_and_score(
                 symbols=symbols,
@@ -160,7 +170,10 @@ class TradingCycleService:
                 account_name=account_name,
                 htf=htf,
                 btc_is_crashing=btc_is_crashing,
-                _log=_log
+                use_htf_shield=use_htf_shield,
+                use_regime_shield=use_regime_shield,
+                _log=_log,
+                display_id=display_id
             )
             
             cycle.symbols_processed = len(symbols)
@@ -176,22 +189,26 @@ class TradingCycleService:
                 _log=_log
             )
             
-            self.db.commit()
+            if not trigger.startswith("BACKTEST-"):
+                self.db.commit()
             return cycle
             
         except Exception as e:
-            logger.exception(f"[Cycle {cycle.id}] Failed with error: {e}")
-            _log("FAILED", f"Critical error in cycle: {str(e)}", "ERROR")
+            logger.exception(f"[Cycle {display_id}] Failed with error: {e}")
+            _log("FAILED", f"Critical error in cycle {display_id}: {str(e)}", "ERROR")
             self.cycle_repository.update_status(cycle.id, "FAILED")
-            self.db.commit()
+            if not trigger.startswith("BACKTEST-"):
+                self.db.commit()
             raise e
 
-    async def _fetch_data_for_symbols(self, symbols, timeframe, now, cycle, _log):
-        logger.info(f"[Cycle {cycle.id}] Starting market data sync for {len(symbols)} symbols.")
+    async def _fetch_data_for_symbols(self, symbols, timeframe, now, cycle, _log, use_btc_shield=True, display_id: int | None = None):
+        display_id = display_id if display_id is not None else cycle.id
+        logger.debug(f"[Cycle {display_id}] Starting market data sync for {len(symbols)} symbols.")
         _log("MARKET_DATA", f"Fetching history from {self.fetcher_service.provider.exchange.value} for {timeframe}")
         
         fetch_symbols = set(symbols)
-        fetch_symbols.add("BTCUSDT")
+        if use_btc_shield:
+            fetch_symbols.add("BTCUSDT")
         fetch_symbols_list = list(fetch_symbols)
         
         fallback_start = now - self._get_timedelta(timeframe) * 60
@@ -222,34 +239,36 @@ class TradingCycleService:
                 end_time=now,
             )
             
-        self.feature_service.calculate_and_store(
-            exchange=self.fetcher_service.provider.exchange,
-            symbol="BTCUSDT",
-            timeframe=timeframe,
-            end_time=now,
-            limit=1000,
-        )
-        btc_snapshots = self.feature_snapshot_repository.list_by_symbol(
-            exchange=self.fetcher_service.provider.exchange.value,
-            symbol="BTCUSDT",
-            timeframe=timeframe.value,
-            limit=5,
-        )
-        
         btc_is_crashing = False
-        if btc_snapshots:
-            latest_btc = btc_snapshots[-1].features_json
-            btc_roc = latest_btc.get("roc_14")
-            if btc_roc is not None and btc_roc < -5.0:
-                btc_is_crashing = True
-                _log("RISK", f"MARKET CRASH DETECTED! BTC ROC: {btc_roc:.2f}%. Longs will be restricted.", "WARN")
-                
+        if use_btc_shield:
+            self.feature_service.calculate_and_store(
+                exchange=self.fetcher_service.provider.exchange,
+                symbol="BTCUSDT",
+                timeframe=timeframe,
+                end_time=now,
+                limit=1000,
+            )
+            btc_snapshots = self.feature_snapshot_repository.list_by_symbol(
+                exchange=self.fetcher_service.provider.exchange.value,
+                symbol="BTCUSDT",
+                timeframe=timeframe.value,
+                limit=5,
+            )
+            
+            if btc_snapshots:
+                latest_btc = btc_snapshots[-1].features_json
+                btc_roc = latest_btc.get("roc_14")
+                if btc_roc is not None and btc_roc < -5.0:
+                    btc_is_crashing = True
+                    _log("RISK", f"MARKET CRASH DETECTED! BTC ROC: {btc_roc:.2f}%. Longs will be restricted.", "WARN")
+                    
         return btc_is_crashing, htf
 
-    def _run_strategies_and_score(self, symbols, timeframe, now, strategy, strategy_name, risk_level, cycle, account_name, htf, btc_is_crashing, _log):
+    def _run_strategies_and_score(self, symbols, timeframe, now, strategy, strategy_name, risk_level, cycle, account_name, htf, btc_is_crashing, _log, use_htf_shield=True, use_regime_shield=True, display_id: int | None = None):
+        display_id = display_id if display_id is not None else cycle.id
         decisions = []
         for symbol in symbols:
-            logger.info(f"[Cycle {cycle.id}] Processing features and decisions for {symbol}")
+            logger.debug(f"[Cycle {display_id}] Processing features and decisions for {symbol}")
             _log("STRATEGY", f"Evaluating {strategy_name} for {symbol}")
             
             self.feature_service.calculate_and_store(
@@ -264,17 +283,29 @@ class TradingCycleService:
                 exchange=self.fetcher_service.provider.exchange.value,
                 symbol=symbol,
                 timeframe=timeframe.value,
+                end_time=now,
                 limit=100,
             )
             
             if not snapshots:
-                logger.warning(f"[Cycle {cycle.id}] No feature snapshots for {symbol}. Skipping.")
+                logger.warning(f"[Cycle {display_id}] No feature snapshots for {symbol}. Skipping.")
                 _log("STRATEGY", f"No data available for {symbol}, skipped", "WARN")
                 continue
             
+            latest_snapshot = snapshots[-1]
+            timeframe_delta = self._get_timedelta(timeframe)
+            max_allowed_delay = timeframe_delta + timedelta(minutes=15)
+            
+            if now - latest_snapshot.timestamp > max_allowed_delay:
+                err_msg = f"STALE DATA DETECTED for {symbol}: Latest snapshot timestamp {latest_snapshot.timestamp} is older than allowed {max_allowed_delay} from now {now}. Kill-Switch triggered."
+                logger.error(f"[Cycle {display_id}] {err_msg}")
+                _log("FAILED", err_msg, "ERROR")
+                raise ValueError(err_msg)
+
+            
             htf_long_allowed = True
             htf_short_allowed = True
-            if htf:
+            if htf and use_htf_shield:
                 self.feature_service.calculate_and_store(
                     exchange=self.fetcher_service.provider.exchange,
                     symbol=symbol,
@@ -284,17 +315,23 @@ class TradingCycleService:
                     exchange=self.fetcher_service.provider.exchange.value,
                     symbol=symbol,
                     timeframe=htf.value,
+                    end_time=now,
                     limit=5,
                 )
                 htf_long_allowed = self.htf_manager.is_long_allowed(htf_snapshots)
                 htf_short_allowed = self.htf_manager.is_short_allowed(htf_snapshots)
             
+            kwargs = {}
+            if strategy_name == "multi_agent":
+                kwargs["use_regime_shield"] = use_regime_shield
+                
             decision = strategy.decide(
                 exchange=self.fetcher_service.provider.exchange,
                 symbol=symbol,
                 timeframe=timeframe,
                 snapshots=snapshots,
                 risk_level=risk_level,
+                **kwargs
             )
             
             if decision:
@@ -405,7 +442,7 @@ class TradingCycleService:
         return decisions
 
     def _apply_risk_and_execute(self, decisions, timeframe, now, cycle, account_name, symbols, _log):
-        logger.info(f"[Cycle {cycle.id}] Constructing portfolio target from {len(decisions)} decisions.")
+        logger.debug(f"[Cycle {cycle.id}] Constructing portfolio target from {len(decisions)} decisions.")
         _log("PORTFOLIO", f"Constructing target portfolio from {len(decisions)} active signals", payload={
             "total_signals": len(decisions),
             "candidate_symbols": [d.symbol for d in decisions],
@@ -417,7 +454,7 @@ class TradingCycleService:
             decisions=decisions,
         )
         
-        logger.info(f"[Cycle {cycle.id}] Evaluating risk limits.")
+        logger.debug(f"[Cycle {cycle.id}] Evaluating risk limits.")
         risk_assessment = self.risk_engine.assess(target=target_portfolio)
         approved_portfolio = risk_assessment.approved_target
         
@@ -452,7 +489,7 @@ class TradingCycleService:
                 "reason": "No eligible long candidates survived filters.",
             })
         
-        logger.info(f"[Cycle {cycle.id}] Executing portfolio.")
+        logger.debug(f"[Cycle {cycle.id}] Executing portfolio.")
         _log("EXECUTION", "Executing orders against virtual broker")
         
         self.paper_broker.update_mark_prices(
@@ -498,7 +535,7 @@ class TradingCycleService:
         self.cycle_repository.update_status(cycle.id, "COMPLETED")
         cycle.finished_at = self.time_provider.now()
         
-        logger.info(f"[Cycle {cycle.id}] Completed successfully. PnL: {cycle.cycle_pnl}")
+        logger.debug(f"[Cycle {cycle.id}] Completed successfully. PnL: {cycle.cycle_pnl}")
         _log(
             "COMPLETED",
             f"Cycle #{cycle.id} tamamlandı. {len(symbols)} coin tarandı, {cycle.trades_executed} işlem yapıldı. PnL: ${cycle.cycle_pnl:.4f}",

@@ -32,4 +32,6 @@ migrations/versions/*.pyc
 *.db
 *.sqlite
 *.sqlite3
-crypto_mas.db
+crypto_mas.dbnotes/
+data/
+logs/

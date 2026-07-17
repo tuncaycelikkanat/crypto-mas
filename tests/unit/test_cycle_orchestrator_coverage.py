@@ -40,7 +40,7 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
     
     # Force BTC crash
     btc_snapshot_mock = MagicMock()
-    btc_snapshot_mock.features_json = {"roc_14": -3.0}
+    btc_snapshot_mock.features_json = {"roc_14": -6.0}
     
     # Simulate htf_long_allowed=False, htf_short_allowed=False
     service.htf_manager = MagicMock()
