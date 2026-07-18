@@ -38,15 +38,19 @@ class FeatureSnapshotRepository:
         exchange: str,
         symbol: str,
         timeframe: str,
+        end_time: datetime | None = None,
     ) -> FeatureSnapshot | None:
         stmt = (
             select(FeatureSnapshot)
             .where(FeatureSnapshot.exchange == exchange)
             .where(FeatureSnapshot.symbol == symbol)
             .where(FeatureSnapshot.timeframe == timeframe)
-            .order_by(FeatureSnapshot.timestamp.desc())
-            .limit(1)
         )
+
+        if end_time is not None:
+            stmt = stmt.where(FeatureSnapshot.timestamp <= end_time)
+
+        stmt = stmt.order_by(FeatureSnapshot.timestamp.desc()).limit(1)
 
         return self.db.scalars(stmt).first()
 

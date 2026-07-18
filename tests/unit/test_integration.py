@@ -49,14 +49,14 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
     # RSI Oversold strategy: RSI < 30 and starts rising
     candles = []
     # Start far back so they end near the current time (2026-01-01 12:00:00)
-    base_time = datetime(2025, 12, 31, 0, 0, 0, tzinfo=UTC)
+    base_time = datetime(2025, 12, 31, 12, 15, 0, tzinfo=UTC)
 
     # 90 neutral candles
     for i in range(90):
         candles.append(
             OHLCVCandle(
                 exchange=Exchange.BINANCE,
-                symbol="BTCUSDT",
+                symbol="ETHUSDT",
                 timeframe=Timeframe.FIFTEEN_MINUTES,
                 open_time=base_time,
                 close_time=base_time + timedelta(minutes=15) - timedelta(milliseconds=1),
@@ -78,7 +78,7 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
         candles.append(
              OHLCVCandle(
                 exchange=Exchange.BINANCE,
-                symbol="BTCUSDT",
+                symbol="ETHUSDT",
                 timeframe=Timeframe.FIFTEEN_MINUTES,
                 open_time=base_time,
                 close_time=base_time + timedelta(minutes=15) - timedelta(milliseconds=1),
@@ -98,7 +98,7 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
     candles.append(
         OHLCVCandle(
             exchange=Exchange.BINANCE,
-            symbol="BTCUSDT",
+            symbol="ETHUSDT",
             timeframe=Timeframe.FIFTEEN_MINUTES,
             open_time=base_time,
             close_time=base_time + timedelta(minutes=15) - timedelta(milliseconds=1),
@@ -114,16 +114,46 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
     )
 
     async def mock_fetch_ohlcv(symbol, timeframe, start_time, end_time, limit=None):
+        if symbol == "BTCUSDT":
+            if timeframe == Timeframe.FOUR_HOURS:
+                htf_candles = []
+                htf_base_time = datetime(2026, 1, 1, 11, 45, tzinfo=UTC) - timedelta(days=10)
+                for i in range(10):
+                    htf_candles.append(
+                        OHLCVCandle(
+                            exchange=Exchange.BINANCE, symbol="BTCUSDT", timeframe=Timeframe.FOUR_HOURS,
+                            open_time=htf_base_time, close_time=htf_base_time + timedelta(hours=4) - timedelta(milliseconds=1),
+                            open=Decimal("50000"), high=Decimal("50000"), low=Decimal("50000"), close=Decimal("50000"),
+                            volume=Decimal("1000"), quote_volume=Decimal("50000000"), trade_count=10000, source="MOCK"
+                        )
+                    )
+                    htf_base_time += timedelta(hours=4)
+                return htf_candles
+            else:
+                btc_candles = []
+                btc_base = datetime(2025, 12, 31, 12, 15, 0, tzinfo=UTC)
+                for _ in range(100):
+                    btc_candles.append(
+                        OHLCVCandle(
+                            exchange=Exchange.BINANCE, symbol="BTCUSDT", timeframe=timeframe,
+                            open_time=btc_base, close_time=btc_base + timedelta(minutes=15) - timedelta(milliseconds=1),
+                            open=Decimal("50000"), high=Decimal("50000"), low=Decimal("50000"), close=Decimal("50000"),
+                            volume=Decimal("10"), quote_volume=Decimal("500000"), trade_count=100, source="MOCK"
+                        )
+                    )
+                    btc_base += timedelta(minutes=15)
+                return btc_candles
+
         if timeframe == Timeframe.FOUR_HOURS:
             # Return dummy 4H candles to pass integrity and HTF checks
             htf_candles = []
-            htf_base_time = datetime(2026, 1, 1, tzinfo=UTC) - timedelta(days=10)
+            htf_base_time = datetime(2026, 1, 1, 11, 45, tzinfo=UTC) - timedelta(days=10)
             for i in range(10):
                 htf_candles.append(
                     OHLCVCandle(
-                        exchange=Exchange.BINANCE, symbol="BTCUSDT", timeframe=Timeframe.FOUR_HOURS,
+                        exchange=Exchange.BINANCE, symbol="ETHUSDT", timeframe=Timeframe.FOUR_HOURS,
                         open_time=htf_base_time, close_time=htf_base_time + timedelta(hours=4) - timedelta(milliseconds=1),
-                        open=Decimal("50000"), high=Decimal("55000"), low=Decimal("45000"), close=Decimal("50000"),
+                        open=Decimal("12500"), high=Decimal("13000"), low=Decimal("12000"), close=Decimal("12500"),
                         volume=Decimal("1000"), quote_volume=Decimal("50000000"), trade_count=10000, source="MOCK"
                     )
                 )
@@ -131,6 +161,7 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
             return htf_candles
         else:
             return candles
+
 
     mock_provider.fetch_ohlcv = AsyncMock(side_effect=mock_fetch_ohlcv)
 
@@ -145,7 +176,7 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
     # Act
     cycle = await service.run_cycle(
         account_name="default-paper",
-        symbols=["BTCUSDT"],
+        symbols=["ETHUSDT"],
         timeframe=Timeframe.FIFTEEN_MINUTES,
         strategy_name="rsi_oversold",
         trigger="E2E_TEST"
@@ -159,7 +190,7 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
     assert len(open_positions) == 1
     
     position = open_positions[0]
-    assert position.symbol == "BTCUSDT"
+    assert position.symbol == "ETHUSDT"
     assert position.side == "LONG"
     
     # Check if cash was deducted

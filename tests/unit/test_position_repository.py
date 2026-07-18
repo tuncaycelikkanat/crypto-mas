@@ -10,7 +10,7 @@ def test_update_mark_price():
     db_mock = MagicMock()
     repo = PositionRepository(db_mock)
     
-    pos = Position(entry_price=Decimal("50000"), quantity=Decimal("0.1"), notional_value=Decimal("5000"))
+    pos = Position(side="LONG", entry_price=Decimal("50000"), quantity=Decimal("0.1"), notional_value=Decimal("5000"))
     
     # Test positive PnL
     updated = repo.update_mark_price(pos, Decimal("60000"))
@@ -24,7 +24,7 @@ def test_update_mark_price_zero_pnl():
     db_mock = MagicMock()
     repo = PositionRepository(db_mock)
     
-    pos = Position(entry_price=Decimal("50000"), quantity=Decimal("0.1"), notional_value=Decimal("5000"))
+    pos = Position(side="LONG", entry_price=Decimal("50000"), quantity=Decimal("0.1"), notional_value=Decimal("5000"))
     
     # Test exactly zero PnL
     updated = repo.update_mark_price(pos, Decimal("50000"))
@@ -47,7 +47,7 @@ def test_close_position():
     db_mock = MagicMock()
     repo = PositionRepository(db_mock)
     
-    pos = Position(entry_price=Decimal("50000"), quantity=Decimal("0.1"), notional_value=Decimal("5000"))
+    pos = Position(side="LONG", entry_price=Decimal("50000"), quantity=Decimal("0.1"), notional_value=Decimal("5000"))
     dt = datetime.now(UTC)
     
     updated = repo.close_position(pos, Decimal("60000"), closed_at=dt, close_reason="TAKE_PROFIT")
@@ -64,7 +64,7 @@ def test_close_position_zero_pnl():
     db_mock = MagicMock()
     repo = PositionRepository(db_mock)
     
-    pos = Position(entry_price=Decimal("50000"), quantity=Decimal("0.1"), notional_value=Decimal("5000"))
+    pos = Position(side="LONG", entry_price=Decimal("50000"), quantity=Decimal("0.1"), notional_value=Decimal("5000"))
     dt = datetime.now(UTC)
     
     updated = repo.close_position(pos, Decimal("50000"), closed_at=dt)

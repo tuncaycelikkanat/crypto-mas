@@ -47,7 +47,7 @@ async def test_run_full_trading_cycle(db_session):
     cycle = await service.run_cycle(
         account_name="test-account",
         symbols=["BTCUSDT"],
-        timeframe=Timeframe.FOUR_HOURS,
+        timeframe=Timeframe.FIFTEEN_MINUTES,
         strategy_name="multi_agent",
         trigger="TEST",
     )

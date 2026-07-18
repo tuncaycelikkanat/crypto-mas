@@ -39,9 +39,7 @@ def test_execute_target_portfolio_existing_position():
     target = MagicMock(spec=PortfolioTarget)
     target.exchange = Exchange.BINANCE
     target.timeframe = Timeframe.FIFTEEN_MINUTES
-    tp = MagicMock(spec=TargetPosition)
-    tp.symbol = "BTCUSDT"
-    tp.target_weight = 0.5
+    tp = TargetPosition(symbol="BTCUSDT", target_weight=0.5, confidence=0.8, final_score=0.8, reason="test")
     target.target_positions = [tp]
     
     report = broker.execute_target_portfolio("test_acc", target)
@@ -66,9 +64,7 @@ def test_execute_target_portfolio_missing_price():
     target = MagicMock(spec=PortfolioTarget)
     target.exchange = Exchange.BINANCE
     target.timeframe = Timeframe.FIFTEEN_MINUTES
-    tp = MagicMock(spec=TargetPosition)
-    tp.symbol = "BTCUSDT"
-    tp.target_weight = 0.5
+    tp = TargetPosition(symbol="BTCUSDT", target_weight=0.5, confidence=0.8, final_score=0.8, reason="test")
     target.target_positions = [tp]
     
     report = broker.execute_target_portfolio("test_acc", target)
@@ -98,9 +94,7 @@ def test_execute_target_portfolio_zero_notional():
     target = MagicMock(spec=PortfolioTarget)
     target.exchange = Exchange.BINANCE
     target.timeframe = Timeframe.FIFTEEN_MINUTES
-    tp = MagicMock(spec=TargetPosition)
-    tp.symbol = "BTCUSDT"
-    tp.target_weight = 0.5
+    tp = TargetPosition(symbol="BTCUSDT", target_weight=0.5, confidence=0.8, final_score=0.8, reason="test")
     target.target_positions = [tp]
     
     report = broker.execute_target_portfolio("test_acc", target)
@@ -137,6 +131,7 @@ def test_close_positions_not_in_target_missing_price():
     pos_mock.symbol = "ETHUSDT"
     pos_mock.notional_value = Decimal("100")
     pos_mock.quantity = Decimal("1")
+    pos_mock.side = "LONG"
     pos_mock.current_price = Decimal("100")
     broker.position_repository.list_open_positions.return_value = [pos_mock]
     
@@ -183,6 +178,7 @@ def test_update_mark_prices_missing_price():
     pos_mock.symbol = "ETHUSDT"
     pos_mock.notional_value = Decimal("100")
     pos_mock.quantity = Decimal("1")
+    pos_mock.side = "LONG"
     pos_mock.current_price = Decimal("100")
     broker.position_repository.list_open_positions.return_value = [pos_mock]
     

@@ -1,5 +1,11 @@
 from math import tanh
 
+from crypto_mas.engine.math.jit_calculators import (
+    jit_momentum_score,
+    jit_trend_score,
+    jit_volatility_penalty,
+)
+
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.scoring import AssetScore
 from crypto_mas.engine.signal import SignalDirection, TradingSignal
@@ -73,22 +79,24 @@ class ScoringEngine:
             if len(rsi_values) >= 2:
                 rsi_slope = rsi_values[-1] - sum(rsi_values[:-1]) / len(rsi_values[:-1])
 
-        trend_score = self._trend_score(
+        direction_val = 1 if signal.direction == SignalDirection.LONG else (-1 if signal.direction == SignalDirection.SHORT else 0)
+
+        trend_score = jit_trend_score(
             close=close,
             ema_20=ema_20,
             ema_50=ema_50,
-            direction=signal.direction,
+            direction_val=direction_val,
         )
-        momentum_score = self._momentum_score(
+        momentum_score = jit_momentum_score(
             rsi_14=rsi_14,
             roc_14=roc_14,
             macd=macd,
             macd_signal=macd_signal,
             atr_14=atr_14,
             close=close,
-            direction=signal.direction,
+            direction_val=direction_val,
         )
-        volatility_penalty = self._volatility_penalty(
+        volatility_penalty = jit_volatility_penalty(
             close=close,
             atr_14=atr_14,
         )
@@ -125,64 +133,4 @@ class ScoringEngine:
         )
 
 
-    @staticmethod
-    def _trend_score(
-        close: float,
-        ema_20: float,
-        ema_50: float,
-        direction: SignalDirection,
-    ) -> float:
-        if close <= 0:
-            return 0.0
 
-        if direction == SignalDirection.LONG:
-            ema_spread = max((ema_20 - ema_50) / close, 0.0)
-            price_distance = max((close - ema_20) / close, 0.0)
-        elif direction == SignalDirection.SHORT:
-            ema_spread = max((ema_50 - ema_20) / close, 0.0)
-            price_distance = max((ema_20 - close) / close, 0.0)
-        else:
-            return 0.0
-
-        return max(0.0, min((ema_spread * 20) + (price_distance * 10), 1.0))
-
-    @staticmethod
-    def _momentum_score(
-        rsi_14: float,
-        roc_14: float,
-        macd: float,
-        macd_signal: float,
-        atr_14: float,
-        close: float,
-        direction: SignalDirection,
-    ) -> float:
-        if close <= 0:
-            return 0.0
-
-        macd_hist = macd - macd_signal
-
-        # ATR-normalized MACD score using tanh
-        norm_denom = max(atr_14 * 0.1, 1e-9)
-
-        if direction == SignalDirection.LONG:
-            rsi_score = max((rsi_14 - 50) / 50, 0.0)
-            roc_score = max(roc_14 / 10, 0.0)
-            macd_score = max(tanh(macd_hist / norm_denom), 0.0)
-        elif direction == SignalDirection.SHORT:
-            rsi_score = max((50 - rsi_14) / 50, 0.0)
-            roc_score = max((-roc_14) / 10, 0.0)
-            macd_score = max(tanh(-macd_hist / norm_denom), 0.0)
-        else:
-            return 0.0
-
-        return max(0.0, min((rsi_score * 0.3) + (roc_score * 0.3) + (macd_score * 0.4), 1.0))
-
-    @staticmethod
-    def _volatility_penalty(close: float, atr_14: float) -> float:
-        if close <= 0:
-            return 0.0
-
-        atr_ratio = atr_14 / close
-
-        # ATR / close %5 üstündeyse daha ciddi ceza üretir.
-        return max(0.0, min(atr_ratio * 2, 0.35))

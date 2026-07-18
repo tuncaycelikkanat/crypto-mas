@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -41,34 +41,42 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
     # Force BTC crash
     btc_snapshot_mock = MagicMock()
     btc_snapshot_mock.features_json = {"roc_14": -6.0}
+    btc_snapshot_mock.timestamp = datetime.now(UTC)
     
     # Simulate htf_long_allowed=False, htf_short_allowed=False
     service.htf_manager = MagicMock()
     service.htf_manager.is_long_allowed.return_value = False
     service.htf_manager.is_short_allowed.return_value = False
-    
+    htf_snapshot_mock = MagicMock()
+    htf_snapshot_mock.features_json = {
+        "close": 1000.0,
+        "ema_20": 1100.0,
+        "ema_50": 1200.0,
+        "roc_14": -5.0
+    }
+    htf_snapshot_mock.timestamp = datetime.now(UTC)
+
     service.feature_snapshot_repository = MagicMock()
     # List by symbol side effect to return btc crash, then ETH snapshots
-    def list_by_symbol_mock(exchange, symbol, timeframe, limit):
+    def list_by_symbol_mock(exchange, symbol, timeframe, **kwargs):
         if symbol == "BTCUSDT" and timeframe == "15m":
             return [btc_snapshot_mock]
         if symbol == "ETHUSDT" and timeframe == "15m":
             s = MagicMock()
             s.features_json = {}
+            s.timestamp = datetime.now(UTC)
             return [s]
         if symbol == "ETHUSDT" and timeframe == "4h":
-            s = MagicMock()
-            s.features_json = {}
-            return [s]
+            return [htf_snapshot_mock]
         return []
         
     service.feature_snapshot_repository.list_by_symbol.side_effect = list_by_symbol_mock
     
-    # Mock strategy
     mock_strategy = MagicMock()
     decision_mock = MagicMock()
     decision_mock.action = DecisionAction.CONSIDER_LONG
     decision_mock.reason = "Test"
+    decision_mock.confidence = 0.8
     mock_strategy.decide.return_value = decision_mock
     
     with patch("crypto_mas.services.trading_cycle_service.cycle_orchestrator.StrategyFactory.create", return_value=mock_strategy), \
@@ -120,9 +128,15 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
             timeframe=Timeframe.FIFTEEN_MINUTES,
         )
         assert decision_mock.action == DecisionAction.HOLD
-        assert "REJECTED by HTF 4h Bear Trend" in decision_mock.reason
+        assert "REJECTED by HTF Shield (Strong Bear)" in decision_mock.reason
         
         # Next test htf_short_allowed = False
+        htf_snapshot_mock.features_json = {
+            "close": 1500.0,
+            "ema_20": 1400.0,
+            "ema_50": 1300.0,
+            "roc_14": 5.0
+        }
         decision_mock.action = DecisionAction.CONSIDER_SHORT
         decision_mock.reason = "Test"
         await service.run_cycle(
@@ -131,4 +145,4 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
             timeframe=Timeframe.FIFTEEN_MINUTES,
         )
         assert decision_mock.action == DecisionAction.HOLD
-        assert "REJECTED by HTF 4h Bull Trend" in decision_mock.reason
+        assert "REJECTED by HTF Shield (Strong Bull)" in decision_mock.reason

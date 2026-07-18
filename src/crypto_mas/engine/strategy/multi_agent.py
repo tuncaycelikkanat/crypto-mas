@@ -6,6 +6,7 @@ from crypto_mas.engine.signal import SignalDirection
 from crypto_mas.engine.signal.trend import TrendSignalEngine
 from crypto_mas.engine.strategy.base import BaseStrategy
 from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
+from crypto_mas.engine.math.jit_calculators import jit_calculate_confidence
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
@@ -71,7 +72,7 @@ class MultiAgentStrategy(BaseStrategy):
             use_regime_shield=use_regime_shield,
         )
 
-        confidence = self._calculate_confidence(
+        confidence = jit_calculate_confidence(
             score=score.final_score,
             regime_confidence=regime.confidence,
             risk_multiplier=regime.risk_multiplier,
@@ -125,16 +126,7 @@ class MultiAgentStrategy(BaseStrategy):
 
         return DecisionAction.HOLD
 
-    @staticmethod
-    def _calculate_confidence(
-        score: float,
-        regime_confidence: float,
-        risk_multiplier: float,
-    ) -> float:
-        raw = score * 0.65 + regime_confidence * 0.35
-        adjusted = raw * risk_multiplier
 
-        return max(0.0, min(adjusted, 1.0))
 
     @staticmethod
     def _build_reason(

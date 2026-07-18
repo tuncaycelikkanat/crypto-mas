@@ -9,7 +9,10 @@ from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSn
 from crypto_mas.domain.repositories.position_repository import PositionRepository
 from crypto_mas.domain.repositories.trading_cycle_repository import TradingCycleRepository
 from crypto_mas.engine.portfolio.portfolio import PortfolioEngine
-from crypto_mas.engine.regime.htf_manager import HTFRegimeManager
+from crypto_mas.engine.risk.manager import RiskManager
+from crypto_mas.engine.risk.models.btc_crash_model import BTCCrashModel
+from crypto_mas.engine.risk.models.htf_portfolio_model import HTFPortfolioModel
+from crypto_mas.engine.risk.models.regime_model import RegimeModel
 from crypto_mas.engine.risk.risk import RiskEngine
 from crypto_mas.engine.risk.profiles import get_risk_profile
 from crypto_mas.engine.strategy.factory import StrategyFactory
@@ -58,7 +61,11 @@ class TradingCycleService:
             time_provider=self.time_provider,
             strategy_mode=strategy_mode,
         )
-        self.htf_manager = HTFRegimeManager()
+        self.risk_manager = RiskManager(models=[
+            BTCCrashModel(),
+            HTFPortfolioModel(),
+            RegimeModel(),
+        ])
 
     async def run_cycle(
         self,
@@ -170,6 +177,7 @@ class TradingCycleService:
                 account_name=account_name,
                 htf=htf,
                 btc_is_crashing=btc_is_crashing,
+                use_btc_shield=use_btc_shield,
                 use_htf_shield=use_htf_shield,
                 use_regime_shield=use_regime_shield,
                 _log=_log,
@@ -264,7 +272,7 @@ class TradingCycleService:
                     
         return btc_is_crashing, htf
 
-    def _run_strategies_and_score(self, symbols, timeframe, now, strategy, strategy_name, risk_level, cycle, account_name, htf, btc_is_crashing, _log, use_htf_shield=True, use_regime_shield=True, display_id: int | None = None):
+    def _run_strategies_and_score(self, symbols, timeframe, now, strategy, strategy_name, risk_level, cycle, account_name, htf, btc_is_crashing, _log, use_btc_shield=True, use_htf_shield=True, use_regime_shield=True, display_id: int | None = None):
         display_id = display_id if display_id is not None else cycle.id
         decisions = []
         for symbol in symbols:
@@ -296,15 +304,16 @@ class TradingCycleService:
             timeframe_delta = self._get_timedelta(timeframe)
             max_allowed_delay = timeframe_delta + timedelta(minutes=15)
             
-            if now - latest_snapshot.timestamp > max_allowed_delay:
+            from datetime import timezone
+            snap_time = latest_snapshot.timestamp
+            if snap_time.tzinfo is None:
+                snap_time = snap_time.replace(tzinfo=timezone.utc)
+            if now - snap_time > max_allowed_delay:
                 err_msg = f"STALE DATA DETECTED for {symbol}: Latest snapshot timestamp {latest_snapshot.timestamp} is older than allowed {max_allowed_delay} from now {now}. Kill-Switch triggered."
                 logger.error(f"[Cycle {display_id}] {err_msg}")
                 _log("FAILED", err_msg, "ERROR")
                 raise ValueError(err_msg)
 
-            
-            htf_long_allowed = True
-            htf_short_allowed = True
             if htf and use_htf_shield:
                 self.feature_service.calculate_and_store(
                     exchange=self.fetcher_service.provider.exchange,
@@ -318,8 +327,6 @@ class TradingCycleService:
                     end_time=now,
                     limit=5,
                 )
-                htf_long_allowed = self.htf_manager.is_long_allowed(htf_snapshots)
-                htf_short_allowed = self.htf_manager.is_short_allowed(htf_snapshots)
             
             kwargs = {}
             if strategy_name == "multi_agent":
@@ -335,6 +342,7 @@ class TradingCycleService:
             )
             
             if decision:
+                # 1. Base logic: Don't buy if we already hold an open position
                 if decision.action == DecisionAction.CONSIDER_LONG:
                     open_pos = self.db.query(Position).filter(
                         Position.account_name == account_name,
@@ -361,20 +369,19 @@ class TradingCycleService:
                             decision.action = DecisionAction.HOLD
                             decision.reason += " | REJECTED: Cooldown (30m)"
 
-                    if decision.action == DecisionAction.CONSIDER_LONG:
-                        if btc_is_crashing and symbol != "BTCUSDT":
-                            _log("STRATEGY", f"Decision CONSIDER_LONG for {symbol} REJECTED due to general BTC market crash.", "WARN")
-                            decision.action = DecisionAction.HOLD
-                            decision.reason += " | REJECTED by BTC Crash Filter"
-                        elif not htf_long_allowed:
-                            _log("STRATEGY", f"Decision CONSIDER_LONG for {symbol} REJECTED by HTF ({htf.value}) Bear Trend filter.", "WARN")
-                            decision.action = DecisionAction.HOLD
-                            decision.reason += f" | REJECTED by HTF {htf.value} Bear Trend"
-                        
-                elif decision.action == DecisionAction.CONSIDER_SHORT and not htf_short_allowed:
-                    _log("STRATEGY", f"Decision CONSIDER_SHORT for {symbol} REJECTED by HTF ({htf.value}) Bull Trend filter.", "WARN")
-                    decision.action = DecisionAction.HOLD
-                    decision.reason += f" | REJECTED by HTF {htf.value} Bull Trend"
+                # 2. Modular Risk Architecture (QuantConnect style shields)
+                if decision.action != DecisionAction.HOLD:
+                    context = {
+                        "btc_is_crashing": btc_is_crashing,
+                        "use_btc_shield": use_btc_shield,
+                        "htf_snapshots": htf_snapshots if 'htf_snapshots' in locals() else [],
+                        "use_htf_shield": use_htf_shield,
+                        "use_regime_shield": use_regime_shield,
+                    }
+                    decision = self.risk_manager.evaluate_decision(decision, context)
+                    
+                    if decision.action == DecisionAction.HOLD:
+                        _log("STRATEGY", f"Decision for {symbol} REJECTED by RiskManager: {decision.reason}", "WARN")
                     
                 latest_snap = snapshots[-1].features_json if snapshots else {}
                 

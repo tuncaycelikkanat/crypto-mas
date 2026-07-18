@@ -41,6 +41,7 @@ def _mock_position(sym="BTCUSDT", qty=0.1, price=50000.0, tp=None, sl=None):
     m.account_name = "test_acc"
     m.exchange = "BINANCE"
     m.symbol = sym
+    m.side = "LONG"
     m.quantity = Decimal(str(qty))
     m.entry_price = Decimal(str(price))
     m.notional_value = Decimal(str(qty * price))

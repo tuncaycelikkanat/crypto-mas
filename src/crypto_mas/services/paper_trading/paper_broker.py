@@ -542,7 +542,7 @@ class PaperBrokerService:
             price = self._extract_close_price(latest_snapshot)
 
             if price is None or price <= Decimal("0"):
-                executed.append(
+                skipped.append(
                     PaperExecutionItem(
                         symbol=position.symbol,
                         side=PaperOrderSide.BUY if position.side == "LONG" else PaperOrderSide.SELL,

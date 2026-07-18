@@ -35,3 +35,4 @@ migrations/versions/*.pyc
 crypto_mas.dbnotes/
 data/
 logs/
+competitor_analysis.md
