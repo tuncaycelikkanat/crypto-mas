@@ -31,6 +31,11 @@ class PaperBrokerService:
     COMMISSION_RATE = Decimal("0.0002") # 0.02% Futures Maker limit fee
     SLIPPAGE_RATE = Decimal("0.0002")  # 0.02% Limit order slippage/execution spread
 
+    # Max risk per trade: 2% of current equity.
+    # This prevents the compounding bug where a growing balance leads to
+    # astronomically large positions that are unrealistic in a real market.
+    MAX_RISK_PER_TRADE = Decimal("0.02")
+
     def __init__(
         self,
         db: Session,
@@ -129,7 +134,12 @@ class PaperBrokerService:
                 )
                 continue
 
-            target_notional = Decimal(str(target_position.target_weight)) * starting_equity
+            # Cap each trade to MAX_RISK_PER_TRADE (2%) of current equity.
+            # Without this cap, the bot bets 70-85% of a compounding balance,
+            # resulting in unrealistic multi-billion dollar positions.
+            weight_notional = Decimal(str(target_position.target_weight)) * starting_equity
+            max_notional = starting_equity * self.MAX_RISK_PER_TRADE
+            target_notional = min(weight_notional, max_notional)
 
             if target_notional <= Decimal("0"):
                 skipped.append(

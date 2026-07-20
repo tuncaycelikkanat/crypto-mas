@@ -96,15 +96,15 @@ class HFTMomentumStrategy(BaseStrategy):
             return None
 
         factors.append(f"PULLBACK({dist_to_ema*100:.2f}%)")
-        confidence += 0.50  # Base confidence for reaching pullback zone
+        confidence += 0.55  # Base confidence for reaching pullback zone
 
         # ── Gate 3: Oversold Momentum ───────────────────────────
         # RSI should be cooling off (dropping below 50)
         if rsi_14 < 45.0:
-            confidence += 0.20
+            confidence += 0.25
             factors.append(f"RSI={rsi_14:.1f}")
         elif stoch_k is not None and stoch_k < 20.0:
-            confidence += 0.20
+            confidence += 0.25
             factors.append(f"STOCH={stoch_k:.1f}")
         else:
             # Not oversold enough on the micro scale
@@ -125,8 +125,9 @@ class HFTMomentumStrategy(BaseStrategy):
         confidence = max(0.0, min(confidence, 0.99))
 
         # Dynamic confidence threshold based on risk_level (0-100)
-        # Risk 0 -> 0.85, Risk 50 -> 0.775, Risk 100 -> 0.70
-        dynamic_min_confidence = 0.85 - (risk_level / 100.0) * 0.15
+        # Base = 0.78 (requires pullback+oversold to pass)
+        # Risk 0  -> 0.78, Risk 50 -> 0.73, Risk 100 -> 0.68
+        dynamic_min_confidence = 0.78 - (risk_level / 100.0) * 0.10
 
         if confidence >= dynamic_min_confidence:
             action    = DecisionAction.CONSIDER_LONG
