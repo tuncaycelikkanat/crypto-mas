@@ -16,7 +16,7 @@ logger = logging.getLogger("crypto_mas.scheduler_service")
 
 # Mode → (timeframe, strategy_name, default_interval_seconds)
 MODE_CONFIG: dict[str, tuple[str, str, int]] = {
-    "scalping": ("1m", "hft_momentum", 30),
+    "scalping": ("15m", "hft_momentum", 60),
     "swing":    ("4h",  "macd_cross",   120),
     "hodl":     ("1d",  "ema_golden_cross", 3600),
 }

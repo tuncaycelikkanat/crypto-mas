@@ -60,8 +60,8 @@ class EventEngine:
 
         self.metrics_store = RealtimeMetricsStore()
         
-        # Cache for RVOL baseline (baseline_notional, timestamp)
-        self._rvol_cache: dict[str, tuple[float, float]] = {}
+        # Cache for RVOL baseline (baseline_notional, adx, timestamp)
+        self._rvol_cache: dict[str, tuple[float, float, float]] = {}
 
     # ── Public interface ─────────────────────────────────────────
     async def process_websocket_message(self, stream: str, payload: dict[str, Any]):
@@ -138,14 +138,14 @@ class EventEngine:
             return
 
         # ── RVOL check — use feature snapshot for coin's average volume ──
-        rvol = self._get_rvol(symbol, total_notional)
+        rvol, dyn_thresh = self._get_rvol(symbol, total_notional)
         self.metrics_store.set_metric(symbol, "rvol_live", rvol)
 
-        if rvol < RVOL_TRIGGER_THRESHOLD:
-            # Volume directional but not unusual for this coin
+        if rvol < dyn_thresh:
+            # Volume directional but not unusual for this coin's current ADX
             self.metrics_store.set_metric(symbol, "volume_spike", False)
             logger.debug(
-                f"[EVENT] {symbol} directional but RVOL={rvol:.2f}x < {RVOL_TRIGGER_THRESHOLD}x, skip."
+                f"[EVENT] {symbol} directional but RVOL={rvol:.2f}x < {dyn_thresh}x (ADX based), skip."
             )
             return
 
@@ -177,18 +177,20 @@ class EventEngine:
             logger.debug(f"[DEPTH] {symbol} | Bid%: {depth_imbalance*100:.1f}% | Depth: ${total_depth:,.0f}")
 
     # ── RVOL estimation ──────────────────────────────────────────
-    def _get_rvol(self, symbol: str, window_notional: float) -> float:
+    def _get_rvol(self, symbol: str, window_notional: float) -> tuple[float, float]:
         """
         Compare current 60-second window notional against the coin's
         volume_sma_20 feature (candle-based). If no snapshot is available,
         fall back to a conservative 3× the raw notional threshold.
+        Returns: (rvol_multiplier, dynamic_threshold)
         """
         now = time.time()
         if symbol in self._rvol_cache:
-            baseline, cache_time = self._rvol_cache[symbol]
+            baseline, adx, cache_time = self._rvol_cache[symbol]
             if now - cache_time < 900:  # 15 minutes TTL
                 if baseline > 0:
-                    return round(window_notional / baseline, 2)
+                    dyn_thresh = 1.5 if adx > 25.0 else (3.0 if adx < 20.0 else 2.0)
+                    return round(window_notional / baseline, 2), dyn_thresh
                     
         try:
             from crypto_mas.domain.repositories.feature_snapshot_repository import (
@@ -207,21 +209,23 @@ class EventEngine:
                 )
                 if snapshot and snapshot.features_json:
                     vol_sma = snapshot.features_json.get("volume_sma_20")
+                    adx = snapshot.features_json.get("adx_14", 20.0)
                     last_price = self.metrics_store.get_metric(symbol, "last_price", 0.0)
                     if vol_sma and vol_sma > 0 and last_price > 0:
                         # Convert candle volume (coins) → notional (USDT) per 60s slice
                         # 15m candle has 900s; our window is 60s → scale factor ~1/15
                         candle_notional_60s = vol_sma * last_price / 15.0
                         if candle_notional_60s > 0:
-                            self._rvol_cache[symbol] = (candle_notional_60s, now)
-                            return round(window_notional / candle_notional_60s, 2)
+                            self._rvol_cache[symbol] = (candle_notional_60s, adx, now)
+                            dyn_thresh = 1.5 if adx > 25.0 else (3.0 if adx < 20.0 else 2.0)
+                            return round(window_notional / candle_notional_60s, 2), dyn_thresh
             finally:
                 db.close()
         except Exception as exc:
             logger.debug(f"RVOL DB lookup failed for {symbol}: {exc}")
 
         # Fallback: if we can't get baseline, require $50k to trigger
-        return window_notional / 25_000.0
+        return window_notional / 25_000.0, 2.0
 
     # ── Cycle trigger ─────────────────────────────────────────────
     async def _trigger_cycle(self, symbol: str):
@@ -242,7 +246,7 @@ class EventEngine:
             await cycle_service.run_cycle(
                 account_name="default-paper",
                 symbols=[symbol],
-                timeframe=Timeframe.ONE_MINUTE,
+                timeframe=Timeframe.FIFTEEN_MINUTES,
                 strategy_name="hft_momentum",
                 trigger="EVENT_TRIGGERED",
             )
