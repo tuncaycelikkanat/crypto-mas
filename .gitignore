@@ -32,7 +32,9 @@ migrations/versions/*.pyc
 *.db
 *.sqlite
 *.sqlite3
-crypto_mas.dbnotes/
+*.db-shm
+*.db-wal
+notes/
 data/
 logs/
-competitor_analysis.md
+docs/competitor_analysis.md
