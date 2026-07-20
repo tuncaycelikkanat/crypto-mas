@@ -84,30 +84,29 @@ class HFTMomentumStrategy(BaseStrategy):
         factors.append(f"TREND(ADX={adx_14:.1f})")
 
         # ── Gate 2: Micro-Pullback to EMA 20 ────────────────────
-        # Price should be within 0.2% of EMA_20 (or slightly below)
+        # Price should be near EMA_20 (touching or slightly below).
+        # Thresholds are wider to accommodate 15m candle noise vs 1m.
         dist_to_ema = (last_price - ema_20) / ema_20
         
-        if dist_to_ema > 0.003:
-            # Price is too high above EMA 20 (still flying, not a pullback yet)
+        if dist_to_ema > 0.006:   # > 0.6% above EMA → still extended, not a pullback
             return None
             
-        if dist_to_ema < -0.005:
-            # Price broke support too deeply
+        if dist_to_ema < -0.012:  # > 1.2% below EMA → support broken, skip
             return None
 
         factors.append(f"PULLBACK({dist_to_ema*100:.2f}%)")
         confidence += 0.55  # Base confidence for reaching pullback zone
 
         # ── Gate 3: Oversold Momentum ───────────────────────────
-        # RSI should be cooling off (dropping below 50)
-        if rsi_14 < 45.0:
+        # RSI should be in mild oversold territory — tightened to < 42
+        # to avoid catching mid-trend dips that continue falling.
+        if rsi_14 < 42.0:
             confidence += 0.25
             factors.append(f"RSI={rsi_14:.1f}")
         elif stoch_k is not None and stoch_k < 20.0:
             confidence += 0.25
             factors.append(f"STOCH={stoch_k:.1f}")
         else:
-            # Not oversold enough on the micro scale
             return None
 
         # ── Bonus Factors ───────────────────────────────────────

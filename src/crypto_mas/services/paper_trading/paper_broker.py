@@ -25,8 +25,8 @@ from crypto_mas.services.paper_trading.schemas import (
 
 
 class PaperBrokerService:
-    SL_PCT = {"scalping": 0.015, "swing": 0.03, "hodl": 0.05}
-    TP_PCT = {"scalping": 0.012, "swing": 0.06, "hodl": 0.12}
+    SL_PCT = {"scalping": 0.020, "swing": 0.03, "hodl": 0.05}
+    TP_PCT = {"scalping": 0.024, "swing": 0.06, "hodl": 0.12}
     
     COMMISSION_RATE = Decimal("0.0002") # 0.02% Futures Maker limit fee
     SLIPPAGE_RATE = Decimal("0.0002")  # 0.02% Limit order slippage/execution spread
