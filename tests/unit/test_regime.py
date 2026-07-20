@@ -85,20 +85,20 @@ def test_compute_regime_sideways():
         FeatureSnapshot(
             exchange=Exchange.BINANCE.value, symbol="BTCUSDT", timeframe="15m",
             timestamp=datetime(2023, 1, 1, 0, 0, tzinfo=UTC),
-            features_json={"close": 10000.0, "ema_20": 9990.0, "ema_50": 10010.0, "roc_14": 0.1, "atr_14": 50.0, "bb_upper": 10100.0, "bb_middle": 10000.0, "bb_lower": 9900.0}
+            features_json={"close": 10000.0, "ema_20": 10000.0, "ema_50": 10000.0, "roc_14": 0.1, "atr_14": 50.0, "bb_upper": 10100.0, "bb_middle": 10000.0, "bb_lower": 9900.0}
         ),
         FeatureSnapshot(
             exchange=Exchange.BINANCE.value, symbol="BTCUSDT", timeframe="15m",
             timestamp=datetime(2023, 1, 1, 0, 15, tzinfo=UTC),
-            features_json={"close": 10000.0, "ema_20": 9990.0, "ema_50": 10010.0, "roc_14": 0.1, "atr_14": 50.0, "bb_upper": 10100.0, "bb_middle": 10000.0, "bb_lower": 9900.0}
+            features_json={"close": 10000.0, "ema_20": 10000.0, "ema_50": 10000.0, "roc_14": 0.1, "atr_14": 50.0, "bb_upper": 10100.0, "bb_middle": 10000.0, "bb_lower": 9900.0}
         ),
         FeatureSnapshot(
             exchange=Exchange.BINANCE.value, symbol="BTCUSDT", timeframe="15m",
             timestamp=datetime(2023, 1, 1, 0, 30, tzinfo=UTC),
-            features_json={"close": 10000.0, "ema_20": 9990.0, "ema_50": 10010.0, "roc_14": 0.1, "atr_14": 50.0, "bb_upper": 10100.0, "bb_middle": 10000.0, "bb_lower": 9900.0}
+            features_json={"close": 10000.0, "ema_20": 10000.0, "ema_50": 10000.0, "roc_14": 0.1, "atr_14": 50.0, "bb_upper": 10100.0, "bb_middle": 10000.0, "bb_lower": 9900.0}
         )
     ]
-    
+
     result = RegimeEngine().detect(Exchange.BINANCE, "BTCUSDT", Timeframe.FIFTEEN_MINUTES, snapshots)
     assert result is not None
     assert result.regime == MarketRegime.SIDEWAYS

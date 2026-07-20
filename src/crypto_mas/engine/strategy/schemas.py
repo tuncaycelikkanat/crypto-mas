@@ -13,6 +13,8 @@ from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 class DecisionAction(StrEnum):
     CONSIDER_LONG = "CONSIDER_LONG"
     CONSIDER_SHORT = "CONSIDER_SHORT"
+    CLOSE_LONG = "CLOSE_LONG"
+    CLOSE_SHORT = "CLOSE_SHORT"
     HOLD = "HOLD"
     AVOID = "AVOID"
 

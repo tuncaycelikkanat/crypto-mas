@@ -19,6 +19,7 @@ class BaseTactic(ABC):
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
         params: dict[str, Any],
+        is_open: bool = False,
     ) -> TradingDecision | None:
         """
         Evaluate the market conditions and return a TradingDecision if a setup is found.

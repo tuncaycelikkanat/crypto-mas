@@ -1,7 +1,11 @@
+import logging
+
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.regime import MarketRegime, RegimeSnapshot
 from crypto_mas.engine.utils import get_float
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
+logger = logging.getLogger(__name__)
 
 
 class RegimeEngine:
@@ -26,8 +30,17 @@ class RegimeEngine:
         bb_upper = get_float(features, "bb_upper")
         bb_middle = get_float(features, "bb_middle")
         bb_lower = get_float(features, "bb_lower")
+        
+        required_features = {
+            "close": close, "ema_20": ema_20, "ema_50": ema_50, 
+            "atr_14": atr_14, "roc_14": roc_14, 
+            "bb_upper": bb_upper, "bb_middle": bb_middle, "bb_lower": bb_lower
+        }
+        
+        missing = [k for k, v in required_features.items() if v is None]
 
-        if None in {close, ema_20, ema_50, atr_14, roc_14, bb_upper, bb_middle, bb_lower}:
+        if missing:
+            logger.error(f"[{symbol}] Regime UNKNOWN because missing features: {missing}. Available keys: {list(features.keys())}")
             return RegimeSnapshot(
                 exchange=exchange,
                 symbol=symbol,
@@ -64,8 +77,8 @@ class RegimeEngine:
                 timestamp=latest.timestamp,
             )
 
-        bullish = close > ema_20 > ema_50 and roc_14 > 0
-        bearish = close < ema_20 < ema_50 and roc_14 < 0
+        bullish = ema_20 > ema_50
+        bearish = ema_20 < ema_50
 
         if bullish:
             confidence = self._trend_confidence(

@@ -86,6 +86,7 @@ class RegimeAdaptiveStrategy(BaseStrategy):
             timeframe=timeframe,
             snapshots=snapshots,
             params=tactic_params,
+            is_open=kwargs.get("is_open", False)
         )
 
         if decision:

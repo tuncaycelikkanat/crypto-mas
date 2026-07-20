@@ -467,7 +467,7 @@ class PaperBrokerService:
                 realized_pnl=closed_position.realized_pnl,
                 position_id=closed_position.id,
                 cycle_id=cycle_id,
-                reason=f"Paper {side_enum.value} executed (Fee: ${float(fee):.4f})",
+                reason=f"Closed by PortfolioEngine (Fee: ${float(fee):.4f})",
                 executed_at=self.time_provider.now(),
             )
             self.trade_repository.add(trade)

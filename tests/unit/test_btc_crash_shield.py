@@ -105,7 +105,7 @@ async def test_btc_crash_shield_rejects_altcoin_longs(db_session, test_account):
     def log_mock(tag, msg, level="INFO", **kwargs):
         pass
         
-    candidates = service._run_strategies_and_score(
+    candidates, _ = service._run_strategies_and_score(
         symbols=["ETHUSDT"],
         timeframe=Timeframe.ONE_HOUR,
         now=now_time,
@@ -179,7 +179,7 @@ async def test_btc_crash_shield_allows_altcoin_shorts(db_session, test_account):
     def log_mock(tag, msg, level="INFO", **kwargs):
         pass
         
-    candidates = service._run_strategies_and_score(
+    candidates, _ = service._run_strategies_and_score(
         symbols=["ETHUSDT"],
         timeframe=Timeframe.ONE_HOUR,
         now=now_time,

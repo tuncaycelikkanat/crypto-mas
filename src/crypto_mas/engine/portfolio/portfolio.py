@@ -27,24 +27,40 @@ class PortfolioEngine:
         exchange: Exchange,
         timeframe: Timeframe,
         decisions: list[TradingDecision],
+        open_positions: list[str] | None = None,
     ) -> PortfolioTarget:
-        candidates = [
+        open_symbols = set(open_positions) if open_positions else set()
+        
+        # 1. Process explicit CLOSE decisions
+        close_decisions = {
+            d.symbol: d
+            for d in decisions
+            if d.action in (DecisionAction.CLOSE_LONG, DecisionAction.CLOSE_SHORT)
+        }
+        
+        # Remove symbols that have a CLOSE decision from the retained list
+        retained_symbols = open_symbols - set(close_decisions.keys())
+        
+        # 2. Process NEW entry candidates
+        new_candidates = [
             decision
             for decision in decisions
             if decision.action in (DecisionAction.CONSIDER_LONG, DecisionAction.CONSIDER_SHORT)
             and decision.confidence >= self.min_confidence
             and decision.score.final_score > 0
+            and decision.symbol not in retained_symbols  # Don't add if already retained
         ]
 
-        candidates = sorted(
-            candidates,
+        new_candidates = sorted(
+            new_candidates,
             key=lambda decision: (decision.confidence, decision.score.final_score),
             reverse=True,
         )
 
-        selected = candidates[: self.max_positions]
+        available_slots = max(0, self.max_positions - len(retained_symbols))
+        selected_new = new_candidates[:available_slots]
 
-        if not selected:
+        if not retained_symbols and not selected_new:
             return PortfolioTarget(
                 exchange=exchange,
                 timeframe=timeframe,
@@ -55,13 +71,28 @@ class PortfolioEngine:
                 created_at=self.time_provider.now(),
             )
 
-        total_score = sum(decision.score.final_score for decision in selected)
+        total_score = sum(decision.score.final_score for decision in selected_new)
 
         risk_per_trade = 0.01   # 1% of portfolio per position
         stop_loss_mult = 2.0
 
         positions = []
-        for decision in selected:
+        
+        # Add retained positions with a fixed weight (PaperBroker skips them anyway)
+        for symbol in retained_symbols:
+            positions.append(
+                TargetPosition(
+                    symbol=symbol,
+                    side="LONG",  # Simplification, broker ignores side for existing
+                    target_weight=0.10,
+                    confidence=1.0,
+                    final_score=1.0,
+                    reason="Retained open position (no CLOSE signal received).",
+                    metadata={}
+                )
+            )
+
+        for decision in selected_new:
             # Approximate ATR% from volatility_penalty (which = atr/close * 2)
             atr_pct = decision.score.volatility_penalty / 2.0
 
@@ -69,13 +100,13 @@ class PortfolioEngine:
             if atr_pct > 0:
                 atr_weight = risk_per_trade / (atr_pct * stop_loss_mult)
             else:
-                atr_weight = self.max_gross_exposure / len(selected)
+                atr_weight = self.max_gross_exposure / max(1, len(selected_new))
 
             # Score-proportional weight
             if total_score > 0:
                 score_weight = self.max_gross_exposure * decision.score.final_score / total_score
             else:
-                score_weight = self.max_gross_exposure / len(selected)
+                score_weight = self.max_gross_exposure / max(1, len(selected_new))
 
             # Blend: 60% score-proportional, 40% ATR-based, hard cap per position
             target_weight = 0.60 * score_weight + 0.40 * atr_weight
@@ -95,7 +126,7 @@ class PortfolioEngine:
         )
         if corr_total > self.max_correlated_group_weight and corr_total > 0:
             scale = self.max_correlated_group_weight / corr_total
-            positions = [
+            scaled_new = [
                 self._to_target_position(
                     decision=decision,
                     target_weight=p.target_weight * scale
@@ -107,8 +138,10 @@ class PortfolioEngine:
                         else p.reason
                     ),
                 )
-                for p, decision in zip(positions, selected, strict=False)
+                for p, decision in zip(positions[len(retained_symbols):], selected_new, strict=False)
             ]
+            # Prepend retained positions back
+            positions = positions[:len(retained_symbols)] + scaled_new
 
         gross_exposure = round(sum(position.target_weight for position in positions), 6)
         cash_weight = round(max(0.0, 1.0 - gross_exposure), 10)

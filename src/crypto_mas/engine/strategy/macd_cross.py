@@ -23,6 +23,8 @@ class MACDStrategy(BaseStrategy):
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
         risk_level: int = 50,
+        is_open: bool = False,
+        **kwargs,
     ) -> TradingDecision | None:
         if not snapshots or len(snapshots) < 2:
             return None

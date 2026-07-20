@@ -43,6 +43,7 @@ const Backtesting: React.FC = () => {
   
   const [exchange, setExchange] = useState(() => localStorage.getItem('bt_exchange') || "BINANCE");
   const [configMode, setConfigMode] = useState<'scalping' | 'swing' | 'hodl' | 'regime_adaptive'>(() => (localStorage.getItem('bt_configMode') as any) || 'regime_adaptive');
+  const [timeframe, setTimeframe] = useState(() => localStorage.getItem('bt_timeframe') || "15m");
   const [symbolSource, setSymbolSource] = useState<'manual' | 'auto'>(() => (localStorage.getItem('bt_symbolSource') as any) || 'manual');
   const [manualSymbols, setManualSymbols] = useState(() => localStorage.getItem('bt_manualSymbols') || "BTCUSDT, ETHUSDT");
   const [autoScroll, setAutoScroll] = useState(false);
@@ -62,6 +63,7 @@ const Backtesting: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('bt_exchange', exchange);
     localStorage.setItem('bt_configMode', configMode);
+    localStorage.setItem('bt_timeframe', timeframe);
     localStorage.setItem('bt_symbolSource', symbolSource);
     localStorage.setItem('bt_manualSymbols', manualSymbols);
     localStorage.setItem('bt_startDate', startDate);
@@ -72,7 +74,7 @@ const Backtesting: React.FC = () => {
     localStorage.setItem('bt_useHtfShield', useHtfShield.toString());
     localStorage.setItem('bt_useRegimeShield', useRegimeShield.toString());
     localStorage.setItem('bt_configJsonText', configJsonText);
-  }, [exchange, configMode, symbolSource, manualSymbols, startDate, endDate, initialBalance, riskLevel, useBtcShield, useHtfShield, useRegimeShield, configJsonText]);
+  }, [exchange, configMode, timeframe, symbolSource, manualSymbols, startDate, endDate, initialBalance, riskLevel, useBtcShield, useHtfShield, useRegimeShield, configJsonText]);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -146,7 +148,7 @@ const Backtesting: React.FC = () => {
       const payload = {
         exchange,
         symbols: symbolsList,
-        timeframe: configMode === 'scalping' ? '15m' : (configMode === 'swing' ? '4h' : (configMode === 'regime_adaptive' ? '15m' : '1d')),
+        timeframe: timeframe,
         strategy_name: configMode === 'scalping' ? 'hft_momentum' : (configMode === 'swing' ? 'macd_cross' : (configMode === 'regime_adaptive' ? 'regime_adaptive' : 'ema_golden_cross')),
         start_time: new Date(startDate).toISOString(),
         end_time: new Date(endDate).toISOString(),
@@ -250,9 +252,21 @@ const Backtesting: React.FC = () => {
                 <label className="section-label">Trading Mode</label>
                 <select className="form-input" value={configMode} onChange={(e) => setConfigMode(e.target.value as any)}>
                   <option value="regime_adaptive">Regime Adaptive (Dynamic Tactics)</option>
-                  <option value="scalping">Scalping (15m - Micro Pullback)</option>
-                  <option value="swing">Swing Trading (4h - MACD Cross)</option>
-                  <option value="hodl">Hodl (1d - EMA Golden Cross)</option>
+                  <option value="scalping">Scalping (Micro Pullback)</option>
+                  <option value="swing">Swing Trading (MACD Cross)</option>
+                  <option value="hodl">Hodl (EMA Golden Cross)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="section-label">Timeframe (Mum Periyodu)</label>
+                <select className="form-input" value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
+                  <option value="1m">1 Minute (1m)</option>
+                  <option value="5m">5 Minutes (5m)</option>
+                  <option value="15m">15 Minutes (15m)</option>
+                  <option value="1h">1 Hour (1h)</option>
+                  <option value="4h">4 Hours (4h)</option>
+                  <option value="1d">1 Day (1d)</option>
                 </select>
               </div>
               

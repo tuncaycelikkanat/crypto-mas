@@ -24,6 +24,7 @@ class BearTactic(BaseTactic):
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
         params: dict[str, Any],
+        is_open: bool = False,
     ) -> TradingDecision | None:
         
         if not snapshots:
@@ -36,10 +37,65 @@ class BearTactic(BaseTactic):
         ema_50 = features.get("ema_50")
         adx_14 = features.get("adx_14")
         rsi_14 = features.get("rsi_14")
-        stoch_k = features.get("stoch_k")
+        stoch_k = features.get("stoch_rsi_k")
         
         if None in (last_price, ema_20, ema_50, adx_14, rsi_14):
             return None
+
+        # --- Exit Logic (if position is already open) ---
+        if is_open:
+            # Simple take profit logic for scalping: 
+            # If price extended below EMA20 and RSI is oversold, close.
+            dist_to_ema = (last_price - ema_20) / ema_20  # type: ignore
+            
+            close_factors = []
+            should_close = False
+            
+            # Rule 1: Low RSI (Oversold) + Overextended downwards
+            if rsi_14 < 30.0 and dist_to_ema < -0.015:
+                should_close = True
+                close_factors.append(f"RSI={rsi_14:.1f}")
+                close_factors.append(f"EXT={dist_to_ema*100:.2f}%")
+                
+            # Rule 2: Trend Breakdown (ADX died completely)
+            elif adx_14 < 15.0:
+                should_close = True
+                close_factors.append(f"ADX_DEATH={adx_14:.1f}")
+                
+            if should_close:
+                return TradingDecision(
+                    exchange=exchange,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    action=DecisionAction.CLOSE_SHORT,
+                    confidence=0.9,
+                    signal=TradingSignal(
+                        symbol=symbol,
+                        exchange=exchange,
+                        timeframe=timeframe,
+                        direction=SignalDirection.NEUTRAL,
+                        signal_type=SignalType.MEAN_REVERSION,
+                        strength=0.9,
+                        timestamp=snapshots[-1].timestamp,
+                        reason=f"Exit Setup: {', '.join(close_factors)}"
+                    ),
+                    score=AssetScore(exchange=exchange, timeframe=timeframe, direction=SignalDirection.NEUTRAL, reason=f"Exit Setup: {', '.join(close_factors)}", timestamp=snapshots[-1].timestamp, symbol=symbol, final_score=0.9, trend_score=0, momentum_score=0, volatility_penalty=0),
+                    reason=f"Taking Profit / Closing Short: {', '.join(close_factors)}"
+                )
+            # If no exit condition is met, hold!
+            return TradingDecision(
+                exchange=exchange,
+                symbol=symbol,
+                timeframe=timeframe,
+                action=DecisionAction.HOLD,
+                confidence=1.0,
+                signal=TradingSignal(
+                    symbol=symbol, exchange=exchange, timeframe=timeframe,
+                    direction=SignalDirection.SHORT, signal_type=SignalType.TREND_FOLLOWING, strength=1.0, timestamp=snapshots[-1].timestamp, reason="Holding"
+                ),
+                score=AssetScore(exchange=exchange, timeframe=timeframe, direction=SignalDirection.SHORT, reason="Holding", timestamp=snapshots[-1].timestamp, symbol=symbol, final_score=1.0, trend_score=1.0, momentum_score=1.0, volatility_penalty=0),
+                reason="Holding open short position."
+            )
 
         # --- Parameters ---
         min_adx = params.get("min_adx", 25.0)
@@ -47,7 +103,7 @@ class BearTactic(BaseTactic):
         max_dist_ema = params.get("max_dist_ema", 0.012)
         rsi_threshold = params.get("rsi_threshold", 58.0)
         stoch_threshold = params.get("stoch_threshold", 80.0)
-        min_confidence = params.get("min_confidence", 0.70)
+        min_confidence = params.get("min_confidence", 0.55)
         
         # Override ATR multipliers for broker execution
         sl_mult_override = params.get("sl_mult", 2.0)
@@ -82,6 +138,20 @@ class BearTactic(BaseTactic):
             factors.append(f"STOCH={stoch_k:.1f}")
         else:
             return None
+            
+        # ── Bonus Factors (Scalping Logic) ────────────────────────
+        from crypto_mas.engine.strategy.realtime_metrics import RealtimeMetricsStore
+        store = RealtimeMetricsStore()
+        
+        imbalance = store.get_metric(symbol, "imbalance", 0.5)
+        if imbalance < 0.40:
+            confidence += 0.15
+            factors.append(f"TF_IMB={imbalance*100:.1f}%")
+            
+        depth_imbalance = store.get_metric(symbol, "depth_imbalance", 0.5)
+        if depth_imbalance < 0.45:
+            confidence += 0.10
+            factors.append(f"DEPTH={depth_imbalance*100:.1f}%")
 
         confidence = max(0.0, min(confidence, 0.99))
 

@@ -24,6 +24,7 @@ class SidewaysTactic(BaseTactic):
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
         params: dict[str, Any],
+        is_open: bool = False,
     ) -> TradingDecision | None:
         
         if not snapshots:
@@ -38,6 +39,63 @@ class SidewaysTactic(BaseTactic):
         
         if None in (last_price, rsi_14, bb_upper, bb_lower):
             return None
+
+        # --- Exit Logic (if position is already open) ---
+        if is_open:
+            # In sideways, we close when it reaches the middle band or the opposite band
+            close_factors = []
+            should_close_long = False
+            should_close_short = False
+            
+            # If price hits upper band, close long
+            if last_price >= bb_upper:
+                should_close_long = True
+                close_factors.append(f"HIT_RESISTANCE={last_price:.2f}")
+            # If price hits lower band, close short
+            elif last_price <= bb_lower:
+                should_close_short = True
+                close_factors.append(f"HIT_SUPPORT={last_price:.2f}")
+            # Close anything if RSI flips extreme
+            elif rsi_14 > 65.0:
+                should_close_long = True
+                close_factors.append(f"RSI_HIGH={rsi_14:.1f}")
+            elif rsi_14 < 35.0:
+                should_close_short = True
+                close_factors.append(f"RSI_LOW={rsi_14:.1f}")
+
+            # Note: We don't know the exact side of the open position here.
+            # But PortfolioEngine will close whatever position is open if we emit CLOSE_LONG or CLOSE_SHORT
+            # To be safe, we can just emit both or just HOLD if we don't have enough confidence.
+            # Actually, `PortfolioEngine` removes the symbol if CLOSE_LONG or CLOSE_SHORT is emitted.
+            # So emitting CLOSE_LONG will close a SHORT position too in our current paper broker logic!
+            if should_close_long or should_close_short:
+                return TradingDecision(
+                    exchange=exchange,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    action=DecisionAction.CLOSE_LONG,  # Just sending CLOSE to drop it from target
+                    confidence=0.9,
+                    signal=TradingSignal(
+                        symbol=symbol, exchange=exchange, timeframe=timeframe,
+                        direction=SignalDirection.NEUTRAL, signal_type=SignalType.MEAN_REVERSION, strength=0.9, timestamp=snapshots[-1].timestamp, reason="Exit Sideways"
+                    ),
+                    score=AssetScore(exchange=exchange, timeframe=timeframe, direction=SignalDirection.NEUTRAL, reason=f"Closing Sideways Trade: {', '.join(close_factors)}", timestamp=snapshots[-1].timestamp, symbol=symbol, final_score=0.9, trend_score=0, momentum_score=0, volatility_penalty=0),
+                    reason=f"Closing Sideways Trade: {', '.join(close_factors)}"
+                )
+            
+            return TradingDecision(
+                exchange=exchange,
+                symbol=symbol,
+                timeframe=timeframe,
+                action=DecisionAction.HOLD,
+                confidence=1.0,
+                signal=TradingSignal(
+                    symbol=symbol, exchange=exchange, timeframe=timeframe,
+                    direction=SignalDirection.NEUTRAL, signal_type=SignalType.MEAN_REVERSION, strength=1.0, timestamp=snapshots[-1].timestamp, reason="Holding"
+                ),
+                score=AssetScore(exchange=exchange, timeframe=timeframe, direction=SignalDirection.NEUTRAL, reason="Holding open sideways position.", timestamp=snapshots[-1].timestamp, symbol=symbol, final_score=1.0, trend_score=0, momentum_score=0, volatility_penalty=0),
+                reason="Holding open sideways position."
+            )
 
         # --- Parameters ---
         # Sideways markets require wider RSI extremes to avoid chop

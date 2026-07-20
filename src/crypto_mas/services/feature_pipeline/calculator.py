@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import pandas_ta as ta  # noqa: F401
 
 from crypto_mas.domain.models.candle import Candle
 
@@ -62,57 +63,57 @@ class FeatureCalculator:
         snapshots: list[dict[str, Any]] = []
 
         # Convert back to standard list of dicts
-        for row in df.itertuples(index=False):
+        for row in df.to_dict(orient="records"):
             def _safe_float(val: Any) -> float | None:
-                if pd.isna(val):
+                if pd.isna(val) or val is None:
                     return None
                 return float(Decimal(str(round(val, 8))))
 
             features = {
                 # Price
-                "open": _safe_float(row.open),
-                "high": _safe_float(row.high),
-                "low": _safe_float(row.low),
-                "close": _safe_float(row.close),
+                "open": _safe_float(row.get("open")),
+                "high": _safe_float(row.get("high")),
+                "low": _safe_float(row.get("low")),
+                "close": _safe_float(row.get("close")),
                 
                 # Volume
-                "volume": _safe_float(row.volume),
-                "volume_sma_20": _safe_float(getattr(row, "VOL_SMA_20", None)),
-                "rvol": _safe_float(getattr(row, "rvol", None)),
-                "obv": _safe_float(getattr(row, "OBV", getattr(row, "OBV_in_1", None))),
-                "cmf_20": _safe_float(getattr(row, "CMF_20", None)),
+                "volume": _safe_float(row.get("volume")),
+                "volume_sma_20": _safe_float(row.get("VOL_SMA_20")),
+                "rvol": _safe_float(row.get("rvol")),
+                "obv": _safe_float(row.get("OBV", row.get("OBV_in_1"))),
+                "cmf_20": _safe_float(row.get("CMF_20")),
                 
                 # Trend
-                "ema_20": _safe_float(getattr(row, "EMA_20", None)),
-                "ema_50": _safe_float(getattr(row, "EMA_50", None)),
-                "sma_20": _safe_float(getattr(row, "SMA_20", None)),
-                "adx_14": _safe_float(getattr(row, "ADX_14", None)),
-                "plus_di": _safe_float(getattr(row, "DMP_14", None)),
-                "minus_di": _safe_float(getattr(row, "DMN_14", None)),
+                "ema_20": _safe_float(row.get("EMA_20")),
+                "ema_50": _safe_float(row.get("EMA_50")),
+                "sma_20": _safe_float(row.get("SMA_20")),
+                "adx_14": _safe_float(row.get("ADX_14")),
+                "plus_di": _safe_float(row.get("DMP_14")),
+                "minus_di": _safe_float(row.get("DMN_14")),
                 
                 # Momentum
-                "rsi_14": _safe_float(getattr(row, "RSI_14", None)),
-                "stoch_rsi_k": _safe_float(getattr(row, "STOCHRSIk_14_14_3_3", getattr(row, "STOCHk_14_3_3", None))),
-                "stoch_rsi_d": _safe_float(getattr(row, "STOCHRSId_14_14_3_3", getattr(row, "STOCHd_14_3_3", None))),
-                "roc_14": _safe_float(getattr(row, "ROC_14", None)),
-                "macd": _safe_float(getattr(row, "MACD_12_26_9", None)),
-                "macd_signal": _safe_float(getattr(row, "MACDs_12_26_9", None)),
-                "macd_hist": _safe_float(getattr(row, "MACDh_12_26_9", None)),
+                "rsi_14": _safe_float(row.get("RSI_14")),
+                "stoch_rsi_k": _safe_float(row.get("STOCHRSIk_14_14_3_3", row.get("STOCHk_14_3_3"))),
+                "stoch_rsi_d": _safe_float(row.get("STOCHRSId_14_14_3_3", row.get("STOCHd_14_3_3"))),
+                "roc_14": _safe_float(row.get("ROC_14", row.get("ROCP_14"))),
+                "macd": _safe_float(row.get("MACD_12_26_9")),
+                "macd_signal": _safe_float(row.get("MACDs_12_26_9")),
+                "macd_hist": _safe_float(row.get("MACDh_12_26_9")),
                 
                 # Volatility
-                "atr_14": _safe_float(getattr(row, "ATRr_14", None)),
-                "bb_upper": _safe_float(getattr(row, "BBU_20_2.0_2.0", None)),
-                "bb_middle": _safe_float(getattr(row, "BBM_20_2.0_2.0", None)),
-                "bb_lower": _safe_float(getattr(row, "BBL_20_2.0_2.0", None)),
+                "atr_14": _safe_float(row.get("ATRr_14")),
+                "bb_upper": _safe_float(row.get("BBU_20_2.0", row.get("BBU_20_2.0_2.0"))),
+                "bb_middle": _safe_float(row.get("BBM_20_2.0", row.get("BBM_20_2.0_2.0"))),
+                "bb_lower": _safe_float(row.get("BBL_20_2.0", row.get("BBL_20_2.0_2.0"))),
             }
 
             snapshots.append(
                 {
-                    "exchange": row.exchange,
-                    "symbol": row.symbol,
-                    "timeframe": row.timeframe,
-                    "timestamp": row.timestamp,
-                    "available_at": row.available_at,
+                    "exchange": row.get("exchange"),
+                    "symbol": row.get("symbol"),
+                    "timeframe": row.get("timeframe"),
+                    "timestamp": row.get("timestamp"),
+                    "available_at": row.get("available_at"),
                     "features_json": features,
                 }
             )

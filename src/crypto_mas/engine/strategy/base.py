@@ -13,6 +13,9 @@ class BaseStrategy(Protocol):
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
         risk_level: int = 50,
+        htf_snapshots: list[FeatureSnapshot] | None = None,
+        config: dict | None = None,
+        is_open: bool = False,
     ) -> TradingDecision | None:
         """
         Calculates a trading decision given historical feature snapshots.

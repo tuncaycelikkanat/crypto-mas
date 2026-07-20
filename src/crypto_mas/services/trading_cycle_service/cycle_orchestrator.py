@@ -199,7 +199,7 @@ class TradingCycleService:
                 btc_is_crashing, htf = await self._fetch_data_for_symbols(symbols, timeframe, now, cycle, _log, use_btc_shield, display_id=display_id)
             
             time.time()
-            decisions = self._run_strategies_and_score(
+            decisions, open_positions = self._run_strategies_and_score(
                 symbols=symbols,
                 timeframe=timeframe,
                 now=now,
@@ -231,6 +231,7 @@ class TradingCycleService:
                 account_name=account_name,
                 symbols=symbols,
                 _log=_log,
+                open_positions=open_positions,
                 strategy_id=strategy_id
             )
             time.time()
@@ -371,9 +372,13 @@ class TradingCycleService:
                 snap_time = snap_time.replace(tzinfo=UTC)
             if now - snap_time > max_allowed_delay:
                 err_msg = f"STALE DATA DETECTED for {symbol}: Latest snapshot timestamp {latest_snapshot.timestamp} is older than allowed {max_allowed_delay} from now {now}. Kill-Switch triggered."
-                logger.error(f"[Cycle {display_id}] {err_msg}")
-                _log("FAILED", err_msg, "ERROR")
-                raise ValueError(err_msg)
+                if is_backtest:
+                    logger.warning(f"[Cycle {display_id}] {err_msg} (Skipped due to backtest data gap)")
+                    _log("STRATEGY", f"Stale data for {symbol}, skipped", "WARN")
+                    continue
+                else:
+                    logger.error(f"[Cycle {display_id}] {err_msg}")
+                    raise ValueError(err_msg)
 
             htf_snapshots = []  # type: ignore
             if htf and use_htf_shield:
@@ -403,6 +408,7 @@ class TradingCycleService:
                 timeframe=timeframe,
                 snapshots=snapshots,
                 risk_level=risk_level,
+                is_open=(symbol in open_position_symbols),
                 **kwargs
             )
             
@@ -421,7 +427,7 @@ class TradingCycleService:
                         decision.reason += " | REJECTED: Cooldown (30m)"
 
                 # 2. Modular Risk Architecture (QuantConnect style shields)
-                if decision.action != DecisionAction.HOLD:
+                if decision.action not in (DecisionAction.HOLD, DecisionAction.CLOSE_LONG, DecisionAction.CLOSE_SHORT):
                     context = {
                         "btc_is_crashing": btc_is_crashing,
                         "use_btc_shield": use_btc_shield,
@@ -436,9 +442,14 @@ class TradingCycleService:
                     
                 latest_snap = snapshots[-1].features_json if snapshots else {}
                 
-                if decision.action != DecisionAction.HOLD:
-                    decisions.append(decision)
-                    _log(
+                # Append if NOT AVOID and NOT REJECTED HOLD (but keep valid HOLDs that come from tactics)
+                if decision.action != DecisionAction.AVOID:
+                    # Only append HOLD if it is for an OPEN position (otherwise it's noise)
+                    if decision.action == DecisionAction.HOLD and symbol not in open_position_symbols:
+                        pass
+                    else:
+                        decisions.append(decision)
+                        _log(
                         "STRATEGY",
                         f"Decision made for {symbol}: {decision.action.value} (Confidence: {decision.confidence:.4f})",
                         payload={
@@ -497,9 +508,9 @@ class TradingCycleService:
                         }
                     }
                 )
-        return decisions
+        return decisions, list(open_position_symbols)
 
-    def _apply_risk_and_execute(self, decisions, timeframe, now, cycle, account_name, symbols, _log, strategy_id: str | None = None):
+    def _apply_risk_and_execute(self, decisions, timeframe, now, cycle, account_name, symbols, _log, open_positions: list[str], strategy_id: str | None = None):
         logger.debug(f"[Cycle {cycle.id}] Constructing portfolio target from {len(decisions)} decisions.")
         _log("PORTFOLIO", f"Constructing target portfolio from {len(decisions)} active signals", payload={
             "total_signals": len(decisions),
@@ -510,6 +521,7 @@ class TradingCycleService:
             exchange=self.fetcher_service.provider.exchange,
             timeframe=timeframe,
             decisions=decisions,
+            open_positions=open_positions
         )
         target_portfolio.strategy_id = strategy_id
         

@@ -31,6 +31,7 @@ class MultiAgentStrategy(BaseStrategy):
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
         risk_level: int = 50,
+        is_open: bool = False,
         use_regime_shield: bool = True,
     ) -> TradingDecision | None:
         signal = self.signal_agent.generate(
