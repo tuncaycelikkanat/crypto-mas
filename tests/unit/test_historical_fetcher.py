@@ -55,7 +55,7 @@ async def test_fetch_and_store_range_pagination(mock_provider, mock_db_session, 
         if current_time < start_time:
             current_time += timedelta(hours=1)
             
-        for i in range(limit):
+        for _i in range(limit):
             candles.append(
                 OHLCVCandle(
                     exchange=Exchange.BINANCE,

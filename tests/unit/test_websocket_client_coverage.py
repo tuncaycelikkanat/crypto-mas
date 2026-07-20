@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import websockets
@@ -13,18 +13,18 @@ async def test_add_remove_subscription():
     client._connection = MagicMock()
     client._connection.state = websockets.State.OPEN
     
-    client._run_task = MagicMock()
+    client._send_payload = AsyncMock()
     
     # Add subscription
     client.add_subscription("BTCUSDT", "trade")
     assert "btcusdt@trade" in client._subscriptions
-    assert client._run_task.called
+    assert client._send_payload.called
         
     # Remove subscription
-    client._run_task.reset_mock()
+    client._send_payload.reset_mock()
     client.remove_subscription("BTCUSDT", "trade")
     assert "btcusdt@trade" not in client._subscriptions
-    assert client._run_task.called
+    assert client._send_payload.called
         
 @pytest.mark.asyncio
 async def test_send_payload():

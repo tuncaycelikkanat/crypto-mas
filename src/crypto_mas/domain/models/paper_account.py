@@ -13,6 +13,7 @@ class PaperAccount(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    strategy_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     exchange: Mapped[str] = mapped_column(String(32), nullable=False, default="MOCK")
     base_currency: Mapped[str] = mapped_column(String(16), nullable=False, default="USDT")

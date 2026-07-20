@@ -1,17 +1,19 @@
 from collections.abc import Generator
-import pytest
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from crypto_mas.domain.models.paper_account import PaperAccount
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
+from crypto_mas.domain.models.paper_account import PaperAccount
 from crypto_mas.domain.models.trading_cycle import TradingCycle
 from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
+
 
 @pytest.fixture()
 def db_session() -> Generator[Session, None, None]:
@@ -121,6 +123,12 @@ async def test_kill_switch_passes_on_fresh_data(db_session, test_account):
     # We also need to mock multi_agent to prevent errors later in the cycle
     service.multi_agent = MagicMock()
     service.multi_agent.evaluate.return_value = []
+    
+    from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
+    from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
+    queue = OrderExecutorQueue.get_instance()
+    queue.sync_mode = True
+    queue.set_broker_factory(lambda: PaperBrokerService(db_session))
     
     cycle = await service.run_cycle(
         account_name=test_account.name,

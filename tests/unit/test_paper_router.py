@@ -1,14 +1,12 @@
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from crypto_mas.apps.api.main import app
-from crypto_mas.infrastructure.db.session import get_db_session
 from crypto_mas.domain.models import *  # noqa
 from crypto_mas.infrastructure.db.base import Base
-
-from sqlalchemy.pool import StaticPool
+from crypto_mas.infrastructure.db.session import get_db_session
 
 engine = create_engine(
     "sqlite:///:memory:",

@@ -8,7 +8,7 @@ from crypto_mas.services.scheduler_service import SchedulerService
 router = APIRouter(prefix="/api/v1/bot", tags=["Trading Bot"])
 
 def get_scheduler(request: Request) -> SchedulerService:
-    return request.app.state.scheduler
+    return request.app.state.scheduler  # type: ignore
 
 
 class StartBotRequest(BaseModel):

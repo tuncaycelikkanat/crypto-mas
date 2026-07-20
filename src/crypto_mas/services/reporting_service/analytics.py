@@ -13,7 +13,7 @@ Design notes:
 import math
 import statistics
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -130,7 +130,7 @@ class PerformanceAnalytics:
         )
 
         # ── Cycle PnL series for ratio computation ───────────────────────────
-        pnl_series = [float(c.cycle_pnl) for c in cycles if c.cycle_pnl is not None]
+        [float(c.cycle_pnl) for c in cycles if c.cycle_pnl is not None]
 
         # For ratio computation, prefer trade-level PnL per closed trade
         trade_pnl_series = [float(t.realized_pnl) for t in closed_trades]
@@ -223,7 +223,7 @@ class PerformanceAnalytics:
             if sigma == 0:
                 return 0.0
             # Scale by sqrt(periods_per_year); actual frequency detected below
-            n = len(returns)
+            len(returns)
             # Rough annualisation — if we have enough data, compute actual freq
             return (mu / sigma) * math.sqrt(periods_per_year)
         except Exception:

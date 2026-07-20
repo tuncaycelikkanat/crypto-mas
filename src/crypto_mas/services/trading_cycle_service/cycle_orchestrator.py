@@ -1,9 +1,9 @@
 import logging
-from datetime import timedelta
+import time
+from datetime import UTC, timedelta
 
 from sqlalchemy.orm import Session
 
-from crypto_mas.domain.models.position import Position
 from crypto_mas.domain.models.trading_cycle import TradingCycle
 from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
 from crypto_mas.domain.repositories.position_repository import PositionRepository
@@ -13,17 +13,17 @@ from crypto_mas.engine.risk.manager import RiskManager
 from crypto_mas.engine.risk.models.btc_crash_model import BTCCrashModel
 from crypto_mas.engine.risk.models.htf_portfolio_model import HTFPortfolioModel
 from crypto_mas.engine.risk.models.regime_model import RegimeModel
-from crypto_mas.engine.risk.risk import RiskEngine
 from crypto_mas.engine.risk.profiles import get_risk_profile
+from crypto_mas.engine.risk.risk import RiskEngine
 from crypto_mas.engine.strategy.factory import StrategyFactory
 from crypto_mas.engine.strategy.schemas import DecisionAction
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.services.feature_pipeline.service import FeaturePipelineService
+from crypto_mas.services.gainers_service import fetch_gainers, fetch_hidden_gems
 from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
 from crypto_mas.services.market_data_service.interfaces import MarketDataProvider
 from crypto_mas.services.market_data_service.schemas import Timeframe
 from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
-from crypto_mas.services.gainers_service import fetch_gainers, fetch_hidden_gems
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,7 @@ class TradingCycleService:
         use_htf_shield: bool = True,
         use_regime_shield: bool = True,
         cycle_index: int | None = None,
+        config_json: dict | None = None,
     ) -> TradingCycle:
         now = self.time_provider.now()
         strategy = StrategyFactory.create(strategy_name, time_provider=self.time_provider)
@@ -132,11 +133,17 @@ class TradingCycleService:
             trigger=trigger,
             started_at=now,
         )
-        self.cycle_repository.add(cycle)
-        if not trigger.startswith("BACKTEST-"):
-            self.db.commit()
         
-        display_id = cycle_index if cycle_index is not None else cycle.id
+        is_backtest = trigger.startswith("BACKTEST-")
+        if not is_backtest:
+            self.cycle_repository.add(cycle)
+            self.db.commit()
+            display_id = cycle.id
+        else:
+            # Skip DB writes for backtest to massively speed up the loop
+            display_id = cycle_index if cycle_index is not None else 0
+            cycle.id = display_id
+
 
         def _log(stage: str, message: str, level: str = "INFO", payload: dict | None = None):
             if trigger.startswith("BACKTEST-") and level not in ("ERROR", "SUCCESS"):
@@ -164,8 +171,34 @@ class TradingCycleService:
         })
 
         try:
-            btc_is_crashing, htf = await self._fetch_data_for_symbols(symbols, timeframe, now, cycle, _log, use_btc_shield, display_id=display_id)
+            is_backtest = trigger.startswith("BACKTEST-")
+            if is_backtest:
+                # In backtest mode, skip fetching data because engine.py pre-calculated it in memory!
+                htf_map = {
+                    Timeframe.ONE_MINUTE: Timeframe.FOUR_HOURS,
+                    Timeframe.FIFTEEN_MINUTES: Timeframe.FOUR_HOURS,
+                    Timeframe.ONE_HOUR: Timeframe.ONE_DAY,
+                    Timeframe.FOUR_HOURS: Timeframe.ONE_WEEK,
+                    Timeframe.ONE_DAY: Timeframe.ONE_MONTH,
+                }
+                htf = htf_map.get(timeframe)
+                
+                btc_is_crashing = False
+                if use_btc_shield:
+                    btc_feat = self.feature_snapshot_repository.get_latest(
+                        exchange=self.fetcher_service.provider.exchange.value,
+                        symbol="BTCUSDT",
+                        timeframe=timeframe.value,
+                        end_time=now
+                    )
+                    roc_val = btc_feat.features_json.get("roc_14") if btc_feat else None
+                    if roc_val is not None and roc_val < -5.0:
+                        btc_is_crashing = True
+                        _log("RISK", "MARKET CRASH DETECTED! BTC ROC: < -5.0%. Longs will be restricted.", "WARN")
+            else:
+                btc_is_crashing, htf = await self._fetch_data_for_symbols(symbols, timeframe, now, cycle, _log, use_btc_shield, display_id=display_id)
             
+            time.time()
             decisions = self._run_strategies_and_score(
                 symbols=symbols,
                 timeframe=timeframe,
@@ -180,13 +213,16 @@ class TradingCycleService:
                 use_btc_shield=use_btc_shield,
                 use_htf_shield=use_htf_shield,
                 use_regime_shield=use_regime_shield,
+                config_json=config_json,
                 _log=_log,
-                display_id=display_id
+                display_id=cycle.id if not is_backtest else cycle_index
             )
             
             cycle.symbols_processed = len(symbols)
             cycle.decisions_made = len(decisions)
             
+            strategy_id = f"{strategy_name}_{risk_level}"
+
             self._apply_risk_and_execute(
                 decisions=decisions,
                 timeframe=timeframe,
@@ -194,11 +230,17 @@ class TradingCycleService:
                 cycle=cycle,
                 account_name=account_name,
                 symbols=symbols,
-                _log=_log
+                _log=_log,
+                strategy_id=strategy_id
             )
+            time.time()
             
             if not trigger.startswith("BACKTEST-"):
+                cycle.status = "COMPLETED"
                 self.db.commit()
+            cycle.trades_executed = len(decisions)
+
+            
             return cycle
             
         except Exception as e:
@@ -219,7 +261,7 @@ class TradingCycleService:
             fetch_symbols.add("BTCUSDT")
         fetch_symbols_list = list(fetch_symbols)
         
-        fallback_start = now - self._get_timedelta(timeframe) * 60
+        fallback_start = now - self._get_timedelta(timeframe) * 1000
         
         await self.fetcher_service.backfill_universe(
             symbols=fetch_symbols_list,
@@ -272,27 +314,47 @@ class TradingCycleService:
                     
         return btc_is_crashing, htf
 
-    def _run_strategies_and_score(self, symbols, timeframe, now, strategy, strategy_name, risk_level, cycle, account_name, htf, btc_is_crashing, _log, use_btc_shield=True, use_htf_shield=True, use_regime_shield=True, display_id: int | None = None):
+    def _run_strategies_and_score(self, symbols, timeframe, now, strategy, strategy_name, risk_level, cycle, account_name, htf, btc_is_crashing, _log, use_btc_shield=True, use_htf_shield=True, use_regime_shield=True, config_json=None, display_id: int | None = None):
         display_id = display_id if display_id is not None else cycle.id
         decisions = []
+        is_backtest = cycle.trigger.startswith("BACKTEST-")
+        
+        # --- Pre-fetch open positions + stop-loss cooldowns in 2 bulk queries ---
+        exchange_str = self.fetcher_service.provider.exchange.value
+        
+        # In backtest mode, use the shared in-memory position repo — zero DB queries
+        # In live mode, do 2 bulk SQL queries instead of N per-symbol queries
+        pos_repo = getattr(self, "_bt_position_repo", None) if is_backtest else None
+        if pos_repo is None:
+            pos_repo = PositionRepository(self.db)
+        
+        open_position_symbols: set[str] = pos_repo.get_open_position_symbols(account_name, exchange_str)
+        cooldown_symbols: set[str] = pos_repo.get_recent_stop_loss_symbols(
+            account_name=account_name,
+            exchange=exchange_str,
+            time_now=now,
+            cooldown_minutes=30,
+        )
+        
         for symbol in symbols:
-            logger.debug(f"[Cycle {display_id}] Processing features and decisions for {symbol}")
+            # logger.debug(f"[Cycle {display_id}] Processing features and decisions for {symbol}")
             _log("STRATEGY", f"Evaluating {strategy_name} for {symbol}")
             
-            self.feature_service.calculate_and_store(
-                exchange=self.fetcher_service.provider.exchange,
-                symbol=symbol,
-                timeframe=timeframe,
-                end_time=now,
-                limit=1000,
-            )
+            if not is_backtest:
+                self.feature_service.calculate_and_store(
+                    exchange=self.fetcher_service.provider.exchange,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    end_time=now,
+                    limit=1000,
+                )
             
             snapshots = self.feature_snapshot_repository.list_by_symbol(
                 exchange=self.fetcher_service.provider.exchange.value,
                 symbol=symbol,
                 timeframe=timeframe.value,
                 end_time=now,
-                limit=100,
+                limit=5,  # strategies only use the last 1-3 snapshots
             )
             
             if not snapshots:
@@ -304,22 +366,23 @@ class TradingCycleService:
             timeframe_delta = self._get_timedelta(timeframe)
             max_allowed_delay = timeframe_delta + timedelta(minutes=15)
             
-            from datetime import timezone
             snap_time = latest_snapshot.timestamp
             if snap_time.tzinfo is None:
-                snap_time = snap_time.replace(tzinfo=timezone.utc)
+                snap_time = snap_time.replace(tzinfo=UTC)
             if now - snap_time > max_allowed_delay:
                 err_msg = f"STALE DATA DETECTED for {symbol}: Latest snapshot timestamp {latest_snapshot.timestamp} is older than allowed {max_allowed_delay} from now {now}. Kill-Switch triggered."
                 logger.error(f"[Cycle {display_id}] {err_msg}")
                 _log("FAILED", err_msg, "ERROR")
                 raise ValueError(err_msg)
 
+            htf_snapshots = []  # type: ignore
             if htf and use_htf_shield:
-                self.feature_service.calculate_and_store(
-                    exchange=self.fetcher_service.provider.exchange,
-                    symbol=symbol,
-                    timeframe=htf,
-                )
+                if not is_backtest:
+                    self.feature_service.calculate_and_store(
+                        exchange=self.fetcher_service.provider.exchange,
+                        symbol=symbol,
+                        timeframe=htf,
+                    )
                 htf_snapshots = self.feature_snapshot_repository.list_by_symbol(
                     exchange=self.fetcher_service.provider.exchange.value,
                     symbol=symbol,
@@ -329,7 +392,9 @@ class TradingCycleService:
                 )
             
             kwargs = {}
-            if strategy_name == "multi_agent":
+            if strategy_name == "regime_adaptive":
+                kwargs["config"] = config_json or {}
+            elif strategy_name == "multi_agent":
                 kwargs["use_regime_shield"] = use_regime_shield
                 
             decision = strategy.decide(
@@ -343,31 +408,17 @@ class TradingCycleService:
             
             if decision:
                 # 1. Base logic: Don't buy if we already hold an open position
-                if decision.action == DecisionAction.CONSIDER_LONG:
-                    open_pos = self.db.query(Position).filter(
-                        Position.account_name == account_name,
-                        Position.exchange == self.fetcher_service.provider.exchange.value,
-                        Position.symbol == symbol,
-                        Position.status == "OPEN"
-                    ).first()
-                    
-                    if open_pos:
-                        _log("STRATEGY", f"Decision CONSIDER_LONG for {symbol} REJECTED: Already have an open position.", "WARN")
+                if decision.action in (DecisionAction.CONSIDER_LONG, DecisionAction.CONSIDER_SHORT):
+                    # O(1) set lookup — no DB query
+                    if symbol in open_position_symbols:
+                        _log("STRATEGY", f"Decision {decision.action.value} for {symbol} REJECTED: Already have an open position.", "WARN")
                         decision.action = DecisionAction.HOLD
                         decision.reason += " | REJECTED: Open Position Exists"
                         
-                    elif decision.action == DecisionAction.CONSIDER_LONG:
-                        pos_repo = PositionRepository(self.db)
-                        if pos_repo.has_recent_stop_loss(
-                            account_name=account_name,
-                            exchange=self.fetcher_service.provider.exchange.value,
-                            symbol=symbol,
-                            time_now=now,
-                            cooldown_minutes=30
-                        ):
-                            _log("STRATEGY", f"Decision CONSIDER_LONG for {symbol} REJECTED: Cooldown active (Recent Stop-Loss).", "WARN")
-                            decision.action = DecisionAction.HOLD
-                            decision.reason += " | REJECTED: Cooldown (30m)"
+                    elif symbol in cooldown_symbols:
+                        _log("STRATEGY", f"Decision {decision.action.value} for {symbol} REJECTED: Cooldown active (Recent Stop-Loss).", "WARN")
+                        decision.action = DecisionAction.HOLD
+                        decision.reason += " | REJECTED: Cooldown (30m)"
 
                 # 2. Modular Risk Architecture (QuantConnect style shields)
                 if decision.action != DecisionAction.HOLD:
@@ -448,7 +499,7 @@ class TradingCycleService:
                 )
         return decisions
 
-    def _apply_risk_and_execute(self, decisions, timeframe, now, cycle, account_name, symbols, _log):
+    def _apply_risk_and_execute(self, decisions, timeframe, now, cycle, account_name, symbols, _log, strategy_id: str | None = None):
         logger.debug(f"[Cycle {cycle.id}] Constructing portfolio target from {len(decisions)} decisions.")
         _log("PORTFOLIO", f"Constructing target portfolio from {len(decisions)} active signals", payload={
             "total_signals": len(decisions),
@@ -460,6 +511,7 @@ class TradingCycleService:
             timeframe=timeframe,
             decisions=decisions,
         )
+        target_portfolio.strategy_id = strategy_id
         
         logger.debug(f"[Cycle {cycle.id}] Evaluating risk limits.")
         risk_assessment = self.risk_engine.assess(target=target_portfolio)
@@ -471,6 +523,7 @@ class TradingCycleService:
             approved_portfolio = PortfolioTarget(
                 exchange=target_portfolio.exchange,
                 timeframe=target_portfolio.timeframe,
+                strategy_id=strategy_id,
                 target_positions=[],
                 cash_weight=1.0,
                 gross_exposure=0.0,
@@ -496,68 +549,22 @@ class TradingCycleService:
                 "reason": "No eligible long candidates survived filters.",
             })
         
-        logger.debug(f"[Cycle {cycle.id}] Executing portfolio.")
-        _log("EXECUTION", "Executing orders against virtual broker")
+        logger.debug(f"[Cycle {cycle.id}] Enqueuing portfolio target for execution.")
+        _log("EXECUTION", "Enqueuing approved portfolio to asynchronous OrderExecutorQueue")
         
-        self.paper_broker.update_mark_prices(
-            account_name=account_name,
-            exchange=self.fetcher_service.provider.exchange,
-            timeframe=timeframe.value,
-            cycle_id=cycle.id,
-        )
+        from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
         
-        if self.strategy_mode != "scalping":
-            close_report = self.paper_broker.close_positions_not_in_target(
-                account_name=account_name,
-                target=approved_portfolio,
-                cycle_id=cycle.id,
-            )
-        else:
-            from crypto_mas.services.paper_trading.schemas import PaperExecutionReport
-            account_model = self.paper_broker.account_repository.get_by_name(account_name)
-            start_eq = account_model.cash_balance + self.paper_broker._calculate_open_positions_value(account_name)
-            close_report = PaperExecutionReport(
-                account_name=account_name,
-                exchange=self.fetcher_service.provider.exchange,
-                starting_cash=float(account_model.cash_balance),
-                ending_cash=float(account_model.cash_balance),
-                starting_equity=float(start_eq),
-                ending_equity=float(start_eq),
-                executed=[],
-                skipped=[],
-                created_at=self.time_provider.now()
-            )
-        
-        execute_report = self.paper_broker.execute_target_portfolio(
+        queue = OrderExecutorQueue.get_instance()
+        queue.enqueue(
             account_name=account_name,
             target=approved_portfolio,
-            cycle_id=cycle.id,
+            cycle_id=cycle.id
         )
         
-        cycle.trades_executed = len(close_report.executed) + len(execute_report.executed)
-        cycle.starting_equity = close_report.starting_equity
-        cycle.ending_equity = execute_report.ending_equity
-        cycle.cycle_pnl = cycle.ending_equity - cycle.starting_equity
+        # The synchronous execution logic and cycle completion is now handled by OrderExecutorQueue!
         
-        self.cycle_repository.update_status(cycle.id, "COMPLETED")
-        cycle.finished_at = self.time_provider.now()
-        
-        logger.debug(f"[Cycle {cycle.id}] Completed successfully. PnL: {cycle.cycle_pnl}")
-        _log(
-            "COMPLETED",
-            f"Cycle #{cycle.id} tamamlandı. {len(symbols)} coin tarandı, {cycle.trades_executed} işlem yapıldı. PnL: ${cycle.cycle_pnl:.4f}",
-            "INFO" if cycle.trades_executed == 0 else "SUCCESS",
-            payload={
-                "cycle_id": cycle.id,
-                "symbols_scanned": len(symbols),
-                "decisions_made": cycle.decisions_made,
-                "trades_executed": cycle.trades_executed,
-                "starting_equity": float(cycle.starting_equity) if cycle.starting_equity else None,
-                "ending_equity": float(cycle.ending_equity) if cycle.ending_equity else None,
-                "cycle_pnl": float(cycle.cycle_pnl) if cycle.cycle_pnl else 0.0,
-                "duration_secs": round((self.time_provider.now() - now).total_seconds(), 1),
-            }
-        )
+        # We can just return the decisions
+        return decisions
 
     @staticmethod
     def _get_timedelta(timeframe: Timeframe) -> timedelta:

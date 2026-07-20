@@ -52,7 +52,7 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
     base_time = datetime(2025, 12, 31, 12, 15, 0, tzinfo=UTC)
 
     # 90 neutral candles
-    for i in range(90):
+    for _i in range(90):
         candles.append(
             OHLCVCandle(
                 exchange=Exchange.BINANCE,
@@ -118,7 +118,7 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
             if timeframe == Timeframe.FOUR_HOURS:
                 htf_candles = []
                 htf_base_time = datetime(2026, 1, 1, 11, 45, tzinfo=UTC) - timedelta(days=10)
-                for i in range(10):
+                for _i in range(10):
                     htf_candles.append(
                         OHLCVCandle(
                             exchange=Exchange.BINANCE, symbol="BTCUSDT", timeframe=Timeframe.FOUR_HOURS,
@@ -148,7 +148,7 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
             # Return dummy 4H candles to pass integrity and HTF checks
             htf_candles = []
             htf_base_time = datetime(2026, 1, 1, 11, 45, tzinfo=UTC) - timedelta(days=10)
-            for i in range(10):
+            for _i in range(10):
                 htf_candles.append(
                     OHLCVCandle(
                         exchange=Exchange.BINANCE, symbol="ETHUSDT", timeframe=Timeframe.FOUR_HOURS,
@@ -173,6 +173,12 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
         strategy_mode="scalping"
     )
 
+    from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
+    from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
+    queue = OrderExecutorQueue.get_instance()
+    queue.sync_mode = True
+    queue.set_broker_factory(lambda: PaperBrokerService(e2e_db_session, time_provider=time_provider, strategy_mode="scalping"))
+
     # Act
     cycle = await service.run_cycle(
         account_name="default-paper",
@@ -181,6 +187,8 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
         strategy_name="rsi_oversold",
         trigger="E2E_TEST"
     )
+        
+    e2e_db_session.refresh(cycle)
 
     # Assert
     assert cycle.status == "COMPLETED"

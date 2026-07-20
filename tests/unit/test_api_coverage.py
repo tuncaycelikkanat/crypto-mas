@@ -24,6 +24,7 @@ def test_health_check():
 
 from crypto_mas.apps.api.routers.bot import get_scheduler
 
+
 @patch("crypto_mas.apps.api.routers.bot.SchedulerService")
 def test_bot_endpoints(mock_scheduler):
     mock_instance = mock_scheduler.return_value
@@ -109,12 +110,16 @@ def test_paper_endpoints(mock_broker_service):
 
 def test_analytics_endpoints():
     with patch("crypto_mas.apps.api.routers.analytics.PaperAccountRepository") as mock_repo, \
-         patch("crypto_mas.apps.api.routers.analytics.TradingCycleRepository") as mock_cycle_repo, \
-         patch("crypto_mas.apps.api.routers.analytics.CandleRepository") as mock_candle_repo, \
-         patch("crypto_mas.apps.api.routers.analytics.FeatureSnapshotRepository") as mock_feature_repo, \
-         patch("crypto_mas.apps.api.routers.analytics.ExecutionLogRepository") as mock_log_repo:
+         patch("crypto_mas.apps.api.routers.analytics.TradingCycleRepository"), \
+         patch("crypto_mas.apps.api.routers.analytics.CandleRepository"), \
+         patch("crypto_mas.apps.api.routers.analytics.FeatureSnapshotRepository"), \
+         patch("crypto_mas.apps.api.routers.analytics.ExecutionLogRepository"), \
+         patch("crypto_mas.apps.api.routers.analytics.TradeRepository") as mock_trade_repo, \
+         patch("crypto_mas.apps.api.routers.analytics.PositionRepository") as mock_pos_repo:
         
         mock_repo.return_value.get_by_name.return_value = MagicMock(initial_balance=1000, equity=1000)
+        mock_trade_repo.return_value.list_by_account.return_value = []
+        mock_pos_repo.return_value.list_open_positions.return_value = []
         
         response = client.get("/api/v1/analytics/summary")
         assert response.status_code == 200

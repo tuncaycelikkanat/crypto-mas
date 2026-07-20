@@ -44,6 +44,14 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
     btc_snapshot_mock.timestamp = datetime.now(UTC)
     
     # Simulate htf_long_allowed=False, htf_short_allowed=False
+    service.multi_agent = MagicMock()
+    service.multi_agent.evaluate.return_value = []
+    
+    from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
+    queue = OrderExecutorQueue.get_instance()
+    queue.sync_mode = True
+    # We will set the factory to a mock broker after we initialize it.
+    
     service.htf_manager = MagicMock()
     service.htf_manager.is_long_allowed.return_value = False
     service.htf_manager.is_short_allowed.return_value = False
@@ -107,8 +115,9 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
         service.paper_broker = MagicMock()
         service.paper_broker.close_positions_not_in_target.return_value = close_report_mock
         service.paper_broker.execute_target_portfolio.return_value = execute_report_mock
+        queue.set_broker_factory(lambda: service.paper_broker)
         
-        cycle = await service.run_cycle(
+        await service.run_cycle(
             account_name="test_acc",
             symbols=["ETHUSDT"],
             timeframe=Timeframe.FIFTEEN_MINUTES,

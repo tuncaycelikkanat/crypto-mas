@@ -11,7 +11,7 @@ from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
 @pytest.fixture
-def db_session() -> AsyncGenerator[Session, None]:
+def db_session() -> AsyncGenerator[Session, None]:  # type: ignore
     engine = create_engine("sqlite:///:memory:", echo=False)
     Base.metadata.create_all(bind=engine)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

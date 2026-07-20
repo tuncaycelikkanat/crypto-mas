@@ -1,17 +1,15 @@
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
+import pytest
+
+from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
+from crypto_mas.engine.regime import MarketRegime
 from crypto_mas.engine.risk.manager import RiskManager
 from crypto_mas.engine.risk.models.btc_crash_model import BTCCrashModel
 from crypto_mas.engine.risk.models.htf_portfolio_model import HTFPortfolioModel
 from crypto_mas.engine.risk.models.regime_model import RegimeModel
-from crypto_mas.engine.strategy.schemas import TradingDecision, DecisionAction
-from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
-from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
-from crypto_mas.engine.signal import TradingSignal, SignalType, SignalDirection
-from crypto_mas.engine.scoring import AssetScore
-from crypto_mas.engine.regime import RegimeSnapshot, MarketRegime
+from crypto_mas.engine.strategy.schemas import DecisionAction
 
 
 @pytest.fixture
@@ -55,7 +53,7 @@ def test_htf_shield_rejects_long_in_bear_market(risk_manager):
     
     snapshot = FeatureSnapshot(
         id=1, exchange="binance", symbol="ETHUSDT", timeframe="4h",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         features_json={
             "close": 1000.0,
             "ema_20": 1100.0,
@@ -76,7 +74,7 @@ def test_htf_shield_rejects_short_in_bull_market(risk_manager):
     
     snapshot = FeatureSnapshot(
         id=2, exchange="binance", symbol="ETHUSDT", timeframe="4h",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         features_json={
             "close": 1500.0,
             "ema_20": 1400.0,
@@ -111,7 +109,7 @@ def test_all_shields_pass(risk_manager):
     
     snapshot_4h = FeatureSnapshot(
         id=4, exchange="binance", symbol="ETHUSDT", timeframe="4h",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         features_json={
             "close": 1500.0,
             "ema_20": 1400.0,
@@ -122,7 +120,7 @@ def test_all_shields_pass(risk_manager):
     
     snapshot_15m = FeatureSnapshot(
         id=5, exchange="binance", symbol="ETHUSDT", timeframe="15m",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         features_json={
             "adx_14": 30.0  # Trending market
         }

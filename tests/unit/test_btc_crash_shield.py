@@ -1,17 +1,19 @@
 from collections.abc import Generator
-import pytest
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from crypto_mas.domain.models.paper_account import PaperAccount
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
+from crypto_mas.domain.models.paper_account import PaperAccount
 from crypto_mas.engine.strategy.schemas import DecisionAction
 from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
+
 
 @pytest.fixture()
 def db_session() -> Generator[Session, None, None]:
@@ -90,7 +92,8 @@ async def test_btc_crash_shield_rejects_altcoin_longs(db_session, test_account):
             momentum_score=0.4,
             volatility_penalty=0.0
         ),
-        regime=None
+        regime=None,
+        metadata={}
     )
     strategy_mock.decide.return_value = decision
     
@@ -166,7 +169,8 @@ async def test_btc_crash_shield_allows_altcoin_shorts(db_session, test_account):
             momentum_score=0.4,
             volatility_penalty=0.0
         ),
-        regime=None
+        regime=None,
+        metadata={}
     )
     strategy_mock.decide.return_value = decision
     

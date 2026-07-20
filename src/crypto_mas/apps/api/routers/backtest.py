@@ -25,6 +25,7 @@ class RunBacktestRequest(BaseModel):
     use_btc_shield: bool = True
     use_htf_shield: bool = True
     use_regime_shield: bool = True
+    config_json: dict | None = None
 
 class RunBacktestResponse(BaseModel):
     job_id: str
@@ -41,9 +42,18 @@ class BacktestStatusResponse(BaseModel):
     end_time: datetime
     initial_balance: float
     final_equity: float | None
+    total_fees_paid: float | None = None
     total_trades: int | None
     win_rate: float | None
     max_drawdown: float | None
+    sharpe_ratio: float | None = None
+    sortino_ratio: float | None = None
+    calmar_ratio: float | None = None
+    profit_factor: float | None = None
+    expectancy: float | None = None
+    avg_win: float | None = None
+    avg_loss: float | None = None
+    avg_trade_duration_s: float | None = None
     error_message: str | None
     config_json: dict | None = None
 
@@ -61,6 +71,7 @@ async def run_backtest_task(
     use_btc_shield: bool,
     use_htf_shield: bool,
     use_regime_shield: bool,
+    config_json: dict | None = None,
 ) -> None:
     db = SessionLocal()
     try:
@@ -78,6 +89,7 @@ async def run_backtest_task(
             use_btc_shield=use_btc_shield,
             use_htf_shield=use_htf_shield,
             use_regime_shield=use_regime_shield,
+            config_json=config_json,
         )
     except Exception:
         pass  # Errors are logged inside the service
@@ -109,6 +121,7 @@ async def start_backtest(
         use_btc_shield=request.use_btc_shield,
         use_htf_shield=request.use_htf_shield,
         use_regime_shield=request.use_regime_shield,
+        config_json=request.config_json,
     )
     
     return RunBacktestResponse(
@@ -129,21 +142,30 @@ def get_backtest_status(
         raise HTTPException(status_code=404, detail="Backtest job not found")
         
     return BacktestStatusResponse(
-        job_id=result.job_id,
-        status=result.status,
-        exchange=result.exchange,
-        timeframe=result.timeframe,
-        strategy_name=result.strategy_name,
-        symbols=result.symbols,
-        start_time=result.start_time,
-        end_time=result.end_time,
-        initial_balance=result.initial_balance,
-        final_equity=result.final_equity,
-        total_trades=result.total_trades,
-        win_rate=result.win_rate,
-        max_drawdown=result.max_drawdown,
-        error_message=result.error_message,
-        config_json=result.config_json,
+        job_id=result.job_id,  # type: ignore
+        status=result.status,  # type: ignore
+        exchange=result.exchange,  # type: ignore
+        timeframe=result.timeframe,  # type: ignore
+        strategy_name=result.strategy_name,  # type: ignore
+        symbols=result.symbols,  # type: ignore
+        start_time=result.start_time,  # type: ignore
+        end_time=result.end_time,  # type: ignore
+        initial_balance=result.initial_balance,  # type: ignore
+        final_equity=result.final_equity,  # type: ignore
+        total_fees_paid=result.total_fees_paid,  # type: ignore
+        total_trades=result.total_trades,  # type: ignore
+        win_rate=result.win_rate,  # type: ignore
+        max_drawdown=result.max_drawdown,  # type: ignore
+        sharpe_ratio=result.sharpe_ratio,  # type: ignore
+        sortino_ratio=result.sortino_ratio,  # type: ignore
+        calmar_ratio=result.calmar_ratio,  # type: ignore
+        profit_factor=result.profit_factor,  # type: ignore
+        expectancy=result.expectancy,  # type: ignore
+        avg_win=result.avg_win,  # type: ignore
+        avg_loss=result.avg_loss,  # type: ignore
+        avg_trade_duration_s=result.avg_trade_duration_s,  # type: ignore
+        error_message=result.error_message,  # type: ignore
+        config_json=result.config_json,  # type: ignore
     )
 
 @router.get("", response_model=list[BacktestStatusResponse])
@@ -156,21 +178,30 @@ def get_all_backtests(
     
     return [
         BacktestStatusResponse(
-            job_id=r.job_id,
-            status=r.status,
-            exchange=r.exchange,
-            timeframe=r.timeframe,
-            strategy_name=r.strategy_name,
-            symbols=r.symbols,
-            start_time=r.start_time,
-            end_time=r.end_time,
-            initial_balance=r.initial_balance,
-            final_equity=r.final_equity,
-            total_trades=r.total_trades,
-            win_rate=r.win_rate,
-            max_drawdown=r.max_drawdown,
-            error_message=r.error_message,
-            config_json=r.config_json,
+            job_id=r.job_id,  # type: ignore
+            status=r.status,  # type: ignore
+            exchange=r.exchange,  # type: ignore
+            timeframe=r.timeframe,  # type: ignore
+            strategy_name=r.strategy_name,  # type: ignore
+            symbols=r.symbols,  # type: ignore
+            start_time=r.start_time,  # type: ignore
+            end_time=r.end_time,  # type: ignore
+            initial_balance=r.initial_balance,  # type: ignore
+            final_equity=r.final_equity,  # type: ignore
+            total_fees_paid=r.total_fees_paid,  # type: ignore
+            total_trades=r.total_trades,  # type: ignore
+            win_rate=r.win_rate,  # type: ignore
+            max_drawdown=r.max_drawdown,  # type: ignore
+            sharpe_ratio=r.sharpe_ratio,  # type: ignore
+            sortino_ratio=r.sortino_ratio,  # type: ignore
+            calmar_ratio=r.calmar_ratio,  # type: ignore
+            profit_factor=r.profit_factor,  # type: ignore
+            expectancy=r.expectancy,  # type: ignore
+            avg_win=r.avg_win,  # type: ignore
+            avg_loss=r.avg_loss,  # type: ignore
+            avg_trade_duration_s=r.avg_trade_duration_s,  # type: ignore
+            error_message=r.error_message,  # type: ignore
+            config_json=r.config_json,  # type: ignore
         )
         for r in results
     ]
@@ -226,33 +257,85 @@ def delete_backtest(
         
     return {"message": f"Backtest {job_id} deleted"}
 
+@router.get("/{job_id}/equity-curve")
+def get_equity_curve(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db_session)],
+    source: str = "trades",  # "trades" (trade-level) or "cycles"
+):
+    """
+    Returns a high-resolution equity curve for a backtest.
+
+    - source=trades  → a data point per closed trade (most detailed)
+    - source=cycles  → a data point per simulated cycle (faster, but coarser)
+    """
+    from sqlalchemy import select
+
+    account_name = f"backtest-{job_id}"
+
+    result = BacktestResultRepository(db).get_by_job_id(job_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Backtest not found")
+
+    initial_balance = result.initial_balance or 10000.0
+
+    if source == "trades":
+        from crypto_mas.domain.models.trade import Trade
+        trades = db.execute(
+            select(Trade)
+            .where(Trade.account_name == account_name)
+            .where(Trade.realized_pnl.is_not(None))
+            .order_by(Trade.executed_at.asc())
+        ).scalars().all()
+
+        equity = initial_balance
+        curve = [{"time": result.start_time.isoformat(), "value": equity}]
+        for t in trades:
+            equity += float(t.realized_pnl)  # type: ignore
+            curve.append({
+                "time": t.executed_at.isoformat() if t.executed_at else None,
+                "value": round(equity, 4),
+                "symbol": t.symbol,
+                "pnl": round(float(t.realized_pnl), 4),
+            })
+        return {"job_id": job_id, "source": "trades", "data": curve}
+
+    else:
+        from crypto_mas.domain.models.trading_cycle import TradingCycle
+        cycles = db.execute(
+            select(TradingCycle.finished_at, TradingCycle.ending_equity)
+            .where(TradingCycle.account_name == account_name)
+            .where(TradingCycle.finished_at.is_not(None))
+            .order_by(TradingCycle.finished_at.asc())
+        ).all()
+        curve = [
+            {"time": c.finished_at.isoformat(), "value": float(c.ending_equity)}
+            for c in cycles if c.ending_equity is not None
+        ]
+        return {"job_id": job_id, "source": "cycles", "data": curve}
+
+
 @router.get("/{job_id}/compare-data")
 def get_backtest_compare_data(
     job_id: str,
-    db: Annotated[Session, Depends(get_db_session)]
+    db: Annotated[Session, Depends(get_db_session)],
 ):
-    """
-    Returns time-series data for a backtest to be used in comparison charts.
-    """
-    from crypto_mas.domain.models.trading_cycle import TradingCycle
+    """Legacy endpoint — returns cycle-level equity curve for comparison charts."""
     from sqlalchemy import select
-    
+
+    from crypto_mas.domain.models.trading_cycle import TradingCycle
+
     account_name = f"backtest-{job_id}"
-    
-    # Get equity curve
     cycles = db.execute(
         select(TradingCycle.finished_at, TradingCycle.ending_equity)
         .where(TradingCycle.account_name == account_name)
         .where(TradingCycle.finished_at.is_not(None))
         .order_by(TradingCycle.finished_at.asc())
     ).all()
-    
+
     equity_curve = [
         {"time": c.finished_at.isoformat(), "equity": float(c.ending_equity)}
-        for c in cycles
+        for c in cycles if c.ending_equity is not None
     ]
-    
-    return {
-        "job_id": job_id,
-        "equity_curve": equity_curve
-    }
+    return {"job_id": job_id, "equity_curve": equity_curve}
+

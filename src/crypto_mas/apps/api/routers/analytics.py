@@ -156,7 +156,7 @@ def get_active_coins(db: Session = Depends(get_db)) -> dict[str, Any]:
     init_logs = [log for log in reversed(recent_logs) if log.stage == "INIT"][-5:]
     for log in init_logs:
         if log.payload_json and "symbols" in log.payload_json:
-            for sym in log.payload_json["symbols"]:
+            for sym in log.payload_json["symbols"]:  # type: ignore
                 if sym not in ["AUTO_GAINERS", "HIDDEN_GEMS"]:
                     all_symbols.add(sym)
             

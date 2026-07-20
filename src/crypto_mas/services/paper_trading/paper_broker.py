@@ -60,7 +60,7 @@ class PaperBrokerService:
         target: PortfolioTarget,
         cycle_id: int | None = None,
     ) -> PaperExecutionReport:
-        account = self._bt_account if self.is_backtest else self.account_repository.get_by_name(account_name)
+        account = self._bt_account if self.is_backtest else self.account_repository.get_by_name(account_name)  # type: ignore
 
         if account is None:
             raise ValueError(f"Paper account not found: {account_name}")
@@ -211,14 +211,20 @@ class PaperBrokerService:
                     timeframe="15m" if self.strategy_mode == "scalping" else (
                         "4h" if self.strategy_mode == "swing" else "1d"
                     ),
-                    end_time=self.time_provider.get_time(),
+                    end_time=self.time_provider.get_time(),  # type: ignore
                 )
                 if atr_feature and atr_feature.features_json:
                     atr_val = atr_feature.features_json.get("atr_14")
                     if atr_val and atr_val > 0:
                         atr_d = Decimal(str(atr_val))
-                        sl_mult = Decimal(str(ATR_SL_MULT.get(self.strategy_mode, 2.0)))
-                        tp_mult = Decimal(str(ATR_TP_MULT.get(self.strategy_mode, 4.0)))
+                        
+                        # Apply strategy/tactic specific overrides if they exist
+                        override_sl = target_position.metadata.get("sl_mult_override") if hasattr(target_position, "metadata") else None
+                        override_tp = target_position.metadata.get("tp_mult_override") if hasattr(target_position, "metadata") else None
+                        
+                        sl_mult = Decimal(str(override_sl)) if override_sl else Decimal(str(ATR_SL_MULT.get(self.strategy_mode, 2.0)))
+                        tp_mult = Decimal(str(override_tp)) if override_tp else Decimal(str(ATR_TP_MULT.get(self.strategy_mode, 4.0)))
+                        
                         if target_position.side == "LONG":
                             stop_loss_price   = self._money(price - atr_d * sl_mult)
                             take_profit_price = self._money(price + atr_d * tp_mult)
@@ -303,9 +309,9 @@ class PaperBrokerService:
                 account_name=account.name,
                 level="INFO",
                 stage="PAPER_BROKER",
-                message=f"{side_enum.value} {target_position.symbol} @ ${float(price):.4f} | SL=${float(stop_loss_price):.4f} TP=${float(take_profit_price):.4f}",
+                message=f"{side_enum.value} {target_position.symbol} @ ${float(price):.4f} | SL=${float(stop_loss_price):.4f} TP=${float(take_profit_price):.4f}",  # type: ignore
                 cycle_id=cycle_id,
-                payload={"notional": float(target_notional), "price": float(price), "quantity": float(quantity), "sl": float(stop_loss_price), "tp": float(take_profit_price)}
+                payload={"notional": float(target_notional), "price": float(price), "quantity": float(quantity), "sl": float(stop_loss_price), "tp": float(take_profit_price)}  # type: ignore
             )
 
         if self.is_backtest:
@@ -361,7 +367,7 @@ class PaperBrokerService:
         starting_cash = account.cash_balance
         starting_equity = account.equity
 
-        target_symbols = {position.symbol for position in target.target_positions}
+        {position.symbol for position in target.target_positions}
         open_positions = self.position_repository.list_open_positions(account_name=account.name)
 
         available_cash = account.cash_balance
@@ -547,7 +553,7 @@ class PaperBrokerService:
         timeframe: str,
         cycle_id: int | None = None,
     ) -> PaperExecutionReport:
-        account = self._bt_account if self.is_backtest else self.account_repository.get_by_name(account_name)
+        account = self._bt_account if self.is_backtest else self.account_repository.get_by_name(account_name)  # type: ignore
 
         if account is None:
             raise ValueError(f"Paper account not found: {account_name}")

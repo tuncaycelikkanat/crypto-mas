@@ -12,9 +12,9 @@ async def test_run_backtest_success():
     db = MagicMock()
     service = BacktestEngineService(db)
     
-    with patch("crypto_mas.services.backtesting.engine.get_market_data_provider") as mock_provider, \
+    with patch("crypto_mas.services.backtesting.engine.get_market_data_provider"), \
          patch("crypto_mas.services.backtesting.engine.HistoricalFetcherService") as mock_fetcher, \
-         patch("crypto_mas.services.backtesting.engine.PaperAccountRepository") as mock_account_repo, \
+         patch("crypto_mas.services.backtesting.engine.PaperAccountRepository"), \
          patch("crypto_mas.services.backtesting.engine.TradingCycleService") as mock_cycle_service, \
          patch("crypto_mas.services.reporting_service.analytics.PerformanceAnalytics") as mock_analytics:
          

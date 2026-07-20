@@ -58,6 +58,36 @@ class PositionRepository:
         )
         return self.db.scalars(stmt).first() is not None
 
+    def get_open_position_symbols(self, account_name: str, exchange: str) -> set[str]:
+        """Single query: returns the set of symbols with an open position. O(1) lookup after call."""
+        stmt = (
+            select(Position.symbol)
+            .where(Position.account_name == account_name)
+            .where(Position.exchange == exchange)
+            .where(Position.status == "OPEN")
+        )
+        return set(self.db.scalars(stmt).all())
+
+    def get_recent_stop_loss_symbols(
+        self,
+        account_name: str,
+        exchange: str,
+        time_now: datetime,
+        cooldown_minutes: int = 30,
+    ) -> set[str]:
+        """Single query: returns the set of symbols under stop-loss cooldown."""
+        from datetime import timedelta
+        cutoff_time = time_now - timedelta(minutes=cooldown_minutes)
+        stmt = (
+            select(Position.symbol)
+            .where(Position.account_name == account_name)
+            .where(Position.exchange == exchange)
+            .where(Position.status == "CLOSED")
+            .where(Position.close_reason == "STOP_LOSS")
+            .where(Position.closed_at >= cutoff_time)
+        )
+        return set(self.db.scalars(stmt).all())
+
     def create_open_position(
         self,
         account_name: str,
@@ -71,6 +101,7 @@ class PositionRepository:
         take_profit_price: Decimal | None = None,
         strategy_mode: str | None = None,
         side: str = "LONG",
+        skip_commit: bool = False,
     ) -> Position:
         position = Position(
             account_name=account_name,
@@ -93,8 +124,9 @@ class PositionRepository:
         )
 
         self.db.add(position)
-        self.db.commit()
-        self.db.refresh(position)
+        if not skip_commit:
+            self.db.commit()
+            self.db.refresh(position)
 
         return position
 
@@ -102,6 +134,7 @@ class PositionRepository:
         self,
         position: Position,
         current_price: Decimal,
+        skip_commit: bool = False,
     ) -> Position:
         current_price = self._money(current_price)
 
@@ -119,8 +152,9 @@ class PositionRepository:
         else:
             position.notional_value = self._money(position.quantity * current_price)
 
-        self.db.commit()
-        self.db.refresh(position)
+        if not skip_commit:
+            self.db.commit()
+            self.db.refresh(position)
 
         return position
 
@@ -128,10 +162,12 @@ class PositionRepository:
         self,
         position: Position,
         stop_loss_price: Decimal,
+        skip_commit: bool = False,
     ) -> Position:
         position.stop_loss_price = self._money(stop_loss_price)
-        self.db.commit()
-        self.db.refresh(position)
+        if not skip_commit:
+            self.db.commit()
+            self.db.refresh(position)
         return position
 
     def close_position(
@@ -140,6 +176,7 @@ class PositionRepository:
             exit_price: Decimal,
             closed_at: datetime,
             close_reason: str = "SIGNAL",
+            skip_commit: bool = False,
     ) -> Position:
         exit_price = self._money(exit_price)
 
@@ -162,8 +199,9 @@ class PositionRepository:
         position.closed_at = closed_at
         position.close_reason = close_reason
 
-        self.db.commit()
-        self.db.refresh(position)
+        if not skip_commit:
+            self.db.commit()
+            self.db.refresh(position)
 
         return position
 

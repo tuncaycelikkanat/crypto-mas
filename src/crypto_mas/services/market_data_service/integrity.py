@@ -206,7 +206,7 @@ class CandleIntegrityChecker:
         return issues
 
     @staticmethod
-    def _timeframe_to_delta(timeframe: Timeframe) -> timedelta:
+    def _timeframe_to_delta(timeframe: Timeframe) -> timedelta:  # type: ignore
         match timeframe:
             case Timeframe.ONE_MINUTE:
                 return timedelta(minutes=1)

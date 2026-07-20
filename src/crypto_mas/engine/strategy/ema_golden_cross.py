@@ -56,7 +56,7 @@ class EMAGoldenCrossStrategy(BaseStrategy):
         reason_parts = []
 
         # Golden Cross: EMA20 now above EMA50, and was below or very close before
-        golden_cross = ema_20 > ema_50
+        golden_cross = ema_20 > ema_50  # type: ignore
         fresh_cross = (
             prev_ema_20 is not None
             and prev_ema_50 is not None
@@ -68,11 +68,11 @@ class EMAGoldenCrossStrategy(BaseStrategy):
             direction = SignalDirection.LONG
 
             # Base confidence from EMA spread
-            spread_pct = (ema_20 - ema_50) / close if close > 0 else 0
+            spread_pct = (ema_20 - ema_50) / close if close > 0 else 0  # type: ignore
             confidence = min(0.4 + spread_pct * 10, 0.7)
 
             # RSI confirmation
-            if rsi_14 > 55:
+            if rsi_14 > 55:  # type: ignore
                 confidence = min(confidence + 0.15, 0.95)
                 reason_parts.append(f"RSI={rsi_14:.1f} bullish")
 
@@ -99,7 +99,7 @@ class EMAGoldenCrossStrategy(BaseStrategy):
             timeframe=timeframe,
             action=action,
             confidence=confidence,
-            signal=TradingSignal(
+            signal=TradingSignal(  # type: ignore
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,
@@ -110,7 +110,7 @@ class EMAGoldenCrossStrategy(BaseStrategy):
                 reason=reason,
                 timestamp=datetime.now(UTC),
             ),
-            score=AssetScore(
+            score=AssetScore(  # type: ignore
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,

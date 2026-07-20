@@ -3,6 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import crypto_mas.domain.models  # noqa: F401
 from crypto_mas.infrastructure.config.settings import get_settings
 from crypto_mas.infrastructure.db.base import Base
 

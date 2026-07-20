@@ -112,7 +112,7 @@ def test_short_update_mark_prices_trailing_sl():
     updated_sl_pos = _mock_position("BTCUSDT", 0.1, 50000.0, side="SHORT", tp=40000.0, sl=46350.0)
     broker.position_repository.update_stop_loss.return_value = updated_sl_pos
     
-    report = broker.update_mark_prices("test_acc", Exchange.BINANCE, Timeframe.FOUR_HOURS.value)
+    broker.update_mark_prices("test_acc", Exchange.BINANCE, Timeframe.FOUR_HOURS.value)
     
     assert broker.position_repository.update_stop_loss.called
     kwargs = broker.position_repository.update_stop_loss.call_args.kwargs

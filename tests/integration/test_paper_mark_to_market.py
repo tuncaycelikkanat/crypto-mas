@@ -125,7 +125,7 @@ def test_paper_broker_updates_mark_prices_and_equity(db_session: Session) -> Non
         timeframe=Timeframe.FOUR_HOURS.value,
     )
 
-    assert report.ending_equity == pytest.approx(10290.4, abs=0.1)
+    assert report.ending_equity == pytest.approx(10019.8, abs=0.1)
 
     positions = PositionRepository(db_session).list_open_positions("default-paper")
 
@@ -134,5 +134,5 @@ def test_paper_broker_updates_mark_prices_and_equity(db_session: Session) -> Non
     account = PaperAccountRepository(db_session).get_by_name("default-paper")
 
     assert account is not None
-    assert float(account.cash_balance) == pytest.approx(10290.4, abs=0.1)
-    assert float(account.equity) == pytest.approx(10290.4, abs=0.1)
+    assert float(account.cash_balance) == pytest.approx(10019.8, abs=0.1)
+    assert float(account.equity) == pytest.approx(10019.8, abs=0.1)

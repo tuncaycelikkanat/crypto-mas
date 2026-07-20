@@ -50,12 +50,16 @@ async def test_scheduled_trading_cycle_failure():
 def test_main():
     with patch("crypto_mas.apps.scheduler.main.AsyncIOScheduler") as mock_scheduler_class, \
          patch("crypto_mas.apps.scheduler.main.asyncio.get_event_loop") as mock_get_loop, \
-         patch("crypto_mas.apps.scheduler.main.settings") as mock_settings:
+         patch("crypto_mas.apps.scheduler.main.settings") as mock_settings, \
+         patch("crypto_mas.apps.scheduler.main.OrderExecutorQueue") as mock_queue_class:
         
         mock_settings.schedule_cron = "* * * * *"
         
         mock_scheduler = MagicMock()
         mock_scheduler_class.return_value = mock_scheduler
+        
+        mock_queue = MagicMock()
+        mock_queue_class.get_instance.return_value = mock_queue
         
         mock_loop = MagicMock()
         # Simulate KeyboardInterrupt to break the infinite loop

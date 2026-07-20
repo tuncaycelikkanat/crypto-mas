@@ -1,7 +1,9 @@
 from typing import Any
+
+from crypto_mas.engine.regime import MarketRegime
 from crypto_mas.engine.risk.base import BaseRiskModel
 from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
-from crypto_mas.engine.regime import MarketRegime
+
 
 class RegimeModel(BaseRiskModel):
     """

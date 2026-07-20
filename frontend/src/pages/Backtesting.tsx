@@ -42,7 +42,7 @@ const Backtesting: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'run' | 'history'>('run');
   
   const [exchange, setExchange] = useState(() => localStorage.getItem('bt_exchange') || "BINANCE");
-  const [configMode, setConfigMode] = useState<'scalping' | 'swing' | 'hodl'>(() => (localStorage.getItem('bt_configMode') as any) || 'swing');
+  const [configMode, setConfigMode] = useState<'scalping' | 'swing' | 'hodl' | 'regime_adaptive'>(() => (localStorage.getItem('bt_configMode') as any) || 'regime_adaptive');
   const [symbolSource, setSymbolSource] = useState<'manual' | 'auto'>(() => (localStorage.getItem('bt_symbolSource') as any) || 'manual');
   const [manualSymbols, setManualSymbols] = useState(() => localStorage.getItem('bt_manualSymbols') || "BTCUSDT, ETHUSDT");
   const [autoScroll, setAutoScroll] = useState(false);
@@ -53,6 +53,11 @@ const Backtesting: React.FC = () => {
   const [useBtcShield, setUseBtcShield] = useState(() => localStorage.getItem('bt_useBtcShield') !== 'false');
   const [useHtfShield, setUseHtfShield] = useState(() => localStorage.getItem('bt_useHtfShield') !== 'false');
   const [useRegimeShield, setUseRegimeShield] = useState(() => localStorage.getItem('bt_useRegimeShield') !== 'false');
+  const [configJsonText, setConfigJsonText] = useState(() => localStorage.getItem('bt_configJsonText') || JSON.stringify({
+    bull_tactic: { min_adx: 25.0, rsi_threshold: 42.0 },
+    bear_tactic: { min_adx: 25.0, rsi_threshold: 58.0 },
+    sideways_tactic: { rsi_oversold: 30.0, rsi_overbought: 70.0 }
+  }, null, 2));
 
   useEffect(() => {
     localStorage.setItem('bt_exchange', exchange);
@@ -66,7 +71,8 @@ const Backtesting: React.FC = () => {
     localStorage.setItem('bt_useBtcShield', useBtcShield.toString());
     localStorage.setItem('bt_useHtfShield', useHtfShield.toString());
     localStorage.setItem('bt_useRegimeShield', useRegimeShield.toString());
-  }, [exchange, configMode, symbolSource, manualSymbols, startDate, endDate, initialBalance, riskLevel, useBtcShield, useHtfShield, useRegimeShield]);
+    localStorage.setItem('bt_configJsonText', configJsonText);
+  }, [exchange, configMode, symbolSource, manualSymbols, startDate, endDate, initialBalance, riskLevel, useBtcShield, useHtfShield, useRegimeShield, configJsonText]);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -126,11 +132,22 @@ const Backtesting: React.FC = () => {
         ? ['AUTO_GAINERS'] 
         : manualSymbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
         
+      let parsedConfig = null;
+      if (configMode === 'regime_adaptive') {
+        try {
+          parsedConfig = JSON.parse(configJsonText);
+        } catch (err) {
+          alert("Invalid JSON in Advanced Configuration");
+          setLoading(false);
+          return;
+        }
+      }
+
       const payload = {
         exchange,
         symbols: symbolsList,
-        timeframe: configMode === 'scalping' ? '15m' : (configMode === 'swing' ? '4h' : '1d'),
-        strategy_name: configMode === 'scalping' ? 'hft_momentum' : (configMode === 'swing' ? 'macd_cross' : 'ema_golden_cross'),
+        timeframe: configMode === 'scalping' ? '15m' : (configMode === 'swing' ? '4h' : (configMode === 'regime_adaptive' ? '15m' : '1d')),
+        strategy_name: configMode === 'scalping' ? 'hft_momentum' : (configMode === 'swing' ? 'macd_cross' : (configMode === 'regime_adaptive' ? 'regime_adaptive' : 'ema_golden_cross')),
         start_time: new Date(startDate).toISOString(),
         end_time: new Date(endDate).toISOString(),
         initial_balance: Number(initialBalance),
@@ -138,6 +155,7 @@ const Backtesting: React.FC = () => {
         use_btc_shield: useBtcShield,
         use_htf_shield: useHtfShield,
         use_regime_shield: useRegimeShield,
+        config_json: parsedConfig,
       };
 
       const res = await axios.post('/api/v1/backtest/run', payload);
@@ -231,6 +249,7 @@ const Backtesting: React.FC = () => {
               <div>
                 <label className="section-label">Trading Mode</label>
                 <select className="form-input" value={configMode} onChange={(e) => setConfigMode(e.target.value as any)}>
+                  <option value="regime_adaptive">Regime Adaptive (Dynamic Tactics)</option>
                   <option value="scalping">Scalping (15m - Micro Pullback)</option>
                   <option value="swing">Swing Trading (4h - MACD Cross)</option>
                   <option value="hodl">Hodl (1d - EMA Golden Cross)</option>
@@ -311,6 +330,21 @@ const Backtesting: React.FC = () => {
                   </label>
                 </div>
               </div>
+
+              {configMode === 'regime_adaptive' && (
+                <div style={{ background: 'var(--bg-surface)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <label className="section-label" style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    ⚙️ Advanced Tactics Configuration (JSON)
+                  </label>
+                  <textarea
+                    className="form-input mono"
+                    style={{ width: '100%', height: '150px', resize: 'vertical', fontSize: '0.8rem' }}
+                    value={configJsonText}
+                    onChange={(e) => setConfigJsonText(e.target.value)}
+                  />
+                </div>
+              )}
+
               <button type="submit" className="btn-primary" disabled={loading} style={{ marginTop: '8px', padding: '12px' }}>
                 {loading ? 'Starting...' : 'Run Simulation'}
               </button>

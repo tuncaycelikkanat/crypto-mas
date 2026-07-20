@@ -1,11 +1,9 @@
 import logging
 from decimal import Decimal
-from math import isfinite
 from typing import Any
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta
 
 from crypto_mas.domain.models.candle import Candle
 

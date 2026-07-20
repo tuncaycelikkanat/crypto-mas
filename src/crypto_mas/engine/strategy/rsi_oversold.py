@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.regime import MarketRegime, RegimeSnapshot
 from crypto_mas.engine.scoring import AssetScore
-from crypto_mas.engine.signal import SignalDirection, TradingSignal
+from crypto_mas.engine.signal import SignalDirection, TradingSignal, SignalType
 from crypto_mas.engine.strategy.base import BaseStrategy
 from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
@@ -45,7 +45,7 @@ class RSIOversoldStrategy(BaseStrategy):
         prev_rsi = prev_features.get("rsi_14")
         close = features.get("close")
         bb_lower = features.get("bb_lower")
-        bb_upper = features.get("bb_upper")
+        features.get("bb_upper")
 
         if rsi is None or close is None:
             print(f"RSI Oversold skipping: rsi={rsi}, close={close}")
@@ -84,18 +84,18 @@ class RSIOversoldStrategy(BaseStrategy):
             timeframe=timeframe,
             action=action,
             confidence=confidence,
-            signal=TradingSignal(
+            signal=TradingSignal(  # type: ignore
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,
-                signal_type="MEAN_REVERSION", # using string, pydantic will coerce or we can import it. Let's just use string that matches Enum if possible. Wait, SignalType only has TREND_FOLLOWING. I'll use that for now or import it.
+                signal_type=SignalType.MEAN_REVERSION,
                 direction=direction,
                 strength=confidence,
                 indicators={"rsi_14": rsi, "bb_lower": bb_lower or 0},
                 reason=reason,
                 timestamp=datetime.now(UTC),
             ),
-            score=AssetScore(
+            score=AssetScore(  # type: ignore
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,

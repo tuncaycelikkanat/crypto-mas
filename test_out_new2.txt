@@ -1,0 +1,1 @@
+Total time for 14 days (20,160 cycles): 32.19s | Trades: 5610

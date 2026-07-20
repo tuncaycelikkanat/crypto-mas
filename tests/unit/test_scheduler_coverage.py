@@ -5,8 +5,6 @@ import pytest
 from crypto_mas.services.scheduler_service import SchedulerService
 
 
-
-
 def test_is_bot_running_scheduler_not_running():
     service = SchedulerService()
     service._scheduler = MagicMock()

@@ -1,4 +1,5 @@
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
+from crypto_mas.engine.math.jit_calculators import jit_calculate_confidence
 from crypto_mas.engine.regime import MarketRegime
 from crypto_mas.engine.regime.regime import RegimeEngine
 from crypto_mas.engine.scoring.scoring import ScoringEngine
@@ -6,7 +7,6 @@ from crypto_mas.engine.signal import SignalDirection
 from crypto_mas.engine.signal.trend import TrendSignalEngine
 from crypto_mas.engine.strategy.base import BaseStrategy
 from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
-from crypto_mas.engine.math.jit_calculators import jit_calculate_confidence
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 

@@ -32,7 +32,7 @@ class BacktestEngine:
         self.slippage_pct = slippage_pct
         
         self.positions: dict[str, Position] = {}
-        self.trades = [] # List of executed trades
+        self.trades: list[Any] = []
         
         self.feature_calculator = FeatureCalculator()
 
@@ -48,7 +48,7 @@ class BacktestEngine:
         Runs the backtest over the provided historical candles using the specified strategy.
         """
         if not candles:
-            return self._generate_report(symbol, strategy.name)
+            return self._generate_report(symbol, strategy.name)  # type: ignore
             
         logger.info(f"Starting backtest for {symbol} with {len(candles)} candles. Strategy: {strategy.__class__.__name__}")
         
@@ -62,7 +62,7 @@ class BacktestEngine:
         
         snapshot_window = []
         
-        for idx, snap_dict in enumerate(feature_snapshots):
+        for _idx, snap_dict in enumerate(feature_snapshots):
             current_time = snap_dict['timestamp']
             features_json = snap_dict['features_json']
             current_price = features_json.get('close', 0.0)

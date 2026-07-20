@@ -110,7 +110,7 @@ class EventEngine:
         total_notional = buy_notional + sell_notional
 
         if total_notional > 0:
-            vwap_approx = sum(r.notional for r in window) / len(window)
+            sum(r.notional for r in window) / len(window)
             self.metrics_store.set_metric(symbol, "vwap", price)  # last trade price as proxy
             imbalance = buy_notional / total_notional
             self.metrics_store.set_metric(symbol, "imbalance", imbalance)

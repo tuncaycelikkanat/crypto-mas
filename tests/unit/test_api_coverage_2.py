@@ -36,22 +36,22 @@ def test_decision_endpoints():
         mock_runner.return_value.evaluate_symbols = AsyncMock(return_value={})
         mock_runner.return_value.run = MagicMock(return_value=mock_result)
         
-        response = client.get("/scores/mock/trend")
+        client.get("/scores/mock/trend")
         pass
         
-        response = client.get("/regime/mock")
+        client.get("/regime/mock")
         pass
         
-        response = client.get("/decision/mock/run")
+        client.get("/decision/mock/run")
         pass
         
-        response = client.get("/decision/mock/run-all")
+        client.get("/decision/mock/run-all")
         pass
 
 def test_backtest_endpoints():
     with patch("crypto_mas.apps.api.routers.backtest.BacktestEngineService") as mock_engine, \
          patch("crypto_mas.apps.api.routers.backtest.BacktestResultRepository") as mock_repo, \
-         patch("crypto_mas.apps.api.routers.backtest.BackgroundTasks") as mock_bg:
+         patch("crypto_mas.apps.api.routers.backtest.BackgroundTasks"):
         
         mock_repo_res = MagicMock()
         mock_repo_res.job_id = "test_id"
@@ -88,7 +88,7 @@ def test_backtest_endpoints():
             "strategy_name": "macd_cross"
         })
         
-        response = client.post("/backtest/run", json={
+        client.post("/backtest/run", json={
             "exchange": "BINANCE",
             "symbols": ["BTCUSDT"],
             "timeframe": "15m",
@@ -99,7 +99,7 @@ def test_backtest_endpoints():
         })
         # assert response.status_code == 200
         
-        response = client.get("/backtest/test_id/status")
+        client.get("/backtest/test_id/status")
         # assert response.status_code == 200
 
 def test_cycle_endpoints():
@@ -118,7 +118,7 @@ def test_cycle_endpoints():
         mock_cycle.error_message = None
         mock_cycle_service.return_value.run_cycle = AsyncMock(return_value=mock_cycle)
         
-        response = client.post("/api/v1/cycle/run", json={
+        client.post("/api/v1/cycle/run", json={
             "account_name": "test",
             "symbols": ["BTCUSDT"],
             "timeframe": "15m",
@@ -134,10 +134,10 @@ def test_features_endpoints():
         mock_service.return_value.calculate_and_store = MagicMock(return_value={})
         mock_service.return_value.calculate_features = AsyncMock(return_value={})
         
-        response = client.post("/features/mock/calculate")
+        client.post("/features/mock/calculate")
         pass
         
-        response = client.post("/features/mock/calculate-all")
+        client.post("/features/mock/calculate-all")
         pass
 
 def test_signals_endpoints():
@@ -149,7 +149,7 @@ def test_signals_endpoints():
         mock_res.model_dump.return_value = {}
         mock_strat.return_value.generate = MagicMock(return_value=mock_res)
         
-        response = client.get("/signals/mock/trend")
+        client.get("/signals/mock/trend")
         pass
 
 def test_logs_endpoints():

@@ -11,7 +11,6 @@ from functools import wraps
 from typing import Any, TypeVar
 
 from tenacity import (
-    RetryError,
     retry,
     retry_if_exception_type,
     stop_after_attempt,

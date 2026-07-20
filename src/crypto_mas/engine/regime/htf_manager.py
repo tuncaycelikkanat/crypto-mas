@@ -27,7 +27,7 @@ class HTFRegimeManager:
             return True
             
         # Define Major Bear Trend: Price is below both EMAs, Fast EMA is below Slow EMA, and Momentum is strongly negative.
-        bearish = close < ema_20 < ema_50 and roc_14 < -3.0
+        bearish = close < ema_20 < ema_50 and roc_14 < -3.0  # type: ignore
         
         if bearish:
             # Strong downtrend on HTF. Do not catch falling knives.
@@ -54,7 +54,7 @@ class HTFRegimeManager:
             return True
             
         # Define Major Bull Trend
-        bullish = close > ema_20 > ema_50 and roc_14 > 0
+        bullish = close > ema_20 > ema_50 and roc_14 > 0  # type: ignore
         
         if bullish:
             # Strong uptrend on HTF. Do not short.

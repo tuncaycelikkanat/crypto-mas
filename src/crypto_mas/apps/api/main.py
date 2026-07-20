@@ -1,7 +1,9 @@
+import asyncio
 from contextlib import asynccontextmanager
+
 import uvloop
 
-uvloop.install()
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 from crypto_mas.infrastructure.logging.setup import setup_logging
 

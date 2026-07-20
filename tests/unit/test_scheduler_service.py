@@ -3,7 +3,6 @@ import pytest
 from crypto_mas.services.scheduler_service import SchedulerService
 
 
-
 def test_scheduler_status():
     scheduler = SchedulerService()
     

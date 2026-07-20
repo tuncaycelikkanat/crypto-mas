@@ -107,7 +107,7 @@ class PortfolioEngine:
                         else p.reason
                     ),
                 )
-                for p, decision in zip(positions, selected)
+                for p, decision in zip(positions, selected, strict=False)
             ]
 
         gross_exposure = round(sum(position.target_weight for position in positions), 6)
@@ -140,4 +140,5 @@ class PortfolioEngine:
             confidence=decision.confidence,
             final_score=decision.score.final_score,
             reason=reason,
+            metadata=decision.metadata or {},
         )

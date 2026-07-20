@@ -32,7 +32,6 @@ def optimize():
         
         best_pnl = -float('inf')
         best_params = None
-        best_report = None
         
         results = []
         
@@ -48,7 +47,6 @@ def optimize():
             if report['total_pnl'] > best_pnl:
                 best_pnl = report['total_pnl']
                 best_params = threshold
-                best_report = report
                 
         print("\n" + "="*50)
         print("OPTIMIZATION RESULTS (Ranked by Total PnL)")

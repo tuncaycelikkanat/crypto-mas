@@ -86,7 +86,7 @@ def test_execute_target_portfolio_success():
 
 def test_execute_target_portfolio_insufficient_cash():
     broker = get_mocked_broker()
-    account_mock = _mock_account(1000.0)
+    account_mock = _mock_account(100.0)
     broker.account_repository.get_by_name.return_value = account_mock
     broker.account_repository.update_balances.return_value = account_mock
     

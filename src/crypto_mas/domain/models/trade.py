@@ -13,6 +13,7 @@ class Trade(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
     account_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    strategy_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     exchange: Mapped[str] = mapped_column(String(32), nullable=False)
     symbol: Mapped[str] = mapped_column(String(64), nullable=False)
 

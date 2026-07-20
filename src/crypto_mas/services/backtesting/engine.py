@@ -35,8 +35,22 @@ class BacktestEngineService:
         use_btc_shield: bool = True,
         use_htf_shield: bool = True,
         use_regime_shield: bool = True,
+        config_json: dict | None = None,
+        # Walk-forward can inject pre-warmed caches to skip redundant data fetch
+        _shared_candle_cache=None,
+        _shared_feature_cache=None,
     ) -> BacktestResult:
         # Create backtest result record
+        
+        merged_config = {
+            "risk_level": risk_level,
+            "use_btc_shield": use_btc_shield,
+            "use_htf_shield": use_htf_shield,
+            "use_regime_shield": use_regime_shield,
+        }
+        if config_json:
+            merged_config.update(config_json)
+            
         result = BacktestResult(
             job_id=job_id,
             status="RUNNING",
@@ -47,12 +61,7 @@ class BacktestEngineService:
             start_time=start_time,
             end_time=end_time,
             initial_balance=initial_balance,
-            config_json={
-                "risk_level": risk_level,
-                "use_btc_shield": use_btc_shield,
-                "use_htf_shield": use_htf_shield,
-                "use_regime_shield": use_regime_shield,
-            }
+            config_json=merged_config
         )
         self.repository.add(result)
         self.db.commit()
@@ -140,16 +149,38 @@ class BacktestEngineService:
             # Step 3: Setup simulated time and TradingCycleService
             time_provider = SimulatedTimeProvider(start_time=start_time)
             
-            # Set up InMemory caching for ultra-fast backtesting
             from crypto_mas.domain.repositories.candle_repository import CandleRepository
-            from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
-            from crypto_mas.services.backtesting.memory_cache import InMemoryCandleRepository, InMemoryFeatureSnapshotRepository
-            
-            candle_db = CandleRepository(self.db)
-            feature_db = FeatureSnapshotRepository(self.db)
-            
-            mem_candles = InMemoryCandleRepository(candle_db)
-            mem_features = InMemoryFeatureSnapshotRepository(feature_db)
+            from crypto_mas.domain.repositories.feature_snapshot_repository import (
+                FeatureSnapshotRepository,
+            )
+            from crypto_mas.services.backtesting.memory_cache import (
+                InMemoryCandleRepository,
+                InMemoryFeatureSnapshotRepository,
+            )
+
+            if _shared_candle_cache is not None and _shared_feature_cache is not None:
+                # Walk-forward mode: reuse pre-warmed caches — skip expensive data fetch
+                logger.info(f"[{job_id}] Using shared memory cache from walk-forward parent.")
+                mem_candles = _shared_candle_cache
+                mem_features = _shared_feature_cache
+            else:
+                candle_db = CandleRepository(self.db)
+                feature_db = FeatureSnapshotRepository(self.db)
+                mem_candles = InMemoryCandleRepository(candle_db)
+                mem_features = InMemoryFeatureSnapshotRepository(feature_db)
+                
+                # PRE-CALCULATE ALL FEATURES ONCE! (This avoids 1.0s delay per tick)
+                from crypto_mas.services.feature_pipeline.service import FeaturePipelineService
+                temp_feature_svc = FeaturePipelineService(self.db, candle_repo=candle_db, feature_repo=feature_db)
+                for sym in fetch_symbols:
+                    all_candles = candle_db.list_by_symbol(exchange.value, sym, timeframe.value, end_time=end_time, limit=None)
+                    if all_candles:
+                        all_snaps = temp_feature_svc.calculator.calculate(all_candles)
+                        if all_snaps:
+                            mem_features.bulk_upsert(all_snaps)
+                
+                logger.warning(f"PROFILE [{job_id}] mem_features populated with {sum(len(v) for v in mem_features._snaps.values())} snaps!")
+
             
             strategy_mode = "swing"
             if strategy_name == "hft_momentum":
@@ -166,8 +197,31 @@ class BacktestEngineService:
                 feature_repo=mem_features
             )
             
-            # --- 🚀 VECTORIZED PRE-CALCULATION FOR ULTRA-FAST BACKTEST ---
-            # Also patch the broker service to use in-memory snapshots so it doesn't query SQLite 432,000 times!
+            # --- BACKTEST OVERRIDES ---
+            # 1. Force synchronous execution queue so trades don't lag behind the simulated time loop
+            from crypto_mas.services.backtesting.memory_cache import InMemoryPositionRepository
+            from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
+            queue = OrderExecutorQueue.get_instance()
+            queue.sync_mode = True
+            
+            # Reuse a SINGLE broker instance — don't call factory() on every cycle
+            _backtest_broker = cycle_service.paper_broker
+            _backtest_broker.is_backtest = True  # disables per-operation commit/flush/logging
+            queue.set_broker_factory(lambda: _backtest_broker)
+            
+            # Replace broker's DB-backed position repository with a pure in-memory version
+            # This eliminates ALL SQLite reads/writes for positions during the simulation loop
+            mem_positions = InMemoryPositionRepository()
+            _backtest_broker.position_repository = mem_positions  # type: ignore
+            
+            # Cache account object in broker to avoid account_repo.get_by_name() every cycle
+            _backtest_broker._bt_account = _backtest_broker.account_repository.get_by_name(account_name)  # type: ignore
+            
+            # Give the orchestrator access to the same in-memory position repo
+            # so its open_position / SL-cooldown checks are also O(1) dict lookups
+            cycle_service._bt_position_repo = mem_positions  # type: ignore
+            
+            # 2. Patch the broker service to use in-memory snapshots so it doesn't query SQLite 432,000 times!
             cycle_service.paper_broker.feature_snapshot_repository = mem_features
             
             # Pre-calculate all features instantly using Pandas/pandas-ta
@@ -203,12 +257,12 @@ class BacktestEngineService:
             # It just returns fake metadata since the data is already in memory.
             def _mock_calc_and_store(*args, **kwargs):
                 return {"exchange": exchange.value, "symbol": kwargs.get("symbol"), "timeframe": kwargs.get("timeframe"), "processed_rows": 0}
-            cycle_service.feature_service.calculate_and_store = _mock_calc_and_store
+            cycle_service.feature_service.calculate_and_store = _mock_calc_and_store  # type: ignore
             
             # Patch fetcher_service so it doesn't try to download missing candles during the simulation loop!
             async def _mock_backfill_universe(*args, **kwargs):
                 return
-            cycle_service.fetcher_service.backfill_universe = _mock_backfill_universe
+            cycle_service.fetcher_service.backfill_universe = _mock_backfill_universe  # type: ignore
             
             # Step 4: Time loop
             total_trades = 0
@@ -216,9 +270,12 @@ class BacktestEngineService:
             
             while time_provider.now() <= end_time:
                 cycle_count += 1
-                if cycle_count % 100 == 0:
-                    self.db.commit()  # Batch commit to release SQLite write locks!
 
+                # Batch DB commit every 100 cycles to release SQLite write locks
+                if cycle_count % 100 == 0:
+                    self.db.commit()
+
+                # Heartbeat log every 1440 cycles (~1 day of 1-min candles)
                 if cycle_count % 1440 == 0:
                     hb_log = ExecutionLog(
                         account_name=account_name,
@@ -231,15 +288,17 @@ class BacktestEngineService:
                     self.db.add(hb_log)
                     self.db.commit()
 
-                if cycle_count % 10 == 0:
+                # Check for user cancellation every 50 cycles (faster abort remains acceptable)
+                if cycle_count % 50 == 0:
                     self.db.refresh(result)
                     if result.status == "CANCELLED":
                         logger.info(f"[{job_id}] Backtest cancelled by user.")
-                        result.completed_at = datetime.now(UTC)
+                        result.completed_at = datetime.now(UTC)  # type: ignore
                         self.db.commit()
-                        return result
+                        break
 
-                logger.debug(f"[{job_id}] Simulating time: {time_provider.now()}")
+                import time
+                t0 = time.time()
                 
                 cycle = await cycle_service.run_cycle(
                     account_name=account_name,
@@ -252,17 +311,29 @@ class BacktestEngineService:
                     use_htf_shield=use_htf_shield,
                     use_regime_shield=use_regime_shield,
                     cycle_index=cycle_count,
+                    config_json=config_json,
                 )
                 
-                total_trades += cycle.trades_executed
+                t1 = time.time()
+
+                total_trades += (cycle.trades_executed or 0)
                 time_provider.tick(delta)
                 
-                # Yield control to the event loop so Ctrl+C and other requests are not blocked
-                import asyncio
-                await asyncio.sleep(0)
+                t2 = time.time()
+                logger.warning(f"PROFILE [{job_id}] Cycle {cycle_count}: run_cycle={t1-t0:.4f}s, tick={t2-t1:.4f}s")
+
+
+
+                # Yield to event loop every 20 ticks to ensure Uvicorn stays responsive
+                if cycle_count % 20 == 0:
+                    import asyncio
+                    await asyncio.sleep(0)
+                
+            # Reset sync mode to avoid breaking live paper trading which runs in the same process
+            OrderExecutorQueue.get_instance().sync_mode = False
                 
             # Step 5: Final metrics
-            account = account_repo.get_by_name(account_name)
+            account_repo.get_by_name(account_name)
             
             # 6. Calculate Performance Analytics
             logger.info(f"[{job_id}] Calculating performance analytics.")
@@ -270,21 +341,30 @@ class BacktestEngineService:
             analytics = PerformanceAnalytics(self.db)
             metrics = analytics.calculate_for_account(account_name, initial_balance)
             
-            result.total_trades = metrics.total_trades
-            
-            # A more accurate final equity comes from the last cycle or current equity:
+            result.total_trades = metrics.total_trades  # type: ignore
+
+            # Accurate final equity from last cycle or computed
             stmt = select(TradingCycle).where(TradingCycle.account_name == account_name).order_by(TradingCycle.started_at.desc()).limit(1)
             last_cycle = self.db.scalars(stmt).first()
             if last_cycle and last_cycle.ending_equity:
-                result.final_equity = last_cycle.ending_equity
+                result.final_equity = last_cycle.ending_equity  # type: ignore
             else:
-                result.final_equity = initial_balance + metrics.total_pnl
-                
-            result.win_rate = metrics.win_rate
-            result.max_drawdown = metrics.max_drawdown
+                result.final_equity = initial_balance + metrics.total_pnl  # type: ignore
+
+            result.total_fees_paid = metrics.total_fees_paid  # type: ignore
+            result.win_rate = metrics.win_rate  # type: ignore
+            result.max_drawdown = metrics.max_drawdown  # type: ignore
+            result.sharpe_ratio = metrics.sharpe_ratio  # type: ignore
+            result.sortino_ratio = metrics.sortino_ratio  # type: ignore
+            result.calmar_ratio = metrics.calmar_ratio  # type: ignore
+            result.profit_factor = metrics.profit_factor  # type: ignore
+            result.expectancy = metrics.expectancy  # type: ignore
+            result.avg_win = metrics.avg_win  # type: ignore
+            result.avg_loss = metrics.avg_loss  # type: ignore
+            result.avg_trade_duration_s = metrics.avg_trade_duration_s  # type: ignore
             
-            result.status = "COMPLETED"
-            result.completed_at = datetime.now(UTC)
+            result.status = "COMPLETED"  # type: ignore
+            result.completed_at = datetime.now(UTC)  # type: ignore
             self.db.commit()
             
             logger.info(f"[{job_id}] Backtest completed successfully. Final Equity: {result.final_equity}, Win Rate: {result.win_rate}, Max DD: {result.max_drawdown}")
@@ -300,8 +380,8 @@ class BacktestEngineService:
         except Exception as e:
             logger.exception(f"[{job_id}] Backtest failed: {e}")
             self.repository.update_status(job_id, "FAILED")
-            result.error_message = str(e)
-            result.completed_at = datetime.now(UTC)
+            result.error_message = str(e)  # type: ignore
+            result.completed_at = datetime.now(UTC)  # type: ignore
             self.db.commit()
             raise e
 
@@ -351,7 +431,7 @@ class BacktestEngineService:
         # 4. Market Data (Candles)
         from crypto_mas.domain.models.candle import Candle
         market_data = {}
-        for sym in result.symbols:
+        for sym in result.symbols:  # type: ignore
             candles = self.db.execute(
                 select(Candle)
                 .where(Candle.exchange == result.exchange)

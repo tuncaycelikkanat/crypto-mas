@@ -32,7 +32,7 @@ async def test_process_trade_spike():
     engine = EventEngine()
     
     with patch.object(engine, '_trigger_cycle') as mock_trigger:
-        with patch.object(engine, '_get_rvol', return_value=3.0):
+        with patch.object(engine, '_get_rvol', return_value=(3.0, 2.0)):
             # Trigger spike by making buy vol large
             await engine._process_trade("BTCUSDT", {"p": "60000", "q": "1.0", "m": False}) # 60000 buy vol
             
@@ -43,7 +43,7 @@ async def test_process_trade_cooldown():
     engine = EventEngine()
     
     with patch.object(engine, '_trigger_cycle') as mock_trigger:
-        with patch.object(engine, '_get_rvol', return_value=3.0):
+        with patch.object(engine, '_get_rvol', return_value=(3.0, 2.0)):
             # First spike
             await engine._process_trade("BTCUSDT", {"p": "60000", "q": "1.0", "m": False})
             assert mock_trigger.call_count == 1

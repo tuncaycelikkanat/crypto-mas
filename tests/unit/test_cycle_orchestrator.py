@@ -65,6 +65,12 @@ async def test_run_cycle_success(db_session: Session, test_account: PaperAccount
     symbols = ["BTCUSDT", "ETHUSDT"]
     timeframe = Timeframe.ONE_HOUR
     
+    from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
+    from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
+    queue = OrderExecutorQueue.get_instance()
+    queue.sync_mode = True
+    queue.set_broker_factory(lambda: PaperBrokerService(db_session))
+
     cycle = await service.run_cycle(
         account_name=test_account.name,
         symbols=symbols,
@@ -90,12 +96,19 @@ async def test_run_cycle_account_not_found(db_session: Session) -> None:
     provider = MagicMock()
     provider.exchange = Exchange.MOCK
     service = TradingCycleService(db=db_session, market_provider=provider, time_provider=time_provider)
+
+    from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
+    from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
+    queue = OrderExecutorQueue.get_instance()
+    queue.sync_mode = True
+    queue.set_broker_factory(lambda: PaperBrokerService(db_session))
     
     with pytest.raises(ValueError, match="Paper account not found"):
         await service.run_cycle(
             account_name="nonexistent",
             symbols=["BTCUSDT"],
             timeframe=Timeframe.ONE_HOUR,
+            trigger="TEST",
         )
 
 @pytest.mark.asyncio

@@ -74,63 +74,80 @@ class HFTMomentumStrategy(BaseStrategy):
         confidence = 0.0
         factors    = []
 
-        # ── Gate 1: Strong Uptrend (EMA & ADX) ──────────────────
-        if ema_20 <= ema_50:
-            return None  # Not in an uptrend
-            
-        if adx_14 < 25.0:
+        # ── Gate 1: Trend Identification ────────────────────────
+        if adx_14 < 25.0:  # type: ignore
             return None  # Trend is too weak
-
         factors.append(f"TREND(ADX={adx_14:.1f})")
 
-        # ── Gate 2: Micro-Pullback to EMA 20 ────────────────────
-        # Price should be near EMA_20 (touching or slightly below).
-        # Thresholds are wider to accommodate 15m candle noise vs 1m.
+        is_uptrend = ema_20 > ema_50  # type: ignore
         dist_to_ema = (last_price - ema_20) / ema_20
-        
-        if dist_to_ema > 0.006:   # > 0.6% above EMA → still extended, not a pullback
-            return None
-            
-        if dist_to_ema < -0.012:  # > 1.2% below EMA → support broken, skip
-            return None
 
-        factors.append(f"PULLBACK({dist_to_ema*100:.2f}%)")
-        confidence += 0.55  # Base confidence for reaching pullback zone
+        if is_uptrend:
+            # LONG SETUP
+            # Gate 2: Micro-Pullback to EMA 20 (touching or slightly below)
+            if dist_to_ema > 0.006 or dist_to_ema < -0.012:
+                return None
+            factors.append(f"LONG_PB({dist_to_ema*100:.2f}%)")
+            confidence += 0.55
 
-        # ── Gate 3: Oversold Momentum ───────────────────────────
-        # RSI should be in mild oversold territory — tightened to < 42
-        # to avoid catching mid-trend dips that continue falling.
-        if rsi_14 < 42.0:
-            confidence += 0.25
-            factors.append(f"RSI={rsi_14:.1f}")
-        elif stoch_k is not None and stoch_k < 20.0:
-            confidence += 0.25
-            factors.append(f"STOCH={stoch_k:.1f}")
+            # Gate 3: Oversold Momentum
+            if rsi_14 < 42.0:  # type: ignore
+                bonus = min(0.25, (42.0 - rsi_14) * 0.015)  # type: ignore
+                confidence += 0.10 + bonus
+                factors.append(f"RSI={rsi_14:.1f}")
+            elif stoch_k is not None and stoch_k < 20.0:
+                bonus = min(0.25, (20.0 - stoch_k) * 0.015)
+                confidence += 0.10 + bonus
+                factors.append(f"STOCH={stoch_k:.1f}")
+            else:
+                return None
+
         else:
-            return None
+            # SHORT SETUP
+            # Gate 2: Micro-Pullback UP to EMA 20 (touching or slightly above)
+            if dist_to_ema < -0.006 or dist_to_ema > 0.012:
+                return None
+            factors.append(f"SHORT_PB({dist_to_ema*100:.2f}%)")
+            confidence += 0.55
+
+            # Gate 3: Overbought Momentum
+            if rsi_14 > 58.0:  # type: ignore
+                bonus = min(0.25, (rsi_14 - 58.0) * 0.015)  # type: ignore
+                confidence += 0.10 + bonus
+                factors.append(f"RSI={rsi_14:.1f}")
+            elif stoch_k is not None and stoch_k > 80.0:
+                bonus = min(0.25, (stoch_k - 80.0) * 0.015)
+                confidence += 0.10 + bonus
+                factors.append(f"STOCH={stoch_k:.1f}")
+            else:
+                return None
 
         # ── Bonus Factors ───────────────────────────────────────
         imbalance = store.get_metric(symbol, "imbalance", 0.5)
-        if imbalance > 0.60:
+        # For long: we want > 0.60. For short: we want < 0.40
+        if is_uptrend and imbalance > 0.60:
+            confidence += 0.15
+            factors.append(f"TF_IMB={imbalance*100:.1f}%")
+        elif not is_uptrend and imbalance < 0.40:
             confidence += 0.15
             factors.append(f"TF_IMB={imbalance*100:.1f}%")
             
         depth_imbalance = store.get_metric(symbol, "depth_imbalance", 0.5)
-        if depth_imbalance > 0.55:
+        if is_uptrend and depth_imbalance > 0.55:
+            confidence += 0.10
+            factors.append(f"DEPTH={depth_imbalance*100:.1f}%")
+        elif not is_uptrend and depth_imbalance < 0.45:
             confidence += 0.10
             factors.append(f"DEPTH={depth_imbalance*100:.1f}%")
 
         # ── Decision ─────────────────────────────────────────────
         confidence = max(0.0, min(confidence, 0.99))
 
-        # Dynamic confidence threshold based on risk_level (0-100)
-        # Base = 0.78 (requires pullback+oversold to pass)
-        # Risk 0  -> 0.78, Risk 50 -> 0.73, Risk 100 -> 0.68
         dynamic_min_confidence = 0.78 - (risk_level / 100.0) * 0.10
 
         if confidence >= dynamic_min_confidence:
-            action    = DecisionAction.CONSIDER_LONG
-            direction = SignalDirection.LONG
+            action    = DecisionAction.CONSIDER_LONG if is_uptrend else DecisionAction.CONSIDER_SHORT
+            direction = SignalDirection.LONG if is_uptrend else SignalDirection.SHORT
 
         reason = " | ".join(factors) if factors else "No factors"
 
@@ -140,7 +157,7 @@ class HFTMomentumStrategy(BaseStrategy):
             timeframe=timeframe,
             action=action,
             confidence=confidence,
-            signal=TradingSignal(
+            signal=TradingSignal(  # type: ignore
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,
@@ -149,20 +166,20 @@ class HFTMomentumStrategy(BaseStrategy):
                 strength=confidence,
                 indicators={
                     "ema_20_dist": round(dist_to_ema * 100, 4),
-                    "rsi_14":      round(rsi_14, 2),
-                    "adx_14":      round(adx_14, 2),
+                    "rsi_14":      round(rsi_14, 2),  # type: ignore
+                    "adx_14":      round(adx_14, 2),  # type: ignore
                     "imbalance":   round(imbalance, 4),
                 },
                 reason=reason,
                 timestamp=datetime.now(UTC),
             ),
-            score=AssetScore(
+            score=AssetScore(  # type: ignore
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,
                 direction=direction,
-                trend_score=round(adx_14 / 100.0, 4),
-                momentum_score=round((100 - rsi_14) / 100.0, 4), # Inverse RSI for pullback score
+                trend_score=round(adx_14 / 100.0, 4),  # type: ignore
+                momentum_score=round((100 - float(rsi_14 or 0)) / 100.0, 4), # Inverse RSI for pullback score
                 volatility_penalty=0.0,
                 final_score=confidence,
                 components={},
@@ -189,12 +206,12 @@ class HFTMomentumStrategy(BaseStrategy):
         return TradingDecision(
             exchange=exchange, symbol=symbol, timeframe=timeframe,
             action=DecisionAction.HOLD, confidence=0.0,
-            signal=TradingSignal(
+            signal=TradingSignal(  # type: ignore
                 exchange=exchange, symbol=symbol, timeframe=timeframe,
                 signal_type=SignalType.TREND_FOLLOWING, direction=SignalDirection.NEUTRAL,
                 strength=0.0, indicators={}, reason=reason, timestamp=now,
             ),
-            score=AssetScore(
+            score=AssetScore(  # type: ignore
                 exchange=exchange, symbol=symbol, timeframe=timeframe,
                 direction=SignalDirection.NEUTRAL, trend_score=0.0,
                 momentum_score=0.0, volatility_penalty=0.0,

@@ -12,7 +12,7 @@ class RealtimeMetricsStore:
         return cls._instance
         
     def set_metric(self, symbol: str, key: str, value: Any):
-        self.metrics[symbol][key] = value
+        self.metrics[symbol][key] = value  # type: ignore
         
     def get_metric(self, symbol: str, key: str, default: Any = None) -> Any:
-        return self.metrics[symbol].get(key, default)
+        return self.metrics[symbol].get(key, default)  # type: ignore

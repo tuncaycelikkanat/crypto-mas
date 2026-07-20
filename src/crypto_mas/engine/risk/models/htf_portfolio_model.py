@@ -1,7 +1,8 @@
 from typing import Any
+
+from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.risk.base import BaseRiskModel
 from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
-from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 
 
 class HTFPortfolioModel(BaseRiskModel):
@@ -30,7 +31,7 @@ class HTFPortfolioModel(BaseRiskModel):
 
         # 1. LONG filter: if HTF is strongly bearish, AVOID LONG
         if decision.action == DecisionAction.CONSIDER_LONG:
-            bearish = close < ema_20 < ema_50 and roc_14 < -3.0
+            bearish = close < ema_20 < ema_50 and roc_14 < -3.0  # type: ignore
             if bearish:
                 decision.action = DecisionAction.HOLD
                 decision.reason = f"REJECTED by HTF Shield (Strong Bear). Original: {decision.reason}"
@@ -38,7 +39,7 @@ class HTFPortfolioModel(BaseRiskModel):
 
         # 2. SHORT filter: if HTF is strongly bullish, AVOID SHORT
         if decision.action == DecisionAction.CONSIDER_SHORT:
-            bullish = close > ema_20 > ema_50 and roc_14 > 0
+            bullish = close > ema_20 > ema_50 and roc_14 > 0  # type: ignore
             if bullish:
                 decision.action = DecisionAction.HOLD
                 decision.reason = f"REJECTED by HTF Shield (Strong Bull). Original: {decision.reason}"

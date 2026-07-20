@@ -72,7 +72,7 @@ class MACDStrategy(BaseStrategy):
             timeframe=timeframe,
             action=action,
             confidence=confidence,
-            signal=TradingSignal(
+            signal=TradingSignal(  # type: ignore
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,
@@ -83,7 +83,7 @@ class MACDStrategy(BaseStrategy):
                 reason="MACD Cross",
                 timestamp=datetime.now(UTC),
             ),
-            score=AssetScore(
+            score=AssetScore(  # type: ignore
                 exchange=exchange,
                 symbol=symbol,
                 timeframe=timeframe,

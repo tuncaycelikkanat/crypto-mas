@@ -7,9 +7,9 @@ from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
 def get_dummy_signal(direction: SignalDirection) -> TradingSignal:
-    return TradingSignal(
+    return TradingSignal(  # type: ignore
         exchange=Exchange.BINANCE, symbol="BTCUSDT", timeframe=Timeframe.FIFTEEN_MINUTES,
-        signal_type="TREND_FOLLOWING", direction=direction, strength=1.0,
+        signal_type="TREND_FOLLOWING", direction=direction, strength=1.0,  # type: ignore
         indicators={}, reason="Mock", timestamp=datetime.now(UTC)
     )
 

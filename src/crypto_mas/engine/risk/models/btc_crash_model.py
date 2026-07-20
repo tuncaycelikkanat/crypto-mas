@@ -1,6 +1,8 @@
 from typing import Any
+
 from crypto_mas.engine.risk.base import BaseRiskModel
 from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
+
 
 class BTCCrashModel(BaseRiskModel):
     """

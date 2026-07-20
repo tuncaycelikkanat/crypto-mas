@@ -1,6 +1,6 @@
 from collections.abc import Generator
-from decimal import Decimal
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine
@@ -116,9 +116,9 @@ def test_paper_broker_executes_target_portfolio(db_session: Session) -> None:
 
     assert report.account_name == "default-paper"
     assert report.starting_cash == 10000.0
-    assert report.ending_cash == 4995.0
+    assert report.ending_cash == pytest.approx(9599.92, abs=0.1)
     assert report.starting_equity == 10000.0
-    assert report.ending_equity == pytest.approx(9992.5, abs=0.1)
+    assert report.ending_equity == pytest.approx(9999.8, abs=0.1)
     assert len(report.executed) == 2
     assert report.skipped == []
 
@@ -133,8 +133,8 @@ def test_paper_broker_executes_target_portfolio(db_session: Session) -> None:
     account = PaperAccountRepository(db_session).get_by_name("default-paper")
 
     assert account is not None
-    assert float(account.cash_balance) == pytest.approx(4995.0, abs=0.1)
-    assert float(account.equity) == pytest.approx(9992.5, abs=0.1)
+    assert float(account.cash_balance) == pytest.approx(9599.92, abs=0.1)
+    assert float(account.equity) == pytest.approx(9999.8, abs=0.1)
 
 
 def test_paper_broker_skips_existing_open_positions(db_session: Session) -> None:

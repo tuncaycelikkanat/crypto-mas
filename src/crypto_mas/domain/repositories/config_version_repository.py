@@ -19,7 +19,7 @@ class ConfigVersionRepository:
         stmt = (
             select(ConfigVersion)
             .where(ConfigVersion.name == name)
-            .where(ConfigVersion.is_active == True)
+            .where(ConfigVersion.is_active)
             .order_by(ConfigVersion.created_at.desc())
             .limit(1)
         )

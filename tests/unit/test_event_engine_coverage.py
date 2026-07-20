@@ -16,7 +16,7 @@ async def test_process_trade():
     # Send a massive buy trade to trigger volume spike
     # Total volume > 50000 to trigger spike check
     with patch("crypto_mas.engine.strategy.event_engine.asyncio.create_task") as mock_task:
-        with patch.object(engine, '_get_rvol', return_value=3.0):
+        with patch.object(engine, '_get_rvol', return_value=(3.0, 2.0)):
             await engine.process_websocket_message("BTCUSDT@trade", {"p": "50000", "q": "2.0", "m": False})
             
             assert engine.metrics_store.get_metric("BTCUSDT", "volume_spike") is True

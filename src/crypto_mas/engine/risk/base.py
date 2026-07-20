@@ -1,5 +1,6 @@
 import abc
 from typing import Any
+
 from crypto_mas.engine.strategy.schemas import TradingDecision
 
 

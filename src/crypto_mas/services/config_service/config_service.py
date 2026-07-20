@@ -19,7 +19,7 @@ class ConfigService:
         if self.redis:
             cached = self.redis.get(cache_key)
             if cached:
-                return json.loads(cached)
+                return json.loads(cached)  # type: ignore
 
         config_version = self.repository.get_active_config(name)
         if not config_version:

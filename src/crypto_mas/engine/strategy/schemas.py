@@ -1,7 +1,8 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from crypto_mas.engine.regime import RegimeSnapshot
 from crypto_mas.engine.scoring import AssetScore
@@ -24,6 +25,7 @@ class TradingDecision(BaseModel):
     confidence: float
     signal: TradingSignal
     score: AssetScore
-    regime: RegimeSnapshot
+    regime: RegimeSnapshot | None = None
     reason: str
-    created_at: datetime
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    metadata: dict[str, Any] = Field(default_factory=dict)

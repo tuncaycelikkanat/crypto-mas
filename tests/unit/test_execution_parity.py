@@ -1,11 +1,12 @@
-import pytest
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from crypto_mas.domain.models.paper_account import PaperAccount
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
+from crypto_mas.domain.models.paper_account import PaperAccount
 from crypto_mas.domain.models.position import Position
 from crypto_mas.domain.models.trade import Trade
 from crypto_mas.engine.strategy.schemas import DecisionAction
@@ -13,6 +14,7 @@ from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
+
 
 def setup_fresh_db():
     engine = create_engine("sqlite+pysqlite:///:memory:")
@@ -58,9 +60,9 @@ async def run_simulation(trigger_name: str, account_name: str) -> dict:
     service.feature_snapshot_repository.list_by_symbol.return_value = [fresh_snapshot]
     
     # Fake HTF manager to allow everything
-    service.htf_manager = MagicMock()
-    service.htf_manager.is_long_allowed.return_value = True
-    service.htf_manager.is_short_allowed.return_value = True
+    service.htf_manager = MagicMock()  # type: ignore
+    service.htf_manager.is_long_allowed.return_value = True  # type: ignore
+    service.htf_manager.is_short_allowed.return_value = True  # type: ignore
 
     # 1. Step: LONG decision
     strategy_mock = MagicMock()
@@ -71,14 +73,15 @@ async def run_simulation(trigger_name: str, account_name: str) -> dict:
         confidence=0.9,
         reason="Test buy",
         score=SimpleNamespace(final_score=0.9, trend_score=0.5, momentum_score=0.4, volatility_penalty=0.0),
-        regime=None
+        regime=None,
+        metadata={}
     )
     strategy_mock.decide.return_value = decision
     
     # Run cycle using monkeypatch for StrategyFactory
     import crypto_mas.services.trading_cycle_service.cycle_orchestrator as orchestrator
     original_create = orchestrator.StrategyFactory.create
-    orchestrator.StrategyFactory.create = MagicMock(return_value=strategy_mock)
+    orchestrator.StrategyFactory.create = MagicMock(return_value=strategy_mock)  # type: ignore
 
     try:
         await service.run_cycle(
@@ -115,7 +118,7 @@ async def run_simulation(trigger_name: str, account_name: str) -> dict:
             use_regime_shield=False
         )
     finally:
-        orchestrator.StrategyFactory.create = original_create
+        orchestrator.StrategyFactory.create = original_create  # type: ignore
     
     # Collect results
     session.commit()

@@ -1,10 +1,9 @@
 import asyncio
 import logging
-import signal
-import sys
+
 import uvloop
 
-uvloop.install()
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 from datetime import UTC
 
@@ -16,7 +15,9 @@ from crypto_mas.infrastructure.db.session import SessionLocal
 from crypto_mas.infrastructure.logging.setup import setup_logging
 from crypto_mas.services.market_data_service.provider_factory import get_market_data_provider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
+from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
 
 setup_logging(env="dev")  # Production'da env var'dan okunabilir
 logger = logging.getLogger("crypto_mas.scheduler")
@@ -74,6 +75,13 @@ def main() -> None:
         replace_existing=True,
     )
     
+    queue = OrderExecutorQueue.get_instance()
+    def broker_factory():
+        db = SessionLocal()
+        return PaperBrokerService(db=db)
+    queue.set_broker_factory(broker_factory)
+    queue.start()
+    
     scheduler.start()
     logger.info(f"Scheduler started. Scheduled tasks: {settings.scheduled_symbols} at '{settings.schedule_cron}'")
     
@@ -81,7 +89,8 @@ def main() -> None:
     try:
         asyncio.get_event_loop().run_forever()
     except (KeyboardInterrupt, SystemExit):
-        logger.info("Shutting down scheduler...")
+        logger.info("Shutting down scheduler and queue...")
+        queue.stop()
         scheduler.shutdown()
 
 if __name__ == "__main__":

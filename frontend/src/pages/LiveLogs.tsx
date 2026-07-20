@@ -6,6 +6,7 @@ import {
   TrendingUp, Package, CheckCircle, XCircle,
   BarChart2, Clock, Layers, X
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Types ──────────────────────────────────────────────────────
 interface LogEntry {
@@ -19,25 +20,33 @@ interface LogEntry {
 }
 
 // ── Helpers ────────────────────────────────────────────────────
-const STAGE_META: Record<string, { icon: React.FC<any>; color: string; label: string }> = {
-  INIT:       { icon: Zap,          color: '#60a5fa', label: 'Init'       },
-  STRATEGY:   { icon: TrendingUp,   color: '#a78bfa', label: 'Strategy'   },
-  PORTFOLIO:  { icon: Package,      color: '#34d399', label: 'Portfolio'  },
-  RISK:       { icon: Shield,       color: '#fbbf24', label: 'Risk'       },
-  EXECUTION:  { icon: BarChart2,    color: '#f472b6', label: 'Execution'  },
-  PAPER_BROKER:{ icon: BarChart2,   color: '#f472b6', label: 'Broker'     },
-  TRAILING_SL:{ icon: TrendingUp,   color: '#fb923c', label: 'Trail SL'   },
-  COMPLETED:  { icon: CheckCircle,  color: '#10b981', label: 'Completed'  },
-  FAILED:     { icon: XCircle,      color: '#ef4444', label: 'Failed'     },
-  MARKET_DATA:{ icon: Layers,       color: '#94a3b8', label: 'Market'     },
+const STAGE_META: Record<string, { icon: React.FC<any>; colorVar: string; label: string }> = {
+  INIT:         { icon: Zap,          colorVar: 'var(--accent)', label: 'Init'       },
+  STRATEGY:     { icon: TrendingUp,   colorVar: 'var(--purple-400)', label: 'Strategy'   },
+  PORTFOLIO:    { icon: Package,      colorVar: 'var(--success)', label: 'Portfolio'  },
+  RISK:         { icon: Shield,       colorVar: 'var(--warning)', label: 'Risk'       },
+  EXECUTION:    { icon: BarChart2,    colorVar: 'var(--danger)', label: 'Execution'  },
+  PAPER_BROKER: { icon: BarChart2,    colorVar: 'var(--danger)', label: 'Broker'     },
+  TRAILING_SL:  { icon: TrendingUp,   colorVar: 'var(--warning)', label: 'Trail SL'   },
+  COMPLETED:    { icon: CheckCircle,  colorVar: 'var(--success)', label: 'Completed'  },
+  FAILED:       { icon: XCircle,      colorVar: 'var(--danger)', label: 'Failed'     },
+  MARKET_DATA:  { icon: Layers,       colorVar: 'var(--text-muted)', label: 'Market'     },
+};
+
+const LEVEL_CLASS: Record<string, string> = {
+  INFO:    'badge-muted',
+  SUCCESS: 'badge-success',
+  WARN:    'badge-warning',
+  WARNING: 'badge-warning',
+  ERROR:   'badge-danger',
 };
 
 const LEVEL_COLOR: Record<string, string> = {
-  INFO:    '#94a3b8',
-  SUCCESS: '#10b981',
-  WARN:    '#fbbf24',
-  WARNING: '#fbbf24',
-  ERROR:   '#ef4444',
+  INFO:    'var(--text-muted)',
+  SUCCESS: 'var(--success)',
+  WARN:    'var(--warning)',
+  WARNING: 'var(--warning)',
+  ERROR:   'var(--danger)',
 };
 
 function formatTime(iso: string) {
@@ -52,36 +61,36 @@ const JsonNode: React.FC<{ data: any; depth?: number; label?: string }> = ({ dat
 
   if (data === null || data === undefined) {
     return (
-      <div style={{ paddingLeft: indent }}>
-        {label && <span style={{ color: '#94a3b8' }}>{label}: </span>}
-        <span style={{ color: '#ef4444' }}>null</span>
+      <div style={{ paddingLeft: indent }} className="mono">
+        {label && <span className="text-muted">{label}: </span>}
+        <span className="text-danger">null</span>
       </div>
     );
   }
 
   if (typeof data === 'boolean') {
     return (
-      <div style={{ paddingLeft: indent }}>
-        {label && <span style={{ color: '#94a3b8' }}>{label}: </span>}
-        <span style={{ color: '#fb923c' }}>{String(data)}</span>
+      <div style={{ paddingLeft: indent }} className="mono">
+        {label && <span className="text-muted">{label}: </span>}
+        <span className="text-warning">{String(data)}</span>
       </div>
     );
   }
 
   if (typeof data === 'number') {
     return (
-      <div style={{ paddingLeft: indent }}>
-        {label && <span style={{ color: '#94a3b8' }}>{label}: </span>}
-        <span style={{ color: '#60a5fa' }}>{data}</span>
+      <div style={{ paddingLeft: indent }} className="mono">
+        {label && <span className="text-muted">{label}: </span>}
+        <span className="text-accent">{data}</span>
       </div>
     );
   }
 
   if (typeof data === 'string') {
     return (
-      <div style={{ paddingLeft: indent }}>
-        {label && <span style={{ color: '#94a3b8' }}>{label}: </span>}
-        <span style={{ color: '#34d399' }}>"{data}"</span>
+      <div style={{ paddingLeft: indent }} className="mono">
+        {label && <span className="text-muted">{label}: </span>}
+        <span className="text-success">"{data}"</span>
       </div>
     );
   }
@@ -89,25 +98,31 @@ const JsonNode: React.FC<{ data: any; depth?: number; label?: string }> = ({ dat
   if (Array.isArray(data)) {
     if (data.length === 0) {
       return (
-        <div style={{ paddingLeft: indent }}>
-          {label && <span style={{ color: '#94a3b8' }}>{label}: </span>}
-          <span style={{ color: '#94a3b8' }}>[]</span>
+        <div style={{ paddingLeft: indent }} className="mono">
+          {label && <span className="text-muted">{label}: </span>}
+          <span className="text-muted">[]</span>
         </div>
       );
     }
     return (
-      <div style={{ paddingLeft: indent }}>
+      <div style={{ paddingLeft: indent }} className="mono">
         <div
           onClick={() => setOpen(o => !o)}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, userSelect: 'none' }}
         >
-          {open ? <ChevronDown size={12} color="#94a3b8" /> : <ChevronRight size={12} color="#94a3b8" />}
-          {label && <span style={{ color: '#94a3b8' }}>{label}</span>}
-          <span style={{ color: '#94a3b8' }}>[{data.length}]</span>
+          {open ? <ChevronDown size={14} className="text-muted" /> : <ChevronRight size={14} className="text-muted" />}
+          {label && <span className="text-muted">{label}</span>}
+          <span className="text-muted">[{data.length}]</span>
         </div>
-        {open && data.map((item, i) => (
-          <JsonNode key={i} data={item} depth={depth + 1} label={String(i)} />
-        ))}
+        <AnimatePresence>
+          {open && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
+              {data.map((item, i) => (
+                <JsonNode key={i} data={item} depth={depth + 1} label={String(i)} />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
@@ -116,30 +131,36 @@ const JsonNode: React.FC<{ data: any; depth?: number; label?: string }> = ({ dat
     const keys = Object.keys(data);
     if (keys.length === 0) {
       return (
-        <div style={{ paddingLeft: indent }}>
-          {label && <span style={{ color: '#94a3b8' }}>{label}: </span>}
-          <span style={{ color: '#94a3b8' }}>{'{}'}</span>
+        <div style={{ paddingLeft: indent }} className="mono">
+          {label && <span className="text-muted">{label}: </span>}
+          <span className="text-muted">{'{}'}</span>
         </div>
       );
     }
     return (
-      <div style={{ paddingLeft: indent }}>
+      <div style={{ paddingLeft: indent }} className="mono">
         <div
           onClick={() => setOpen(o => !o)}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, userSelect: 'none' }}
         >
-          {open ? <ChevronDown size={12} color="#94a3b8" /> : <ChevronRight size={12} color="#94a3b8" />}
-          {label && <span style={{ color: '#94a3b8' }}>{label}</span>}
-          {!open && <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{'{'}{keys.slice(0, 3).join(', ')}{keys.length > 3 ? '...' : ''}{'}'}</span>}
+          {open ? <ChevronDown size={14} className="text-muted" /> : <ChevronRight size={14} className="text-muted" />}
+          {label && <span className="text-muted">{label}</span>}
+          {!open && <span className="text-muted" style={{ fontSize: '0.75rem' }}>{'{'}{keys.slice(0, 3).join(', ')}{keys.length > 3 ? '...' : ''}{'}'}</span>}
         </div>
-        {open && keys.map(key => (
-          <JsonNode key={key} data={data[key]} depth={depth + 1} label={key} />
-        ))}
+        <AnimatePresence>
+          {open && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
+              {keys.map(key => (
+                <JsonNode key={key} data={data[key]} depth={depth + 1} label={key} />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
 
-  return <div style={{ paddingLeft: indent }}>{String(data)}</div>;
+  return <div style={{ paddingLeft: indent }} className="mono">{String(data)}</div>;
 };
 
 // ── Detail Panel ───────────────────────────────────────────────
@@ -157,61 +178,55 @@ const DetailPanel: React.FC<{ log: LogEntry | null }> = ({ log }) => {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', height: '100%', gap: 12, color: 'var(--text-muted)'
-      }}>
+        justifyContent: 'center', height: '100%', gap: 12
+      }} className="text-muted">
         <Terminal size={40} opacity={0.3} />
         <p style={{ fontSize: '0.9rem' }}>Detay görmek için bir log satırına tıkla</p>
       </div>
     );
   }
 
-  const meta = STAGE_META[log.stage] || { icon: Circle, color: '#94a3b8', label: log.stage };
+  const meta = STAGE_META[log.stage] || { icon: Circle, colorVar: 'var(--text-muted)', label: log.stage };
   const Icon = meta.icon;
-  const levelColor = LEVEL_COLOR[log.level.toUpperCase()] || '#94a3b8';
+  const badgeClass = LEVEL_CLASS[log.level.toUpperCase()] || 'badge-muted';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <motion.div
+      key={log.id}
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ duration: 0.2 }}
+      style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+    >
       {/* Header */}
       <div style={{
         padding: '16px 20px',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12
       }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-            <Icon size={16} color={meta.color} />
-            <span style={{ color: meta.color, fontWeight: 600, fontSize: '0.85rem', fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Icon size={16} color={meta.colorVar} />
+            <span style={{ color: meta.colorVar, fontWeight: 600, fontSize: '0.85rem' }} className="mono">
               {log.stage}
             </span>
-            <span style={{
-              fontSize: '0.7rem', padding: '2px 8px', borderRadius: 4,
-              background: levelColor + '22', color: levelColor, fontWeight: 600
-            }}>
+            <span className={`badge ${badgeClass}`}>
               {log.level}
             </span>
             {log.cycle_id && (
-              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Cycle #{log.cycle_id}</span>
+              <span style={{ fontSize: '0.7rem' }} className="text-muted">Cycle #{log.cycle_id}</span>
             )}
           </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-main)', lineHeight: 1.5, margin: 0 }}>
+          <p className="text-primary" style={{ fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
             {log.message}
           </p>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '6px 0 0', fontFamily: 'monospace' }}>
+          <p className="text-muted mono" style={{ fontSize: '0.75rem', margin: '8px 0 0' }}>
             {new Date(log.created_at).toLocaleString('tr-TR')}
           </p>
         </div>
         {log.payload && (
-          <button
-            onClick={handleCopy}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-              color: copied ? '#10b981' : 'var(--text-muted)',
-              padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
-              fontSize: '0.8rem', whiteSpace: 'nowrap', flexShrink: 0,
-              transition: 'all 0.2s'
-            }}
-          >
+          <button onClick={handleCopy} className={copied ? "btn-primary" : "btn-secondary"} style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
             {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
             {copied ? 'Kopyalandı' : 'JSON Kopyala'}
           </button>
@@ -221,15 +236,15 @@ const DetailPanel: React.FC<{ log: LogEntry | null }> = ({ log }) => {
       {/* JSON Body */}
       <div style={{
         flex: 1, overflowY: 'auto', padding: '16px 20px',
-        fontFamily: '"Fira Code", "JetBrains Mono", monospace', fontSize: '0.82rem', lineHeight: 1.7
+        fontSize: '0.85rem', lineHeight: 1.7
       }}>
         {log.payload ? (
           <JsonNode data={log.payload} depth={0} />
         ) : (
-          <div style={{ color: '#64748b', fontStyle: 'italic' }}>Bu log için ek veri (payload) yok.</div>
+          <div className="text-muted" style={{ fontStyle: 'italic' }}>Bu log için ek veri (payload) yok.</div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -239,9 +254,9 @@ const LogRow: React.FC<{
   selected: boolean;
   onClick: () => void;
 }> = React.memo(({ log, selected, onClick }) => {
-  const meta = STAGE_META[log.stage] || { icon: Circle, color: '#94a3b8', label: log.stage };
+  const meta = STAGE_META[log.stage] || { icon: Circle, colorVar: 'var(--text-muted)', label: log.stage };
   const Icon = meta.icon;
-  const levelColor = LEVEL_COLOR[log.level.toUpperCase()] || '#94a3b8';
+  const levelColor = LEVEL_COLOR[log.level.toUpperCase()] || 'var(--text-muted)';
   const hasPayload = !!log.payload;
 
   return (
@@ -249,31 +264,32 @@ const LogRow: React.FC<{
       onClick={onClick}
       style={{
         display: 'grid',
-        gridTemplateColumns: '70px 90px 1fr 24px',
-        gap: 8,
+        gridTemplateColumns: '75px 100px 1fr 24px',
+        gap: 12,
         alignItems: 'center',
-        padding: '6px 12px',
+        padding: '10px 16px',
         cursor: 'pointer',
-        borderLeft: selected ? `2px solid ${meta.color}` : '2px solid transparent',
-        background: selected ? 'rgba(139,92,246,0.08)' : 'transparent',
-        transition: 'background 0.1s',
+        borderLeft: selected ? `3px solid ${meta.colorVar}` : '3px solid transparent',
+        background: selected ? 'var(--accent-soft)' : 'transparent',
+        transition: 'all 0.15s',
+        borderBottom: '1px solid var(--border)'
       }}
       onMouseEnter={e => {
-        if (!selected) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)';
+        if (!selected) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-raised)';
       }}
       onMouseLeave={e => {
         if (!selected) (e.currentTarget as HTMLDivElement).style.background = 'transparent';
       }}
     >
       {/* Time */}
-      <span style={{ color: '#475569', fontSize: '0.75rem', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+      <span className="text-muted mono" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
         {formatTime(log.created_at)}
       </span>
 
       {/* Stage badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <Icon size={11} color={meta.color} />
-        <span style={{ color: meta.color, fontSize: '0.72rem', fontFamily: 'monospace', fontWeight: 600 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Icon size={14} color={meta.colorVar} />
+        <span className="mono" style={{ color: meta.colorVar, fontSize: '0.75rem', fontWeight: 600 }}>
           {meta.label}
         </span>
       </div>
@@ -281,18 +297,18 @@ const LogRow: React.FC<{
       {/* Message */}
       <span style={{
         color: levelColor,
-        fontSize: '0.8rem',
+        fontSize: '0.85rem',
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
         {log.message}
       </span>
 
       {/* Payload indicator */}
-      <div>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
         {hasPayload && (
           <div style={{
-            width: 7, height: 7, borderRadius: '50%',
-            background: selected ? meta.color : '#334155',
+            width: 8, height: 8, borderRadius: '50%',
+            background: selected ? meta.colorVar : 'var(--border-strong)',
           }} />
         )}
       </div>
@@ -356,70 +372,67 @@ const LiveLogs: React.FC = () => {
   };
 
   return (
-    <div style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', gap: 0 }}>
-
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      exit={{ opacity: 0 }} 
+      style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', gap: 0 }}
+    >
       {/* Top bar */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 0 20px 0', flexShrink: 0, flexWrap: 'wrap', gap: 12
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Terminal size={28} color="var(--primary)" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ background: 'var(--accent-soft)', padding: '10px', borderRadius: 'var(--radius)' }}>
+            <Terminal size={24} className="text-accent" />
+          </div>
           <div>
-            <h1 style={{ fontSize: '1.6rem', margin: 0, lineHeight: 1.1 }}>Live Logs</h1>
-            <div style={{ display: 'flex', gap: 16, marginTop: 10 }}>
+            <h1 style={{ fontSize: '1.5rem', margin: 0, lineHeight: 1.2 }}>Live Logs</h1>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button
                 onClick={() => setActiveTab('system')}
-                style={{
-                  background: 'none', border: 'none', padding: '0 0 4px 0',
-                  color: activeTab === 'system' ? 'var(--primary)' : 'var(--text-muted)',
-                  borderBottom: activeTab === 'system' ? '2px solid var(--primary)' : '2px solid transparent',
-                  cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem'
-                }}
-              >System Logs</button>
+                className={activeTab === 'system' ? 'btn-primary' : 'btn-ghost'}
+                style={{ padding: '6px 14px', fontSize: '0.8rem', borderRadius: '99px' }}
+              >
+                System Logs
+              </button>
               <button
                 onClick={() => setActiveTab('debug')}
-                style={{
-                  background: 'none', border: 'none', padding: '0 0 4px 0',
-                  color: activeTab === 'debug' ? 'var(--primary)' : 'var(--text-muted)',
-                  borderBottom: activeTab === 'debug' ? '2px solid var(--primary)' : '2px solid transparent',
-                  cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem'
-                }}
-              >Debug Log</button>
+                className={activeTab === 'debug' ? 'btn-primary' : 'btn-ghost'}
+                style={{ padding: '6px 14px', fontSize: '0.8rem', borderRadius: '99px' }}
+              >
+                Debug Log
+              </button>
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#64748b' }}>
-            <Clock size={12} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }} className="text-muted">
+            <Clock size={14} />
             <span>{lastUpdated || '—'}</span>
             <span>·</span>
-            <span style={{ color: 'var(--primary)' }}>{liveCount} log</span>
+            <span className="text-accent" style={{ fontWeight: 600 }}>{liveCount} log</span>
           </div>
+          
           <button
             onClick={() => setAutoScroll(a => !a)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-              borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
-              background: autoScroll ? 'rgba(139,92,246,0.15)' : 'transparent',
-              color: autoScroll ? 'var(--primary)' : 'var(--text-muted)',
-              cursor: 'pointer', fontSize: '0.78rem',
-            }}
+            className={autoScroll ? 'btn-primary' : 'btn-secondary'}
+            style={{ padding: '8px 14px' }}
           >
-            <Circle size={8} style={{ fill: autoScroll ? 'var(--primary)' : 'none' }} />
+            <Circle size={10} style={{ fill: autoScroll ? 'currentColor' : 'none' }} />
             Auto-scroll
           </button>
+          
           <button
             onClick={handleManualRefresh}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-              borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
-              background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem'
-            }}
+            className="btn-secondary"
+            style={{ padding: '8px 14px' }}
           >
-            <RefreshCw size={13} style={{ animation: loading ? 'spin 0.8s linear infinite' : 'none' }} />
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Yenile
           </button>
+          
           <button
             onClick={async () => {
               if (window.confirm('Tüm geçmiş logları silmek istediğinize emin misiniz?')) {
@@ -431,21 +444,22 @@ const LiveLogs: React.FC = () => {
                 setLoading(false);
               }
             }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-              borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)',
-              background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: '0.78rem'
-            }}
+            className="btn-danger"
+            style={{ padding: '8px 14px' }}
           >
-            <X size={13} />
+            <X size={14} />
             Temizle
           </button>
         </div>
       </div>
+      
       {activeTab === 'debug' && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: '20px' }}>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: '20px' }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            <span className="text-muted" style={{ fontSize: '0.9rem' }}>
               Aşağıdaki tüm logları kopyalayıp sisteme veya asistana gönderebilirsiniz. Sadece son {logs.length} işlem kaydını içerir.
             </span>
             <button
@@ -453,193 +467,177 @@ const LiveLogs: React.FC = () => {
                 navigator.clipboard.writeText(JSON.stringify(logs, null, 2));
                 alert("Debug log kopyalandı!");
               }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px',
-                borderRadius: 6, background: 'var(--primary)', color: 'white',
-                border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem'
-              }}
+              className="btn-primary"
             >
-              <Copy size={14} /> Tümünü Kopyala
+              <Copy size={16} /> Tümünü Kopyala
             </button>
           </div>
           <textarea
             readOnly
             value={JSON.stringify(logs, null, 2)}
+            className="form-input mono"
             style={{
               flex: 1, width: '100%', resize: 'none',
-              background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 8, padding: 16, color: '#34d399',
-              fontFamily: '"Fira Code", monospace', fontSize: '0.8rem',
-              outline: 'none'
+              background: 'var(--bg-surface)',
+              color: 'var(--success)',
+              fontSize: '0.85rem',
             }}
           />
-        </div>
+        </motion.div>
       )}
 
       {activeTab === 'system' && (
-        <>
-          {/* Filter Bar */}
-      <div style={{
-        display: 'flex', gap: 8, alignItems: 'center', padding: '10px 16px',
-        background: 'rgba(0,0,0,0.2)', borderRadius: '8px 8px 0 0',
-        border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none',
-        flexShrink: 0, flexWrap: 'wrap'
-      }}>
-        <Filter size={14} color="#64748b" />
-        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Filtre:</span>
-
-        {/* Stage pills */}
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {ALL_STAGES.map(s => {
-            const meta = STAGE_META[s] || { color: '#94a3b8' };
-            const active = filterStage === s;
-            return (
-              <button
-                key={s}
-                onClick={() => setFilterStage(active ? '' : s)}
-                style={{
-                  fontSize: '0.7rem', padding: '3px 8px', borderRadius: 4,
-                  border: `1px solid ${active ? meta.color : 'rgba(255,255,255,0.08)'}`,
-                  background: active ? meta.color + '22' : 'transparent',
-                  color: active ? meta.color : '#64748b',
-                  cursor: 'pointer', fontFamily: 'monospace', fontWeight: active ? 700 : 400,
-                }}
-              >
-                {s}
-              </button>
-            );
-          })}
-        </div>
-
-        <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)' }} />
-
-        {/* Level pills */}
-        {ALL_LEVELS.map(lv => {
-          const col = LEVEL_COLOR[lv];
-          const active = filterLevel === lv;
-          return (
-            <button
-              key={lv}
-              onClick={() => setFilterLevel(active ? '' : lv)}
-              style={{
-                fontSize: '0.7rem', padding: '3px 8px', borderRadius: 4,
-                border: `1px solid ${active ? col : 'rgba(255,255,255,0.08)'}`,
-                background: active ? col + '22' : 'transparent',
-                color: active ? col : '#64748b',
-                cursor: 'pointer', fontFamily: 'monospace',
-              }}
-            >
-              {lv}
-            </button>
-          );
-        })}
-
-        <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)' }} />
-
-        {/* Symbol search */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
-          <Search size={12} color="#64748b" style={{ position: 'absolute', left: 8 }} />
-          <input
-            value={filterSymbol}
-            onChange={e => setFilterSymbol(e.target.value)}
-            placeholder="Sembol ara..."
-            style={{
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 4, color: 'var(--text-main)', fontSize: '0.75rem',
-              padding: '4px 8px 4px 26px', width: 140, outline: 'none', fontFamily: 'monospace'
-            }}
-          />
-          {filterSymbol && (
-            <button
-              onClick={() => setFilterSymbol('')}
-              style={{ position: 'absolute', right: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 0 }}
-            >
-              <X size={11} />
-            </button>
-          )}
-        </div>
-
-        {(filterStage || filterLevel || filterSymbol) && (
-          <button
-            onClick={() => { setFilterStage(''); setFilterLevel(''); setFilterSymbol(''); }}
-            style={{
-              fontSize: '0.7rem', padding: '3px 8px', borderRadius: 4,
-              border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.1)',
-              color: '#ef4444', cursor: 'pointer'
-            }}
-          >
-            Temizle
-          </button>
-        )}
-      </div>
-
-      {/* Main content: log list + detail panel */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 420px',
-        flex: 1,
-        overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '0 0 12px 12px',
-        background: '#0a0f1a',
-      }}>
-        {/* Left: Log list */}
-        <div
-          ref={listRef}
-          onScroll={(e) => {
-            const target = e.target as HTMLDivElement;
-            const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 10;
-            if (isAtBottom && !autoScroll) {
-              setAutoScroll(true);
-            } else if (!isAtBottom && autoScroll) {
-              setAutoScroll(false);
-            }
-          }}
-          style={{ overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,0.06)' }}
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}
         >
-          {/* Column header */}
+          {/* Filter Bar */}
           <div style={{
-            display: 'grid', gridTemplateColumns: '70px 90px 1fr 24px',
-            gap: 8, padding: '8px 12px',
-            borderBottom: '1px solid rgba(255,255,255,0.04)',
-            position: 'sticky', top: 0, background: '#0d1117', zIndex: 1
+            display: 'flex', gap: 12, alignItems: 'center', padding: '12px 20px',
+            background: 'var(--bg-raised)', borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)',
+            border: '1px solid var(--border)', borderBottom: 'none',
+            flexShrink: 0, flexWrap: 'wrap'
           }}>
-            {['Saat', 'Aşama', 'Mesaj', ''].map(h => (
-              <span key={h} style={{ fontSize: '0.68rem', color: '#334155', textTransform: 'uppercase', fontFamily: 'monospace' }}>
-                {h}
-              </span>
-            ))}
+            <Filter size={16} className="text-muted" />
+            <span className="section-label">Filtreler:</span>
+
+            {/* Stage pills */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {ALL_STAGES.map(s => {
+                const active = filterStage === s;
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setFilterStage(active ? '' : s)}
+                    className={active ? 'badge badge-primary' : 'badge badge-muted'}
+                    style={{ cursor: 'pointer', border: active ? '1px solid var(--accent)' : '1px solid transparent' }}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ width: 1, height: 20, background: 'var(--border-strong)' }} />
+
+            {/* Level pills */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {ALL_LEVELS.map(lv => {
+                const active = filterLevel === lv;
+                const badgeClass = active ? (LEVEL_CLASS[lv] || 'badge-primary') : 'badge-muted';
+                return (
+                  <button
+                    key={lv}
+                    onClick={() => setFilterLevel(active ? '' : lv)}
+                    className={`badge ${badgeClass}`}
+                    style={{ cursor: 'pointer', border: active ? '1px solid currentColor' : '1px solid transparent' }}
+                  >
+                    {lv}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ width: 1, height: 20, background: 'var(--border-strong)' }} />
+
+            {/* Symbol search */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
+              <Search size={14} className="text-muted" style={{ position: 'absolute', left: 10 }} />
+              <input
+                value={filterSymbol}
+                onChange={e => setFilterSymbol(e.target.value)}
+                placeholder="Sembol ara..."
+                className="form-input mono"
+                style={{ paddingLeft: '32px', width: '160px', paddingRight: '28px' }}
+              />
+              {filterSymbol && (
+                <button
+                  onClick={() => setFilterSymbol('')}
+                  style={{ position: 'absolute', right: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  className="text-muted"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {(filterStage || filterLevel || filterSymbol) && (
+              <button
+                onClick={() => { setFilterStage(''); setFilterLevel(''); setFilterSymbol(''); }}
+                className="btn-ghost text-danger"
+                style={{ padding: '4px 8px', fontSize: '0.8rem', height: 'auto' }}
+              >
+                Temizle
+              </button>
+            )}
           </div>
 
-          {logs.length === 0 ? (
-            <div style={{ padding: '60px 20px', textAlign: 'center', color: '#334155' }}>
-              <Terminal size={32} opacity={0.3} style={{ marginBottom: 12 }} />
-              <p style={{ fontSize: '0.85rem' }}>Henüz log yok. Bot'u başlatınca burası dolmaya başlar.</p>
-            </div>
-          ) : (
-            logs.map(log => (
-              <LogRow
-                key={log.id}
-                log={log}
-                selected={selectedLog?.id === log.id}
-                onClick={() => setSelectedLog(prev => prev?.id === log.id ? null : log)}
-              />
-            ))
-          )}
-          <div ref={logsEndRef} />
-        </div>
+          {/* Main content: log list + detail panel */}
+          <div className="card" style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 450px',
+            flex: 1,
+            overflow: 'hidden',
+            borderTopLeftRadius: 0,
+            borderTopRightRadius: 0,
+          }}>
+            {/* Left: Log list */}
+            <div
+              ref={listRef}
+              onScroll={(e) => {
+                const target = e.target as HTMLDivElement;
+                const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 10;
+                if (isAtBottom && !autoScroll) {
+                  setAutoScroll(true);
+                } else if (!isAtBottom && autoScroll) {
+                  setAutoScroll(false);
+                }
+              }}
+              style={{ overflowY: 'auto', borderRight: '1px solid var(--border)' }}
+            >
+              {/* Column header */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: '75px 100px 1fr 24px',
+                gap: 12, padding: '12px 16px',
+                borderBottom: '1px solid var(--border-strong)',
+                position: 'sticky', top: 0, background: 'var(--bg-surface)', zIndex: 1,
+                backdropFilter: 'blur(12px)'
+              }}>
+                {['Saat', 'Aşama', 'Mesaj', ''].map(h => (
+                  <span key={h} className="section-label">
+                    {h}
+                  </span>
+                ))}
+              </div>
 
-        {/* Right: Detail panel */}
-        <div style={{ overflowY: 'auto', background: '#0d1117' }}>
-          <DetailPanel log={selectedLog} />
-        </div>
-      </div>
-      </>
+              {logs.length === 0 ? (
+                <div style={{ padding: '80px 20px', textAlign: 'center' }} className="text-muted">
+                  <Terminal size={48} opacity={0.2} style={{ marginBottom: 16 }} />
+                  <p style={{ fontSize: '0.95rem' }}>Henüz log yok. Bot'u başlatınca burası dolmaya başlar.</p>
+                </div>
+              ) : (
+                logs.map(log => (
+                  <LogRow
+                    key={log.id}
+                    log={log}
+                    selected={selectedLog?.id === log.id}
+                    onClick={() => setSelectedLog(prev => prev?.id === log.id ? null : log)}
+                  />
+                ))
+              )}
+              <div ref={logsEndRef} />
+            </div>
+
+            {/* Right: Detail panel */}
+            <div style={{ overflowY: 'auto', background: 'var(--bg-base)' }}>
+              <AnimatePresence mode="wait">
+                <DetailPanel key={selectedLog?.id || 'empty'} log={selectedLog} />
+              </AnimatePresence>
+            </div>
+          </div>
+        </motion.div>
       )}
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
-    </div>
+    </motion.div>
   );
 };
 

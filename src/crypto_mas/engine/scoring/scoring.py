@@ -1,12 +1,10 @@
-from math import tanh
 
+from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.math.jit_calculators import (
     jit_momentum_score,
     jit_trend_score,
     jit_volatility_penalty,
 )
-
-from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.scoring import AssetScore
 from crypto_mas.engine.signal import SignalDirection, TradingSignal
 from crypto_mas.engine.utils import get_float
