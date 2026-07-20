@@ -25,17 +25,18 @@ from crypto_mas.services.paper_trading.schemas import (
 
 
 class PaperBrokerService:
-    SL_PCT = {"scalping": 0.008, "swing": 0.03, "hodl": 0.05}
-    TP_PCT = {"scalping": 0.006, "swing": 0.06, "hodl": 0.12}
+    SL_PCT = {"scalping": 0.015, "swing": 0.03, "hodl": 0.05}
+    TP_PCT = {"scalping": 0.012, "swing": 0.06, "hodl": 0.12}
     
-    COMMISSION_RATE = Decimal("0.001") # 0.1%
-    SLIPPAGE_RATE = Decimal("0.0005")  # 0.05%
+    COMMISSION_RATE = Decimal("0.0002") # 0.02% Futures Maker limit fee
+    SLIPPAGE_RATE = Decimal("0.0002")  # 0.02% Limit order slippage/execution spread
 
     def __init__(
         self,
         db: Session,
         time_provider: TimeProvider | None = None,
         strategy_mode: str = "swing",
+        is_backtest: bool = False,
     ) -> None:
         self.db = db
         self.account_repository = PaperAccountRepository(db)
@@ -46,6 +47,7 @@ class PaperBrokerService:
         self.log_repository = ExecutionLogRepository(db)
         self.time_provider = time_provider or SystemTimeProvider()
         self.strategy_mode = strategy_mode
+        self.is_backtest = is_backtest
 
     def execute_target_portfolio(
         self,
@@ -53,7 +55,7 @@ class PaperBrokerService:
         target: PortfolioTarget,
         cycle_id: int | None = None,
     ) -> PaperExecutionReport:
-        account = self.account_repository.get_by_name(account_name)
+        account = self._bt_account if self.is_backtest else self.account_repository.get_by_name(account_name)
 
         if account is None:
             raise ValueError(f"Paper account not found: {account_name}")
@@ -199,7 +201,7 @@ class PaperBrokerService:
                     timeframe="15m" if self.strategy_mode == "scalping" else (
                         "4h" if self.strategy_mode == "swing" else "1d"
                     ),
-                    end_time=now,
+                    end_time=self.time_provider.get_time(),
                 )
                 if atr_feature and atr_feature.features_json:
                     atr_val = atr_feature.features_json.get("atr_14")
@@ -217,8 +219,10 @@ class PaperBrokerService:
                 pass
 
             if stop_loss_price is None:  # Fallback to static %
+                friction = Decimal(str((self.COMMISSION_RATE + self.SLIPPAGE_RATE) * 2))
                 sl_pct = Decimal(str(self.SL_PCT.get(self.strategy_mode, 0.03)))
-                tp_pct = Decimal(str(self.TP_PCT.get(self.strategy_mode, 0.06)))
+                tp_pct = Decimal(str(self.TP_PCT.get(self.strategy_mode, 0.06))) + friction
+                
                 if target_position.side == "LONG":
                     stop_loss_price   = self._money(price * (1 - sl_pct))
                     take_profit_price = self._money(price * (1 + tp_pct))
@@ -238,6 +242,7 @@ class PaperBrokerService:
                 take_profit_price=take_profit_price,
                 strategy_mode=self.strategy_mode,
                 side=target_position.side,
+                skip_commit=self.is_backtest,
             )
 
             trade = Trade(
@@ -293,15 +298,20 @@ class PaperBrokerService:
                 payload={"notional": float(target_notional), "price": float(price), "quantity": float(quantity), "sl": float(stop_loss_price), "tp": float(take_profit_price)}
             )
 
-        ending_equity = self._money(
-            available_cash + self._calculate_open_positions_value(account.name)
-        )
-
-        updated_account = self.account_repository.update_balances(
-            account=account,
-            cash_balance=available_cash,
-            equity=ending_equity,
-        )
+        if self.is_backtest:
+            # Update in-memory account state directly — no DB round-trip
+            account.cash_balance = available_cash
+            account.equity = self._money(available_cash + self._calculate_open_positions_value(account.name))
+            updated_account = account
+        else:
+            ending_equity = self._money(
+                available_cash + self._calculate_open_positions_value(account.name)
+            )
+            updated_account = self.account_repository.update_balances(
+                account=account,
+                cash_balance=available_cash,
+                equity=ending_equity,
+            )
 
         return PaperExecutionReport(
             account_name=account.name,
@@ -318,12 +328,14 @@ class PaperBrokerService:
     def _calculate_open_positions_value(self, account_name: str) -> Decimal:
         positions = self.position_repository.list_open_positions(account_name=account_name)
 
-        return self._money(
-            sum(
-                (position.current_price * position.quantity for position in positions),
-                Decimal("0"),
-            )
-        )
+        total_value = Decimal("0")
+        for position in positions:
+            if position.side == "LONG":
+                total_value += position.current_price * position.quantity
+            else:
+                total_value += (Decimal("2") * position.entry_price - position.current_price) * position.quantity
+
+        return self._money(total_value)
 
     def close_positions_not_in_target(
         self,
@@ -404,11 +416,17 @@ class PaperBrokerService:
 
             if position.side == "LONG":
                 execution_price = self._money(price * (Decimal("1") - self.SLIPPAGE_RATE))
+                raw_realized_pnl = (execution_price - position.entry_price) * position.quantity
             else:
                 execution_price = self._money(price * (Decimal("1") + self.SLIPPAGE_RATE))
+                raw_realized_pnl = (position.entry_price - execution_price) * position.quantity
+                
             gross_notional = self._money(position.quantity * execution_price)
             fee = self._money(gross_notional * self.COMMISSION_RATE)
-            net_recovered = gross_notional - fee
+            
+            # For LONG: margin + pnl = (qty*entry) + (qty*exit - qty*entry) = qty*exit (gross_notional)
+            # For SHORT: margin + pnl = (qty*entry) + (qty*entry - qty*exit)
+            net_recovered = self._money((position.quantity * position.entry_price) + raw_realized_pnl - fee)
             
             # The close_position method records the trade. But wait, closed_position.realized_pnl is calculated inside repository based on exit_price.
             # We must pass execution_price to close_position!
@@ -416,6 +434,7 @@ class PaperBrokerService:
                 position=position,
                 exit_price=execution_price,
                 closed_at=self.time_provider.now(),
+                skip_commit=self.is_backtest,
             )
             
             # Adjust realized PnL to account for exit fee
@@ -518,7 +537,7 @@ class PaperBrokerService:
         timeframe: str,
         cycle_id: int | None = None,
     ) -> PaperExecutionReport:
-        account = self.account_repository.get_by_name(account_name)
+        account = self._bt_account if self.is_backtest else self.account_repository.get_by_name(account_name)
 
         if account is None:
             raise ValueError(f"Paper account not found: {account_name}")
@@ -566,6 +585,7 @@ class PaperBrokerService:
             updated_position = self.position_repository.update_mark_price(
                 position=position,
                 current_price=price,
+                skip_commit=self.is_backtest,
             )
 
             # --- Trailing Stop-Loss Update ---
@@ -574,12 +594,15 @@ class PaperBrokerService:
             if updated_position.side == "LONG":
                 potential_sl = self._money(price * (Decimal("1") - sl_pct))
                 
-                # Only trail the stop loss UPWARDS, and only if the price has moved favorably (above entry)
+                # Only trail the stop loss UPWARDS, and only if the price has moved favorably (above entry + friction)
+                friction = Decimal(str((self.COMMISSION_RATE + self.SLIPPAGE_RATE) * 2))
+                break_even_price = updated_position.entry_price * (Decimal("1") + friction)
                 if updated_position.stop_loss_price is None or potential_sl > updated_position.stop_loss_price:
-                    if price > updated_position.entry_price:
+                    if price > break_even_price:
                         updated_position = self.position_repository.update_stop_loss(
                             position=updated_position,
                             stop_loss_price=potential_sl,
+                            skip_commit=self.is_backtest,
                         )
                         self._log_execution(
                             account_name=account.name,
@@ -601,12 +624,15 @@ class PaperBrokerService:
             else:
                 potential_sl = self._money(price * (Decimal("1") + sl_pct))
                 
-                # Trail the stop loss DOWNWARDS, only if the price has moved favorably (below entry)
+                # Trail the stop loss DOWNWARDS, only if the price has moved favorably (below entry - friction)
+                friction = Decimal(str((self.COMMISSION_RATE + self.SLIPPAGE_RATE) * 2))
+                break_even_price = updated_position.entry_price * (Decimal("1") - friction)
                 if updated_position.stop_loss_price is None or potential_sl < updated_position.stop_loss_price:
-                    if price < updated_position.entry_price:
+                    if price < break_even_price:
                         updated_position = self.position_repository.update_stop_loss(
                             position=updated_position,
                             stop_loss_price=potential_sl,
+                            skip_commit=self.is_backtest,
                         )
                         self._log_execution(
                             account_name=account.name,
@@ -632,19 +658,22 @@ class PaperBrokerService:
                 if position.side == "LONG":
                     execution_price = self._money(price * (Decimal("1") - self.SLIPPAGE_RATE))
                     pnl_pct = float((execution_price - position.entry_price) / position.entry_price * 100)
+                    raw_realized_pnl = (execution_price - position.entry_price) * position.quantity
                 else:
                     execution_price = self._money(price * (Decimal("1") + self.SLIPPAGE_RATE))
                     pnl_pct = float((position.entry_price - execution_price) / position.entry_price * 100)
+                    raw_realized_pnl = (position.entry_price - execution_price) * position.quantity
 
                 gross_notional = self._money(position.quantity * execution_price)
                 fee = self._money(gross_notional * self.COMMISSION_RATE)
-                net_recovered = gross_notional - fee
+                net_recovered = self._money((position.quantity * position.entry_price) + raw_realized_pnl - fee)
                 
                 closed = self.position_repository.close_position(
                     position=updated_position,
                     exit_price=execution_price,
                     closed_at=self.time_provider.now(),
                     close_reason=close_reason,
+                    skip_commit=self.is_backtest,
                 )
                 
                 # Adjust realized PnL to account for exit fee
@@ -653,7 +682,8 @@ class PaperBrokerService:
                 # Return cash to account
                 new_cash = self._money(account.cash_balance + net_recovered)
                 account.cash_balance = new_cash
-                self.db.commit()
+                if not self.is_backtest:
+                    self.db.commit()
 
                 # Log the closure trade
                 side_enum = PaperOrderSide.SELL if position.side == "LONG" else PaperOrderSide.BUY
@@ -759,6 +789,9 @@ class PaperBrokerService:
         cycle_id: int | None = None,
         payload: dict[str, Any] | None = None,
     ) -> None:
+        # In backtest mode, skip writing logs to DB to avoid thousands of flushes
+        if self.is_backtest:
+            return
         log = ExecutionLog(
             account_name=account_name,
             cycle_id=cycle_id,
