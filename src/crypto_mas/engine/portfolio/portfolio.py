@@ -92,6 +92,10 @@ class PortfolioEngine:
                 )
             )
 
+        # Calculate available exposure for new positions
+        retained_exposure = len(retained_symbols) * 0.10
+        available_exposure = max(0.0, self.max_gross_exposure - retained_exposure)
+
         for decision in selected_new:
             # Approximate ATR% from volatility_penalty (which = atr/close * 2)
             atr_pct = decision.score.volatility_penalty / 2.0
@@ -100,13 +104,13 @@ class PortfolioEngine:
             if atr_pct > 0:
                 atr_weight = risk_per_trade / (atr_pct * stop_loss_mult)
             else:
-                atr_weight = self.max_gross_exposure / max(1, len(selected_new))
+                atr_weight = available_exposure / max(1, len(selected_new))
 
             # Score-proportional weight
             if total_score > 0:
-                score_weight = self.max_gross_exposure * decision.score.final_score / total_score
+                score_weight = available_exposure * decision.score.final_score / total_score
             else:
-                score_weight = self.max_gross_exposure / max(1, len(selected_new))
+                score_weight = available_exposure / max(1, len(selected_new))
 
             # Blend: 60% score-proportional, 40% ATR-based, hard cap per position
             target_weight = 0.60 * score_weight + 0.40 * atr_weight
@@ -144,6 +148,14 @@ class PortfolioEngine:
             positions = positions[:len(retained_symbols)] + scaled_new
 
         gross_exposure = round(sum(position.target_weight for position in positions), 6)
+        
+        # Ensure it doesn't slightly exceed 1.0 due to float rounding
+        if gross_exposure > 1.0:
+            scale_down = 1.0 / gross_exposure
+            for pos in positions:
+                pos.target_weight *= scale_down
+            gross_exposure = 1.0
+            
         cash_weight = round(max(0.0, 1.0 - gross_exposure), 10)
 
         return PortfolioTarget(
