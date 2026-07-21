@@ -282,6 +282,7 @@ class InMemoryPositionRepository:
         self._open: dict[str, Any] = {}
         # symbol -> expiry datetime for SL cooldown
         self._sl_cooldowns: dict[str, datetime] = {}
+        self._global_cooldowns: dict[str, datetime] = {}
 
     # ── Bulk-query helpers (O(1) set returns) ─────────────────────────────────
 
@@ -297,6 +298,16 @@ class InMemoryPositionRepository:
     ) -> set[str]:
         now = _to_utc(time_now)
         return {sym for sym, exp in self._sl_cooldowns.items() if now < exp}
+
+    def get_recent_closed_symbols(
+        self,
+        account_name: str,
+        exchange: str,
+        time_now: datetime,
+        cooldown_minutes: int = 60,
+    ) -> set[str]:
+        now = _to_utc(time_now)
+        return {sym for sym, exp in self._global_cooldowns.items() if now < exp}
 
     # ── Standard PositionRepository interface ─────────────────────────────────
 
@@ -406,5 +417,6 @@ class InMemoryPositionRepository:
 
         if close_reason == "STOP_LOSS":
             self._sl_cooldowns[position.symbol] = _to_utc(closed_at) + timedelta(minutes=30)
+        self._global_cooldowns[position.symbol] = _to_utc(closed_at) + timedelta(minutes=60)
 
         return position

@@ -330,11 +330,11 @@ class TradingCycleService:
             pos_repo = PositionRepository(self.db)
         
         open_position_symbols: set[str] = pos_repo.get_open_position_symbols(account_name, exchange_str)
-        cooldown_symbols: set[str] = pos_repo.get_recent_stop_loss_symbols(
+        cooldown_symbols: set[str] = pos_repo.get_recent_closed_symbols(
             account_name=account_name,
             exchange=exchange_str,
             time_now=now,
-            cooldown_minutes=30,
+            cooldown_minutes=60,
         )
         
         for symbol in symbols:
@@ -422,9 +422,9 @@ class TradingCycleService:
                         decision.reason += " | REJECTED: Open Position Exists"
                         
                     elif symbol in cooldown_symbols:
-                        _log("STRATEGY", f"Decision {decision.action.value} for {symbol} REJECTED: Cooldown active (Recent Stop-Loss).", "WARN")
+                        _log("STRATEGY", f"Decision {decision.action.value} for {symbol} REJECTED: Cooldown active (Recently Closed).", "WARN")
                         decision.action = DecisionAction.HOLD
-                        decision.reason += " | REJECTED: Cooldown (30m)"
+                        decision.reason += " | REJECTED: Cooldown (60m)"
 
                 # 2. Modular Risk Architecture (QuantConnect style shields)
                 if decision.action not in (DecisionAction.HOLD, DecisionAction.CLOSE_LONG, DecisionAction.CLOSE_SHORT):

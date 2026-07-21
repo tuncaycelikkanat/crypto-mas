@@ -88,6 +88,25 @@ class PositionRepository:
         )
         return set(self.db.scalars(stmt).all())
 
+    def get_recent_closed_symbols(
+        self,
+        account_name: str,
+        exchange: str,
+        time_now: datetime,
+        cooldown_minutes: int = 60,
+    ) -> set[str]:
+        """Single query: returns the set of ALL symbols closed recently to enforce a global cooldown."""
+        from datetime import timedelta
+        cutoff_time = time_now - timedelta(minutes=cooldown_minutes)
+        stmt = (
+            select(Position.symbol)
+            .where(Position.account_name == account_name)
+            .where(Position.exchange == exchange)
+            .where(Position.status == "CLOSED")
+            .where(Position.closed_at >= cutoff_time)
+        )
+        return set(self.db.scalars(stmt).all())
+
     def create_open_position(
         self,
         account_name: str,
