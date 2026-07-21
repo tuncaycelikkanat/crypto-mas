@@ -51,16 +51,16 @@ class BullTactic(BaseTactic):
             close_factors = []
             should_close = False
             
-            # Rule 1: High RSI (Overbought) + Overextended
-            if rsi_14 > 70.0 and dist_to_ema > 0.015:
+            # Rule 1: Take Profit (High RSI / Overextended)
+            if rsi_14 > 75.0 and dist_to_ema > 0.02:
                 should_close = True
-                close_factors.append(f"RSI={rsi_14:.1f}")
+                close_factors.append(f"RSI_TP={rsi_14:.1f}")
                 close_factors.append(f"EXT={dist_to_ema*100:.2f}%")
                 
-            # Rule 2: Trend Breakdown (ADX died completely)
-            elif adx_14 < 15.0:
+            # Rule 2: Trend Breakdown (Price crosses below EMA50)
+            elif last_price < ema_50:
                 should_close = True
-                close_factors.append(f"ADX_DEATH={adx_14:.1f}")
+                close_factors.append(f"EMA50_BREAK={last_price:.2f}<{ema_50:.2f}")
                 
             if should_close:
                 return TradingDecision(
