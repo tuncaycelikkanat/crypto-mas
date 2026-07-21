@@ -51,8 +51,11 @@ class BullTactic(BaseTactic):
             close_factors = []
             should_close = False
             
+            tp_rsi = params.get("tp_rsi", 75.0)
+            tp_dist_ema = params.get("tp_dist_ema", 0.018)
+            
             # Rule 1: Take Profit (High RSI / Overextended)
-            if rsi_14 > 75.0 and dist_to_ema > 0.02:
+            if rsi_14 > tp_rsi and dist_to_ema > tp_dist_ema:
                 should_close = True
                 close_factors.append(f"RSI_TP={rsi_14:.1f}")
                 close_factors.append(f"EXT={dist_to_ema*100:.2f}%")

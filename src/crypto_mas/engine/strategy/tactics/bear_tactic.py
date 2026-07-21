@@ -52,15 +52,28 @@ class BearTactic(BaseTactic):
             should_close = False
             
             # Rule 1: Low RSI (Oversold) + Overextended downwards
-            if rsi_14 < 30.0 and dist_to_ema < -0.015:
+            tp_rsi = params.get("tp_rsi", 25.0)
+            tp_dist_ema = params.get("tp_dist_ema", -0.018)
+            
+            if rsi_14 < tp_rsi and dist_to_ema < tp_dist_ema:
                 should_close = True
                 close_factors.append(f"RSI={rsi_14:.1f}")
                 close_factors.append(f"EXT={dist_to_ema*100:.2f}%")
                 
-            # Rule 2: Trend Breakdown (ADX died completely)
-            elif adx_14 < 15.0:
+            # Rule 2: Trend Breakdown (Price crosses above EMA50 robustly)
+            deep_break = last_price > (ema_50 * 1.005)
+            
+            prev_close = snapshots[-2].features_json.get("close") if len(snapshots) >= 2 else None
+            prev_ema50 = snapshots[-2].features_json.get("ema_50") if len(snapshots) >= 2 else None
+            
+            consecutive_break = False
+            if prev_close and prev_ema50:
+                if prev_close > prev_ema50 and last_price > ema_50:
+                    consecutive_break = True
+                    
+            if deep_break or consecutive_break:
                 should_close = True
-                close_factors.append(f"ADX_DEATH={adx_14:.1f}")
+                close_factors.append(f"EMA50_BREAK={last_price:.2f}>{ema_50:.2f}")
                 
             if should_close:
                 return TradingDecision(
@@ -115,6 +128,9 @@ class BearTactic(BaseTactic):
         # ── Gate 1: Trend Identification ────────────────────────
         if adx_14 < min_adx:
             return None
+            
+        if rsi_14 < 35.0:
+            return None  # Prevent entering short at oversold bottoms
             
         factors.append(f"TREND(ADX={adx_14:.1f})")
 
