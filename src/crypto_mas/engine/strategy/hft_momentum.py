@@ -12,6 +12,7 @@ All 5 factors must agree for a HIGH-confidence trade.
 Partial agreement → lower confidence → smaller position.
 """
 from datetime import UTC, datetime
+from typing import Any
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.regime import MarketRegime, RegimeSnapshot
@@ -39,6 +40,7 @@ class HFTMomentumStrategy(BaseStrategy):
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
         risk_level: int = 50,
+        **kwargs: Any
     ) -> TradingDecision | None:
         store = RealtimeMetricsStore()
 

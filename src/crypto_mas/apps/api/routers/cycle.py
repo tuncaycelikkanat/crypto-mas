@@ -37,7 +37,7 @@ async def run_trading_cycle(
     try:
         provider = get_market_data_provider(request.exchange)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
         
     service = TradingCycleService(db=db, market_provider=provider)
     
@@ -61,4 +61,4 @@ async def run_trading_cycle(
             cycle_pnl=float(cycle.cycle_pnl),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Cycle execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Cycle execution failed: {str(e)}") from e

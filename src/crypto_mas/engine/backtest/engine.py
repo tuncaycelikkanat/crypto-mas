@@ -13,11 +13,12 @@ from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 logger = logging.getLogger("backtest_engine")
 
 class Position:
-    def __init__(self, symbol: str, entry_price: float, quantity: float, entry_time: datetime):
+    def __init__(self, symbol: str, entry_price: float, quantity: float, entry_time: datetime, open_fee: float = 0.0):
         self.symbol = symbol
         self.entry_price = entry_price
         self.quantity = quantity
         self.entry_time = entry_time
+        self.open_fee = open_fee
 
 class BacktestEngine:
     def __init__(
@@ -140,7 +141,7 @@ class BacktestEngine:
             fee = trade_amount * self.fee_rate
             
             self.balance -= (trade_amount + fee)
-            self.positions[symbol] = Position(symbol, execution_price, quantity, current_time)
+            self.positions[symbol] = Position(symbol, execution_price, quantity, current_time, open_fee=fee)
             
             self.trades.append({
                 "time": current_time,
@@ -163,7 +164,7 @@ class BacktestEngine:
         
         self.balance += (notional - fee)
         
-        pnl = notional - fee - (pos.quantity * pos.entry_price)
+        pnl = notional - fee - (pos.quantity * pos.entry_price) - pos.open_fee
         
         self.trades.append({
             "time": current_time,
@@ -177,13 +178,14 @@ class BacktestEngine:
         })
         
     def _generate_report(self, symbol: str, strategy_name: str) -> dict[str, Any]:
-        closed_trades = [t for t in self.trades if t['type'] == 'SELL']
+        closed_trades = [t for t in self.trades if t['type'] == 'SELL' and t['symbol'] == symbol]
         
         winning_trades = [t for t in closed_trades if t['realized_pnl'] > 0]
         losing_trades = [t for t in closed_trades if t['realized_pnl'] <= 0]
         
         total_profit = sum(t['realized_pnl'] for t in winning_trades)
         total_loss = abs(sum(t['realized_pnl'] for t in losing_trades))
+        total_pnl = total_profit - total_loss
         
         profit_factor = (total_profit / total_loss) if total_loss > 0 else float('inf')
         win_rate = (len(winning_trades) / len(closed_trades)) * 100 if closed_trades else 0.0
@@ -206,9 +208,9 @@ class BacktestEngine:
             "symbol": symbol,
             "strategy": strategy_name,
             "initial_balance": self.initial_balance,
-            "final_balance": self.balance,
-            "total_pnl": self.balance - self.initial_balance,
-            "pnl_pct": ((self.balance - self.initial_balance) / self.initial_balance) * 100,
+            "final_balance": self.initial_balance + total_pnl,
+            "total_pnl": total_pnl,
+            "pnl_pct": (total_pnl / self.initial_balance) * 100,
             "total_trades": len(closed_trades),
             "win_rate": win_rate,
             "profit_factor": profit_factor,

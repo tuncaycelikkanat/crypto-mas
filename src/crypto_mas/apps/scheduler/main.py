@@ -1,12 +1,8 @@
 import asyncio
 import logging
-
-import uvloop
-
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
 from datetime import UTC
 
+import uvloop
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -18,6 +14,8 @@ from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
 from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 setup_logging(env="dev")  # Production'da env var'dan okunabilir
 logger = logging.getLogger("crypto_mas.scheduler")

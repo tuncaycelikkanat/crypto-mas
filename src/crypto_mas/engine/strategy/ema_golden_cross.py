@@ -5,6 +5,8 @@ Uses RSI > 50 as confirmation. Designed for long-term position holding.
 """
 from datetime import UTC, datetime
 
+from typing import Any
+
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.regime import MarketRegime, RegimeSnapshot
 from crypto_mas.engine.scoring import AssetScore
@@ -27,6 +29,7 @@ class EMAGoldenCrossStrategy(BaseStrategy):
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
         risk_level: int = 50,
+        **kwargs: Any
     ) -> TradingDecision | None:
         if not snapshots or len(snapshots) < 5:
             return None

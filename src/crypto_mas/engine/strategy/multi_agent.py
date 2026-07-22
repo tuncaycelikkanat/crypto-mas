@@ -1,3 +1,5 @@
+from typing import Any
+
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.math.jit_calculators import jit_calculate_confidence
 from crypto_mas.engine.regime import MarketRegime
@@ -33,6 +35,7 @@ class MultiAgentStrategy(BaseStrategy):
         risk_level: int = 50,
         is_open: bool = False,
         use_regime_shield: bool = True,
+        **kwargs: Any
     ) -> TradingDecision | None:
         signal = self.signal_agent.generate(
             exchange=exchange,

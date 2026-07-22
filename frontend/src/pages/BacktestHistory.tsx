@@ -214,6 +214,7 @@ export const BacktestHistory: React.FC = () => {
                 <th>Risk</th>
                 <th>PnL</th>
                 <th>Win Rate</th>
+                <th>Trades</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -251,6 +252,9 @@ export const BacktestHistory: React.FC = () => {
                       <td style={{ color: 'var(--text-primary)' }}>
                         {((job.win_rate || 0) * 100).toFixed(1)}%
                       </td>
+                      <td style={{ color: 'var(--text-primary)' }}>
+                        {job.total_trades || 0}
+                      </td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button 
@@ -279,7 +283,7 @@ export const BacktestHistory: React.FC = () => {
                             initial={{ opacity: 0, height: 0 }} 
                             animate={{ opacity: 1, height: 'auto' }} 
                             exit={{ opacity: 0, height: 0 }}
-                            className="grid-cols-3" 
+                            className="grid-cols-4" 
                             style={{ gap: '16px', background: 'var(--bg-base)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}
                           >
                             <div>
@@ -298,6 +302,12 @@ export const BacktestHistory: React.FC = () => {
                               <div className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Net PnL (Net)</div>
                               <div className="stat-value" style={{ color: netPnL >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                                 ${netPnL.toFixed(2)}
+                              </div>
+                            </div>
+                            <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: '16px' }}>
+                              <div className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Max Drawdown</div>
+                              <div className="stat-value" style={{ color: 'var(--danger)' }}>
+                                -{((job.max_drawdown || 0) * 100).toFixed(2)}%
                               </div>
                             </div>
                           </motion.div>

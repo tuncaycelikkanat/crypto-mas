@@ -103,7 +103,7 @@ class WalkForwardEngine:
         from crypto_mas.services.market_data_service.provider_factory import (
             get_market_data_provider,
         )
-        from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
+        from crypto_mas.services.trading_cycle_service.utils import get_timedelta
 
         result = WalkForwardResult(n_folds=n_folds)
 
@@ -111,7 +111,7 @@ class WalkForwardEngine:
         provider = get_market_data_provider(exchange)
         fetcher = HistoricalFetcherService(provider=provider, db=self.db)
 
-        delta = TradingCycleService._get_timedelta(timeframe)
+        delta = get_timedelta(timeframe)
         warmup_start = start_time - delta * 60
 
         fetch_symbols = list(set(symbols + ["BTCUSDT"])) if use_btc_shield else list(symbols)
@@ -133,7 +133,7 @@ class WalkForwardEngine:
         }
         htf = htf_map.get(timeframe)
         if htf and use_htf_shield:
-            htf_warmup = start_time - TradingCycleService._get_timedelta(htf) * 60
+            htf_warmup = start_time - get_timedelta(htf) * 60
             await fetcher.backfill_universe(
                 symbols=fetch_symbols,
                 timeframe=htf,

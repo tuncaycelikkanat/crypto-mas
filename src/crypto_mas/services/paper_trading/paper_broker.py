@@ -31,10 +31,9 @@ class PaperBrokerService:
     COMMISSION_RATE = Decimal("0.0002") # 0.02% Futures Maker limit fee
     SLIPPAGE_RATE = Decimal("0.0002")  # 0.02% Limit order slippage/execution spread
 
-    # Max risk per trade: 2% of current equity.
-    # This prevents the compounding bug where a growing balance leads to
-    # astronomically large positions that are unrealistic in a real market.
-    MAX_RISK_PER_TRADE = Decimal("0.02")
+    # Max risk per trade: 100% of current equity.
+    # We now rely entirely on the Portfolio Engine (Allocator) for dynamic position sizing.
+    MAX_RISK_PER_TRADE = Decimal("1.00")
 
     def __init__(
         self,
@@ -107,6 +106,7 @@ class PaperBrokerService:
                 exchange=target.exchange.value,
                 symbol=target_position.symbol,
                 timeframe=target.timeframe.value,
+                end_time=self.time_provider.now(),
             )
 
             price = self._extract_close_price(latest_snapshot)
@@ -604,8 +604,26 @@ class PaperBrokerService:
                 skip_commit=self.is_backtest,
             )
 
-            # --- Trailing Stop-Loss Update ---
-            sl_pct = Decimal(str(self.SL_PCT.get(self.strategy_mode, 0.03)))
+            # --- Dynamic ATR-based Trailing Stop-Loss Update ---
+            atr_14 = latest_snapshot.features_json.get("atr_14") if latest_snapshot else None
+            
+            if atr_14 and float(atr_14) > 0:
+                # Use a 2.0x ATR multiplier for the base trailing stop distance
+                sl_pct = Decimal(str((float(atr_14) / float(price)) * 2.0))
+            else:
+                sl_pct = Decimal(str(self.SL_PCT.get(self.strategy_mode, 0.03)))
+                
+            # --- Daralan (Tightening) Stop Mantığı ---
+            # İşlem kâra geçtikçe stop mesafesini daralt (Kârı koru)
+            if updated_position.side == "LONG":
+                current_pnl_pct = (price - updated_position.entry_price) / updated_position.entry_price
+            else:
+                current_pnl_pct = (updated_position.entry_price - price) / updated_position.entry_price
+                
+            if current_pnl_pct > Decimal("0.02"):     # %2'den fazla kâr varsa
+                sl_pct = sl_pct * Decimal("0.5")      # Stop mesafesini yarı yarıya daralt (ATR x 1.0)
+            elif current_pnl_pct > Decimal("0.01"):   # %1'den fazla kâr varsa
+                sl_pct = sl_pct * Decimal("0.75")     # Stop mesafesini %25 daralt (ATR x 1.5)
             
             if updated_position.side == "LONG":
                 potential_sl = self._money(price * (Decimal("1") - sl_pct))

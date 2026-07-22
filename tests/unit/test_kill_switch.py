@@ -61,7 +61,7 @@ async def test_kill_switch_triggered_on_stale_data(db_session, test_account):
         time_provider=time_provider,
     )
     
-    service.feature_service = MagicMock()
+    service.market_data_orchestrator.feature_service = MagicMock()
     
     # Simulate a stale snapshot
     stale_time = now_time - timedelta(minutes=90) # 1h timeframe + 15m delay = 75m max. 90m is stale.
@@ -76,6 +76,8 @@ async def test_kill_switch_triggered_on_stale_data(db_session, test_account):
     
     service.feature_snapshot_repository = MagicMock()
     service.feature_snapshot_repository.list_by_symbol.return_value = [stale_snapshot]
+    service.strategy_orchestrator.feature_snapshot_repository = service.feature_snapshot_repository
+    service.market_data_orchestrator.feature_snapshot_repository = service.feature_snapshot_repository
     
     with pytest.raises(Exception, match="STALE DATA DETECTED"):
         await service.run_cycle(
@@ -104,7 +106,7 @@ async def test_kill_switch_passes_on_fresh_data(db_session, test_account):
         time_provider=time_provider,
     )
     
-    service.feature_service = MagicMock()
+    service.market_data_orchestrator.feature_service = MagicMock()
     
     # Simulate fresh snapshot
     fresh_time = now_time - timedelta(minutes=30) # 1h timeframe + 15m = 75m max. 30m is fresh.
@@ -119,6 +121,8 @@ async def test_kill_switch_passes_on_fresh_data(db_session, test_account):
     
     service.feature_snapshot_repository = MagicMock()
     service.feature_snapshot_repository.list_by_symbol.return_value = [fresh_snapshot]
+    service.strategy_orchestrator.feature_snapshot_repository = service.feature_snapshot_repository
+    service.market_data_orchestrator.feature_snapshot_repository = service.feature_snapshot_repository
     
     # We also need to mock multi_agent to prevent errors later in the cycle
     service.multi_agent = MagicMock()

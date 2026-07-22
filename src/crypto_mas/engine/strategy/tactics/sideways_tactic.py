@@ -37,7 +37,7 @@ class SidewaysTactic(BaseTactic):
         bb_upper = features.get("bb_upper")
         bb_lower = features.get("bb_lower")
         
-        if None in (last_price, rsi_14, bb_upper, bb_lower):
+        if last_price is None or rsi_14 is None or bb_upper is None or bb_lower is None:
             return None
 
         # --- Exit Logic (if position is already open) ---
@@ -99,8 +99,8 @@ class SidewaysTactic(BaseTactic):
 
         # --- Parameters ---
         # Sideways markets require wider RSI extremes to avoid chop
-        rsi_oversold = params.get("rsi_oversold", 30.0)
-        rsi_overbought = params.get("rsi_overbought", 70.0)
+        rsi_oversold = params.get("rsi_oversold", 26.0)
+        rsi_overbought = params.get("rsi_overbought", 62.0)
         min_confidence = params.get("min_confidence", 0.70)
         
         # In sideways, we want tighter TP (revert to mean) and wider SL (allow chop)

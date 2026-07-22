@@ -35,11 +35,14 @@ def test_start_bot_symbols_none():
     service._scheduler.get_job.return_value = None # Not running
     service._scheduler.get_jobs.return_value = []
     
-    service._ws_client = MagicMock()
+    mock_ws = MagicMock()
+    service._event_service = MagicMock()
+    service._event_service.get_ws_client.return_value = mock_ws
+    service._event_service.is_bot_running.return_value = False
     
     service.start_bot("bot_1", symbols=None)
     
-    service._ws_client.add_subscription.assert_called_once_with("BTCUSDT", "trade")
+    mock_ws.add_subscription.assert_called_once_with("BTCUSDT", "trade")
 
 @pytest.mark.asyncio
 @patch("crypto_mas.services.scheduler_service.SessionLocal")

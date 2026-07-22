@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Any, Protocol
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.engine.strategy.schemas import TradingDecision
@@ -13,9 +13,7 @@ class BaseStrategy(Protocol):
         timeframe: Timeframe,
         snapshots: list[FeatureSnapshot],
         risk_level: int = 50,
-        htf_snapshots: list[FeatureSnapshot] | None = None,
-        config: dict | None = None,
-        is_open: bool = False,
+        **kwargs: Any,
     ) -> TradingDecision | None:
         """
         Calculates a trading decision given historical feature snapshots.

@@ -38,8 +38,15 @@ class BearTactic(BaseTactic):
         adx_14 = features.get("adx_14")
         rsi_14 = features.get("rsi_14")
         stoch_k = features.get("stoch_rsi_k")
+        rvol = features.get("rvol")
+        macd_hist = features.get("macd_hist")
         
-        if None in (last_price, ema_20, ema_50, adx_14, rsi_14):
+        # Get previous macd to check momentum
+        prev_macd_hist = None
+        if len(snapshots) > 1:
+            prev_macd_hist = snapshots[-2].features_json.get("macd_hist")
+        
+        if last_price is None or ema_20 is None or ema_50 is None or adx_14 is None or rsi_14 is None:
             return None
 
         # --- Exit Logic (if position is already open) ---
@@ -52,8 +59,9 @@ class BearTactic(BaseTactic):
             should_close = False
             
             # Rule 1: Low RSI (Oversold) + Overextended downwards
-            tp_rsi = params.get("tp_rsi", 25.0)
-            tp_dist_ema = params.get("tp_dist_ema", -0.018)
+            # Rule 1: Low RSI (Oversold) + Overextended downwards
+            tp_rsi = params.get("tp_rsi", 21.0)
+            tp_dist_ema = params.get("tp_dist_ema", -0.016)
             
             if rsi_14 < tp_rsi and dist_to_ema < tp_dist_ema:
                 should_close = True
@@ -111,10 +119,10 @@ class BearTactic(BaseTactic):
             )
 
         # --- Parameters ---
-        min_adx = params.get("min_adx", 25.0)
-        min_dist_ema = params.get("min_dist_ema", -0.006)
-        max_dist_ema = params.get("max_dist_ema", 0.012)
-        rsi_threshold = params.get("rsi_threshold", 58.0)
+        min_adx = params.get("min_adx", 22.0)
+        min_dist_ema = params.get("min_dist_ema", 0.014)
+        max_dist_ema = params.get("max_dist_ema", 0.030)
+        rsi_threshold = params.get("rsi_threshold", 50.0)
         stoch_threshold = params.get("stoch_threshold", 80.0)
         min_confidence = params.get("min_confidence", 0.55)
         
@@ -140,34 +148,63 @@ class BearTactic(BaseTactic):
         if dist_to_ema < min_dist_ema or dist_to_ema > max_dist_ema:
             return None
             
+        # ── Gate 2.1: Volume Filter (Don't short squeezes) ──────
+        max_rvol_pullback = params.get("max_rvol_pullback", 1.5)
+        if rvol is not None and rvol > max_rvol_pullback:
+            # High volume pump. Do not catch rising knife.
+            return None
+            
+        # ── Gate 2.2: Momentum Confirmation (MACD) ──────────────
+        # Only short if MACD histogram is improving (or at least not rising sharper)
+        if macd_hist is not None and prev_macd_hist is not None:
+            if macd_hist > 0 and macd_hist > prev_macd_hist:
+                # Momentum is still accelerating upwards
+                return None
+            
         factors.append(f"SHORT_PB({dist_to_ema*100:.2f}%)")
-        confidence += 0.55
+        confidence += 0.40  # Base confidence (C-Grade)
 
-        # ── Gate 3: Overbought Momentum ─────────────────────────
+        # ── Gate 3: Overbought Momentum & Bonuses ───────────────
         if rsi_14 > rsi_threshold:
-            bonus = min(0.25, (rsi_14 - rsi_threshold) * 0.015)
-            confidence += 0.10 + bonus
             factors.append(f"RSI={rsi_14:.1f}")
+            # If deeply overbought, give massive confidence boost
+            if rsi_14 > 60.0:
+                confidence += 0.20
+            else:
+                confidence += 0.10
         elif stoch_k is not None and stoch_k > stoch_threshold:
-            bonus = min(0.25, (stoch_k - stoch_threshold) * 0.015)
-            confidence += 0.10 + bonus
             factors.append(f"STOCH={stoch_k:.1f}")
+            if stoch_k > 80.0:
+                confidence += 0.15
+            else:
+                confidence += 0.05
         else:
             return None
             
-        # ── Bonus Factors (Scalping Logic) ────────────────────────
+        # ── Bonus Factors (A-Grade Boosters) ────────────────────
+        # 1. MACD strong deterioration
+        if macd_hist is not None and prev_macd_hist is not None:
+            if macd_hist < prev_macd_hist * 1.5 or macd_hist < 0:
+                confidence += 0.15
+                factors.append("MACD_DUMP")
+
+        # 2. Volume confirmation
+        if rvol is not None and 1.0 < rvol <= max_rvol_pullback:
+            confidence += 0.10
+            factors.append(f"RVOL={rvol:.1f}")
+
         from crypto_mas.engine.strategy.realtime_metrics import RealtimeMetricsStore
         store = RealtimeMetricsStore()
         
         imbalance = store.get_metric(symbol, "imbalance", 0.5)
         if imbalance < 0.40:
-            confidence += 0.15
-            factors.append(f"TF_IMB={imbalance*100:.1f}%")
+            confidence += 0.10
+            factors.append(f"TF_IMB={imbalance*100:.0f}%")
             
         depth_imbalance = store.get_metric(symbol, "depth_imbalance", 0.5)
         if depth_imbalance < 0.45:
             confidence += 0.10
-            factors.append(f"DEPTH={depth_imbalance*100:.1f}%")
+            factors.append(f"DEPTH={depth_imbalance*100:.0f}%")
 
         confidence = max(0.0, min(confidence, 0.99))
 

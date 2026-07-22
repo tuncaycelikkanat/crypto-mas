@@ -40,7 +40,7 @@ class RegimeEngine:
         missing = [k for k, v in required_features.items() if v is None]
 
         if missing:
-            logger.error(f"[{symbol}] Regime UNKNOWN because missing features: {missing}. Available keys: {list(features.keys())}")
+            logger.debug(f"[{symbol}] Regime UNKNOWN because missing features: {missing}. Available keys: {list(features.keys())}")
             return RegimeSnapshot(
                 exchange=exchange,
                 symbol=symbol,

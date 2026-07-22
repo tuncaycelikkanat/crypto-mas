@@ -13,6 +13,7 @@ from crypto_mas.services.market_data_service.historical_fetcher import Historica
 from crypto_mas.services.market_data_service.provider_factory import get_market_data_provider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
+from crypto_mas.services.trading_cycle_service.utils import get_timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ class BacktestEngineService:
             self.db.commit()
             
             # Also backfill an extra 60 periods before start_time so features can warm up!
-            delta = TradingCycleService._get_timedelta(timeframe)
+            delta = get_timedelta(timeframe)
             warmup_start = start_time - delta * 60
             
             # Add BTC to fetch list for shield
@@ -115,7 +116,7 @@ class BacktestEngineService:
             htf = htf_map.get(timeframe)
             if htf and use_htf_shield:
                 logger.info(f"[{job_id}] Backfilling HTF ({htf.value}) historical data...")
-                htf_warmup_start = start_time - TradingCycleService._get_timedelta(htf) * 60
+                htf_warmup_start = start_time - get_timedelta(htf) * 60
                 await fetcher.backfill_universe(
                     symbols=fetch_symbols,
                     timeframe=htf,

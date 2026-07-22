@@ -142,8 +142,8 @@ def test_paper_broker_closes_positions_not_in_target(db_session: Session) -> Non
     assert len(report.executed) == 1
     assert report.executed[0].symbol == "BTCUSDT"
     assert report.executed[0].status == PaperExecutionStatus.EXECUTED
-    assert report.ending_cash == pytest.approx(10019.8, abs=0.1)
-    assert report.ending_equity == pytest.approx(10019.8, abs=0.1)
+    assert report.ending_cash == pytest.approx(10297.42, abs=0.1)
+    assert report.ending_equity == pytest.approx(10297.42, abs=0.1)
 
     positions = PositionRepository(db_session).list_open_positions("default-paper")
 
@@ -152,5 +152,5 @@ def test_paper_broker_closes_positions_not_in_target(db_session: Session) -> Non
     account = PaperAccountRepository(db_session).get_by_name("default-paper")
 
     assert account is not None
-    assert float(account.cash_balance) == pytest.approx(10019.8, abs=0.1)
-    assert float(account.equity) == pytest.approx(10019.8, abs=0.1)
+    assert float(account.cash_balance) == pytest.approx(10297.42, abs=0.1)
+    assert float(account.equity) == pytest.approx(10297.42, abs=0.1)

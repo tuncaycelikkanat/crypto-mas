@@ -121,8 +121,8 @@ async def test_run_cycle_exception_handling(db_session: Session, test_account: P
     service = TradingCycleService(db=db_session, market_provider=provider, time_provider=time_provider)
     
     # We must mock feature_service to avoid real feature calculation
-    service.feature_service = MagicMock()
-    service.feature_service.calculate_and_store.side_effect = Exception("Crash inside cycle")
+    service.market_data_orchestrator.feature_service = MagicMock()
+    service.market_data_orchestrator.feature_service.calculate_and_store.side_effect = Exception("Crash inside cycle")
     
     with pytest.raises(Exception, match="Crash inside cycle"):
         await service.run_cycle(

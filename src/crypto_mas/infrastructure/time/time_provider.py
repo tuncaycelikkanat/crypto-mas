@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 
@@ -22,8 +22,6 @@ class FixedTimeProvider:
 
     def now(self) -> datetime:
         return self.fixed_time
-
-from datetime import timedelta
 
 
 class SimulatedTimeProvider:

@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+
 
 from crypto_mas.apps.api.routers.analytics import router as analytics_router
 from crypto_mas.apps.api.routers.backtest import router as backtest_router

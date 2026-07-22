@@ -28,6 +28,7 @@ class PortfolioEngine:
         timeframe: Timeframe,
         decisions: list[TradingDecision],
         open_positions: list[str] | None = None,
+        risk_level: int = 100,
     ) -> PortfolioTarget:
         open_symbols = set(open_positions) if open_positions else set()
         
@@ -71,10 +72,6 @@ class PortfolioEngine:
                 created_at=self.time_provider.now(),
             )
 
-        total_score = sum(decision.score.final_score for decision in selected_new)
-
-        risk_per_trade = 0.01   # 1% of portfolio per position
-        stop_loss_mult = 2.0
 
         positions = []
         
@@ -96,31 +93,41 @@ class PortfolioEngine:
         retained_exposure = len(retained_symbols) * 0.10
         available_exposure = max(0.0, self.max_gross_exposure - retained_exposure)
 
+        # Scale base A-Grade weight according to UI risk_level (0-200)
+        risk_level_clamped = max(0, min(risk_level, 200))
+        if risk_level_clamped <= 100:
+            a_weight_base = 0.05 + (0.15 * (risk_level_clamped / 100.0))
+        else:
+            a_weight_base = 0.20 + (0.30 * ((risk_level_clamped - 100.0) / 100.0))
+
         for decision in selected_new:
-            # Approximate ATR% from volatility_penalty (which = atr/close * 2)
-            atr_pct = decision.score.volatility_penalty / 2.0
-
-            # ATR-based weight
-            if atr_pct > 0:
-                atr_weight = risk_per_trade / (atr_pct * stop_loss_mult)
+            conf = decision.confidence
+            
+            # --- Dinamik Güven Skoru Kasa Yönetimi (Dynamic Position Sizing) ---
+            if conf >= 0.85:
+                # A-Grade: Highest conviction (MACD Surge, Deep RSI, Strong RVOL)
+                raw_weight = a_weight_base
+                grade = f"A-Grade ({raw_weight*100:.1f}%)"
+            elif conf >= 0.70:
+                # B-Grade: Standard conviction (RSI & Indicators align)
+                raw_weight = a_weight_base / 2.0
+                grade = f"B-Grade ({raw_weight*100:.1f}%)"
             else:
-                atr_weight = available_exposure / max(1, len(selected_new))
+                # C-Grade: Minimum conviction (Base gates passed)
+                raw_weight = a_weight_base / 4.0
+                grade = f"C-Grade ({raw_weight*100:.1f}%)"
 
-            # Score-proportional weight
-            if total_score > 0:
-                score_weight = available_exposure * decision.score.final_score / total_score
-            else:
-                score_weight = available_exposure / max(1, len(selected_new))
-
-            # Blend: 60% score-proportional, 40% ATR-based, hard cap per position
-            target_weight = 0.60 * score_weight + 0.40 * atr_weight
-            target_weight = min(target_weight, 0.25)
+            # Check if we have enough available exposure for this requested weight
+            target_weight = min(raw_weight, available_exposure)
+            
+            # Reduce available exposure for the next candidate
+            available_exposure = max(0.0, available_exposure - target_weight)
 
             positions.append(
                 self._to_target_position(
                     decision=decision,
                     target_weight=target_weight,
-                    reason="Weight: 60% score-proportional + 40% ATR-based, capped at 0.25.",
+                    reason=f"Weight: Dynamic {grade} based on Confidence {conf:.2f}.",
                 )
             )
 

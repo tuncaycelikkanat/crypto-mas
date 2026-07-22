@@ -5,11 +5,10 @@ from typing import Any
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from crypto_mas.engine.strategy.event_engine import EventEngine
 from crypto_mas.infrastructure.db.session import SessionLocal
+from crypto_mas.services.event_driven_service import EventDrivenService
 from crypto_mas.services.market_data_service.provider_factory import get_market_data_provider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
-from crypto_mas.services.market_data_service.websocket_client import BinanceWebsocketClient
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
 
 logger = logging.getLogger("crypto_mas.scheduler_service")
@@ -25,32 +24,26 @@ MODE_CONFIG: dict[str, tuple[str, str, int]] = {
 class SchedulerService:
     def __init__(self):
         self._scheduler = AsyncIOScheduler(timezone=UTC)
-        
-        # Phase 4: Event Driven Architecture
-        self._ws_client = BinanceWebsocketClient()
-        self._event_engine = EventEngine()
-        self._ws_client.add_callback(self._event_engine.process_websocket_message)
-        self._event_bots = {} # Track event-driven bots
+        self._event_service = EventDrivenService()
 
     def start(self):
         if not self._scheduler.running:
             self._scheduler.start()
-            self._ws_client.start()
-            logger.info("Scheduler Service and WS Client started.")
+            self._event_service.start()
+            logger.info("Scheduler Service started.")
 
     def shutdown(self):
         if self._scheduler.running:
             self._scheduler.shutdown()
-            self._ws_client.stop()
-            logger.info("Scheduler Service and WS Client shut down.")
+            self._event_service.shutdown()
+            logger.info("Scheduler Service shut down.")
 
     def is_bot_running(self, bot_id: str) -> bool:
         if not self._scheduler.running:
             return False
-        return self._scheduler.get_job(bot_id) is not None or bot_id in self._event_bots
+        return self._scheduler.get_job(bot_id) is not None or self._event_service.is_bot_running(bot_id)
 
     def get_status(self) -> dict[str, Any]:
-        """Returns a list of all active bots."""
         if not self._scheduler.running:
             return {"bots": []}
             
@@ -69,17 +62,9 @@ class SchedulerService:
                 "risk_level": args[3] if len(args) > 3 else 50,
             })
             
-        for bot_id, bot_data in self._event_bots.items():
-            active_bots.append({
-                "bot_id": bot_id,
-                "status": "RUNNING",
-                "next_run_time": "EVENT_DRIVEN",
-                "trigger": "WEBSOCKET_HFT",
-                "symbols": bot_data.get("symbols", []),
-                "mode": bot_data.get("mode", "scalping"),
-                "exchange": bot_data.get("exchange", "BINANCE"),
-                "risk_level": bot_data.get("risk_level", 50),
-            })
+        # Merge with event driven bots
+        event_status = self._event_service.get_status()
+        active_bots.extend(event_status.get("bots", []))
             
         return {"bots": active_bots}
 
@@ -98,22 +83,13 @@ class SchedulerService:
         if symbols is None:
             symbols = ["BTCUSDT"]
 
-        # Resolve mode config
         mode = mode.lower() if mode else "swing"
         _, _, default_interval = MODE_CONFIG.get(mode, MODE_CONFIG["swing"])
         effective_interval = interval_seconds if interval_seconds is not None else default_interval
 
         if mode == "scalping" and "AUTO_GAINERS" not in symbols and "HIDDEN_GEMS" not in symbols:
-            # Event-Driven HFT approach: No APScheduler polling.
-            self._event_bots[bot_id] = {
-                "symbols": symbols,
-                "mode": mode,
-                "exchange": exchange.upper(),
-                "risk_level": risk_level,
-            }
-            logger.info(f"Bot {bot_id} started (EVENT_DRIVEN) | mode={mode} | exchange={exchange.upper()} | {len(symbols)} symbols | risk={risk_level}")
+            self._event_service.start_bot(bot_id, symbols, mode, exchange, risk_level)
         else:
-            # Polling approach
             interval_trigger = IntervalTrigger(seconds=effective_interval, timezone=UTC)
             self._scheduler.add_job(
                 self._run_cycle_task,
@@ -124,49 +100,31 @@ class SchedulerService:
                 replace_existing=True,
             )
             logger.info(f"Bot {bot_id} started (POLLING) | mode={mode} | exchange={exchange.upper()} | interval={effective_interval}s | {len(symbols)} symbols | risk={risk_level}")
+            
+            for sym in symbols:
+                if sym not in ("AUTO_GAINERS", "HIDDEN_GEMS"):
+                    self._event_service.get_ws_client().add_subscription(sym, "trade")
         
-        # Add to real-time WS tracking for Micro-structure Volume Spikes (for both, but essential for scalping)
-        for sym in symbols:
-            if sym not in ("AUTO_GAINERS", "HIDDEN_GEMS"):
-                self._ws_client.add_subscription(sym, "trade")
-
         return self.get_status()
 
     def stop_bot(self, bot_id: str) -> dict[str, Any]:
         if self.is_bot_running(bot_id):
-            symbols_to_remove = []
-            
-            if bot_id in self._event_bots:
-                symbols_to_remove = self._event_bots[bot_id].get("symbols", [])
-                del self._event_bots[bot_id]
-                logger.info(f"Bot {bot_id} (EVENT_DRIVEN) stopped.")
+            if self._event_service.is_bot_running(bot_id):
+                self._event_service.stop_bot(bot_id)
             else:
                 job = self._scheduler.get_job(bot_id)
-                if job and job.args:
-                    symbols_to_remove = job.args[0]
+                symbols_to_remove = job.args[0] if job and job.args else []
                 self._scheduler.remove_job(bot_id)
                 logger.info(f"Bot {bot_id} (POLLING) stopped.")
-                
-            # Remove subscriptions if they aren't used by other bots (simplified approach: just unsubscribe, but in a real app we would ref-count them)
-            # For this exercise, we will just remove them, though a production app needs a ref-counter.
-            for sym in symbols_to_remove:
-                self._ws_client.remove_subscription(sym, "trade")
+                for sym in symbols_to_remove:
+                    self._event_service.get_ws_client().remove_subscription(sym, "trade")
                 
         return self.get_status()
 
     def update_symbols(self, bot_id: str, symbols: list[str]) -> dict[str, Any]:
         if self.is_bot_running(bot_id):
-            if bot_id in self._event_bots:
-                old_symbols = self._event_bots[bot_id].get("symbols", [])
-                self._event_bots[bot_id]["symbols"] = symbols
-                # Diffing subscriptions
-                for sym in old_symbols:
-                    if sym not in symbols:
-                        self._ws_client.remove_subscription(sym, "trade")
-                for sym in symbols:
-                    if sym not in old_symbols:
-                        self._ws_client.add_subscription(sym, "trade")
-                logger.info(f"Bot {bot_id} updated | new symbols: {len(symbols)}")
+            if self._event_service.is_bot_running(bot_id):
+                self._event_service.update_symbols(bot_id, symbols)
             else:
                 job = self._scheduler.get_job(bot_id)
                 if job and job.args:
@@ -174,27 +132,23 @@ class SchedulerService:
                     old_symbols = current_args[0]
                     current_args[0] = symbols
                     self._scheduler.modify_job(bot_id, args=current_args)
-                    
                     for sym in old_symbols:
                         if sym not in symbols:
-                            self._ws_client.remove_subscription(sym, "trade")
+                            self._event_service.get_ws_client().remove_subscription(sym, "trade")
                     for sym in symbols:
                         if sym not in old_symbols:
-                            self._ws_client.add_subscription(sym, "trade")
-                            
+                            self._event_service.get_ws_client().add_subscription(sym, "trade")
                     logger.info(f"Bot {bot_id} updated | new symbols: {len(symbols)}")
         return self.get_status()
 
     def update_risk(self, bot_id: str, risk_level: int) -> dict[str, Any]:
         if self.is_bot_running(bot_id):
-            if bot_id in self._event_bots:
-                self._event_bots[bot_id]["risk_level"] = risk_level
-                logger.info(f"Bot {bot_id} (EVENT_DRIVEN) updated | new risk_level: {risk_level}")
+            if self._event_service.is_bot_running(bot_id):
+                self._event_service.update_risk(bot_id, risk_level)
             else:
                 job = self._scheduler.get_job(bot_id)
                 if job and job.args:
                     current_args = list(job.args)
-                    # Extend args if risk_level wasn't originally passed
                     if len(current_args) < 4:
                         current_args.extend([False] * (4 - len(current_args)))
                     current_args[3] = risk_level
@@ -207,7 +161,6 @@ class SchedulerService:
 
         timeframe_str, strategy_name, _ = MODE_CONFIG.get(mode, MODE_CONFIG["swing"])
 
-        # Map timeframe string to enum
         tf_map = {
             "15m": Timeframe.FIFTEEN_MINUTES,
             "4h":  Timeframe.FOUR_HOURS,
@@ -224,7 +177,7 @@ class SchedulerService:
                 db=db, 
                 market_provider=provider, 
                 strategy_mode=mode,
-                ws_client=self._ws_client
+                ws_client=self._event_service.get_ws_client()
             )
 
             cycle = await service.run_cycle(

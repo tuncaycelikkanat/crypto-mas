@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from crypto_mas.infrastructure.config.settings import get_settings
@@ -13,9 +13,6 @@ engine = create_engine(
     pool_size=5,
     max_overflow=10,
 )
-
-from sqlalchemy import event
-
 
 @event.listens_for(engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):

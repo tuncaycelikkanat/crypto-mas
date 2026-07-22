@@ -6,7 +6,7 @@ import pytest
 from crypto_mas.engine.strategy.schemas import DecisionAction
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
-
+from crypto_mas.services.trading_cycle_service.utils import get_timedelta
 
 @pytest.fixture
 def mock_db():
@@ -19,14 +19,14 @@ def mock_provider():
     return p
 
 def test_get_timedelta():
-    assert TradingCycleService._get_timedelta(Timeframe.ONE_MINUTE) == timedelta(minutes=1)
-    assert TradingCycleService._get_timedelta(Timeframe.FIFTEEN_MINUTES) == timedelta(minutes=15)
-    assert TradingCycleService._get_timedelta(Timeframe.ONE_HOUR) == timedelta(hours=1)
-    assert TradingCycleService._get_timedelta(Timeframe.FOUR_HOURS) == timedelta(hours=4)
-    assert TradingCycleService._get_timedelta(Timeframe.ONE_DAY) == timedelta(days=1)
+    assert get_timedelta(Timeframe.ONE_MINUTE) == timedelta(minutes=1)
+    assert get_timedelta(Timeframe.FIFTEEN_MINUTES) == timedelta(minutes=15)
+    assert get_timedelta(Timeframe.ONE_HOUR) == timedelta(hours=1)
+    assert get_timedelta(Timeframe.FOUR_HOURS) == timedelta(hours=4)
+    assert get_timedelta(Timeframe.ONE_DAY) == timedelta(days=1)
     
     # Test fallback
-    assert TradingCycleService._get_timedelta("invalid") == timedelta(hours=1)
+    assert get_timedelta("invalid") == timedelta(hours=1)
 
 @pytest.mark.asyncio
 async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
@@ -34,6 +34,8 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
     
     service.fetcher_service = AsyncMock()
     service.feature_service = MagicMock()
+    service.market_data_orchestrator.feature_service = service.feature_service
+    service.strategy_orchestrator.feature_service = service.feature_service
     
     # Mock db query to return None so it doesn't trigger "Open Position Exists"
     mock_db.query.return_value.filter.return_value.first.return_value = None
@@ -65,6 +67,9 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
     htf_snapshot_mock.timestamp = datetime.now(UTC)
 
     service.feature_snapshot_repository = MagicMock()
+    service.market_data_orchestrator.feature_snapshot_repository = service.feature_snapshot_repository
+    service.strategy_orchestrator.feature_snapshot_repository = service.feature_snapshot_repository
+    
     # List by symbol side effect to return btc crash, then ETH snapshots
     def list_by_symbol_mock(exchange, symbol, timeframe, **kwargs):
         if symbol == "BTCUSDT" and timeframe == "15m":
@@ -74,7 +79,7 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
             s.features_json = {}
             s.timestamp = datetime.now(UTC)
             return [s]
-        if symbol == "ETHUSDT" and timeframe == "4h":
+        if symbol == "ETHUSDT" and timeframe == "1h":
             return [htf_snapshot_mock]
         return []
         
@@ -88,7 +93,7 @@ async def test_run_cycle_btc_crash_and_htf_overrides(mock_db, mock_provider):
     mock_strategy.decide.return_value = decision_mock
     
     with patch("crypto_mas.services.trading_cycle_service.cycle_orchestrator.StrategyFactory.create", return_value=mock_strategy), \
-         patch("crypto_mas.services.trading_cycle_service.cycle_orchestrator.PositionRepository") as mock_pos_repo:
+         patch("crypto_mas.services.trading_cycle_service.strategy_orchestrator.PositionRepository") as mock_pos_repo:
         
         mock_pos_repo.return_value.has_recent_stop_loss.return_value = False
         # We need to mock Risk and Portfolio

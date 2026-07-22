@@ -2,13 +2,6 @@ import asyncio
 from contextlib import asynccontextmanager
 
 import uvloop
-
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-from crypto_mas.infrastructure.logging.setup import setup_logging
-
-setup_logging(env="dev")  # Production'da env var'dan okunabilir
-
 from fastapi import FastAPI
 
 from crypto_mas.apps.api.routers import (
@@ -30,9 +23,13 @@ from crypto_mas.apps.api.routers import (
 from crypto_mas.domain.models.config_version import ConfigVersion
 from crypto_mas.infrastructure.config.settings import get_settings
 from crypto_mas.infrastructure.db.session import SessionLocal
+from crypto_mas.infrastructure.logging.setup import setup_logging
 from crypto_mas.services.config_service.config_service import ConfigService
 from crypto_mas.services.config_service.schemas import TradingConfig
 from crypto_mas.services.scheduler_service import SchedulerService
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+setup_logging(env="dev")  # Production'da env var'dan okunabilir
 
 settings = get_settings()
 

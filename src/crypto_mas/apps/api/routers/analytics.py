@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from crypto_mas.domain.repositories.candle_repository import CandleRepository
@@ -21,8 +22,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-from sqlalchemy import text
 
 
 @router.post("/reset")
@@ -183,8 +182,10 @@ def get_coin_details(symbol: str, db: Session = Depends(get_db)) -> dict[str, An
             
     # Map timeframe from mode
     timeframe = "4h"
-    if mode == "scalping": timeframe = "15m"
-    elif mode == "hodl": timeframe = "1d"
+    if mode == "scalping":
+        timeframe = "15m"
+    elif mode == "hodl":
+        timeframe = "1d"
         
     # Repositories
     candle_repo = CandleRepository(db)

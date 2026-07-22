@@ -1,5 +1,4 @@
 import logging
-from decimal import Decimal
 from typing import Any
 
 import numpy as np
@@ -57,65 +56,55 @@ class FeatureCalculator:
         # Calculate RVOL: volume / VOL_SMA_20
         df["rvol"] = df["volume"] / df["VOL_SMA_20"]
 
-        # Replace infinite values with NaN so they are safely parsed to None
-        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        # Replace infinite values and NaNs with None for JSON serialization
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].round(8)
+        df = df.replace([np.inf, -np.inf, np.nan], None)
+
+        feature_map = {
+            "open": "open", "high": "high", "low": "low", "close": "close", 
+            "volume": "volume", "VOL_SMA_20": "volume_sma_20", "rvol": "rvol",
+            "OBV": "obv", "OBV_in_1": "obv", "CMF_20": "cmf_20", "EMA_20": "ema_20",
+            "EMA_50": "ema_50", "SMA_20": "sma_20", "ADX_14": "adx_14", 
+            "DMP_14": "plus_di", "DMN_14": "minus_di", "RSI_14": "rsi_14",
+            "STOCHRSIk_14_14_3_3": "stoch_rsi_k", "STOCHk_14_3_3": "stoch_rsi_k",
+            "STOCHRSId_14_14_3_3": "stoch_rsi_d", "STOCHd_14_3_3": "stoch_rsi_d",
+            "ROC_14": "roc_14", "ROCP_14": "roc_14", "MACD_12_26_9": "macd",
+            "MACDs_12_26_9": "macd_signal", "MACDh_12_26_9": "macd_hist",
+            "ATRr_14": "atr_14", "BBU_20_2.0": "bb_upper", "BBU_20_2.0_2.0": "bb_upper",
+            "BBM_20_2.0": "bb_middle", "BBM_20_2.0_2.0": "bb_middle",
+            "BBL_20_2.0": "bb_lower", "BBL_20_2.0_2.0": "bb_lower",
+        }
+
+        expected_keys = [
+            "open", "high", "low", "close", "volume", "volume_sma_20", "rvol", "obv", 
+            "cmf_20", "ema_20", "ema_50", "sma_20", "adx_14", "plus_di", "minus_di", 
+            "rsi_14", "stoch_rsi_k", "stoch_rsi_d", "roc_14", "macd", "macd_signal", 
+            "macd_hist", "atr_14", "bb_upper", "bb_middle", "bb_lower"
+        ]
 
         snapshots: list[dict[str, Any]] = []
+        records = df.to_dict(orient="records")
 
-        # Convert back to standard list of dicts
-        for row in df.to_dict(orient="records"):
-            def _safe_float(val: Any) -> float | None:
-                if pd.isna(val) or val is None:
-                    return None
-                return float(Decimal(str(round(val, 8))))
+        for row in records:
+            features = {}
+            for col, feat_name in feature_map.items():
+                if col in row and row[col] is not None:
+                    if feat_name not in features:
+                        features[feat_name] = row[col]
+            
+            # Fill missing keys with None
+            for key in expected_keys:
+                if key not in features:
+                    features[key] = None
 
-            features = {
-                # Price
-                "open": _safe_float(row.get("open")),
-                "high": _safe_float(row.get("high")),
-                "low": _safe_float(row.get("low")),
-                "close": _safe_float(row.get("close")),
-                
-                # Volume
-                "volume": _safe_float(row.get("volume")),
-                "volume_sma_20": _safe_float(row.get("VOL_SMA_20")),
-                "rvol": _safe_float(row.get("rvol")),
-                "obv": _safe_float(row.get("OBV", row.get("OBV_in_1"))),
-                "cmf_20": _safe_float(row.get("CMF_20")),
-                
-                # Trend
-                "ema_20": _safe_float(row.get("EMA_20")),
-                "ema_50": _safe_float(row.get("EMA_50")),
-                "sma_20": _safe_float(row.get("SMA_20")),
-                "adx_14": _safe_float(row.get("ADX_14")),
-                "plus_di": _safe_float(row.get("DMP_14")),
-                "minus_di": _safe_float(row.get("DMN_14")),
-                
-                # Momentum
-                "rsi_14": _safe_float(row.get("RSI_14")),
-                "stoch_rsi_k": _safe_float(row.get("STOCHRSIk_14_14_3_3", row.get("STOCHk_14_3_3"))),
-                "stoch_rsi_d": _safe_float(row.get("STOCHRSId_14_14_3_3", row.get("STOCHd_14_3_3"))),
-                "roc_14": _safe_float(row.get("ROC_14", row.get("ROCP_14"))),
-                "macd": _safe_float(row.get("MACD_12_26_9")),
-                "macd_signal": _safe_float(row.get("MACDs_12_26_9")),
-                "macd_hist": _safe_float(row.get("MACDh_12_26_9")),
-                
-                # Volatility
-                "atr_14": _safe_float(row.get("ATRr_14")),
-                "bb_upper": _safe_float(row.get("BBU_20_2.0", row.get("BBU_20_2.0_2.0"))),
-                "bb_middle": _safe_float(row.get("BBM_20_2.0", row.get("BBM_20_2.0_2.0"))),
-                "bb_lower": _safe_float(row.get("BBL_20_2.0", row.get("BBL_20_2.0_2.0"))),
-            }
-
-            snapshots.append(
-                {
-                    "exchange": row.get("exchange"),
-                    "symbol": row.get("symbol"),
-                    "timeframe": row.get("timeframe"),
-                    "timestamp": row.get("timestamp"),
-                    "available_at": row.get("available_at"),
-                    "features_json": features,
-                }
-            )
+            snapshots.append({
+                "exchange": row.get("exchange"),
+                "symbol": row.get("symbol"),
+                "timeframe": row.get("timeframe"),
+                "timestamp": row.get("timestamp"),
+                "available_at": row.get("available_at"),
+                "features_json": features,
+            })
 
         return snapshots
