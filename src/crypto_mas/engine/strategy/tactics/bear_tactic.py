@@ -137,49 +137,64 @@ class BearTactic(BaseTactic):
         if adx_14 < min_adx:
             return None
             
-        if rsi_14 < 35.0:
-            return None  # Prevent entering short at oversold bottoms
-            
         factors.append(f"TREND(ADX={adx_14:.1f})")
 
-        # ── Gate 2: Micro-Pullback UP to EMA 20 ─────────────────
+        # ── Gate 2: Entry Triggers (Pullback OR Breakdown) ──────
         dist_to_ema = (last_price - ema_20) / ema_20  # type: ignore
         
-        if dist_to_ema < min_dist_ema or dist_to_ema > max_dist_ema:
+        is_pullback = min_dist_ema <= dist_to_ema <= max_dist_ema
+        
+        # Breakdown condition: Price is below EMA20, MACD is negative and dropping, RSI is not yet oversold (< 25)
+        is_breakdown = False
+        if dist_to_ema < 0 and macd_hist is not None and prev_macd_hist is not None:
+            if macd_hist < 0 and macd_hist < prev_macd_hist:
+                if 25.0 <= rsi_14 < 45.0:
+                    is_breakdown = True
+                    
+        if not is_pullback and not is_breakdown:
             return None
-            
-        # ── Gate 2.1: Volume Filter (Don't short squeezes) ──────
-        max_rvol_pullback = params.get("max_rvol_pullback", 1.5)
-        if rvol is not None and rvol > max_rvol_pullback:
-            # High volume pump. Do not catch rising knife.
-            return None
-            
-        # ── Gate 2.2: Momentum Confirmation (MACD) ──────────────
-        # Only short if MACD histogram is improving (or at least not rising sharper)
-        if macd_hist is not None and prev_macd_hist is not None:
-            if macd_hist > 0 and macd_hist > prev_macd_hist:
-                # Momentum is still accelerating upwards
-                return None
-            
-        factors.append(f"SHORT_PB({dist_to_ema*100:.2f}%)")
-        confidence += 0.40  # Base confidence (C-Grade)
 
-        # ── Gate 3: Overbought Momentum & Bonuses ───────────────
-        if rsi_14 > rsi_threshold:
-            factors.append(f"RSI={rsi_14:.1f}")
-            # If deeply overbought, give massive confidence boost
-            if rsi_14 > 60.0:
-                confidence += 0.20
+        max_rvol_pullback = params.get("max_rvol_pullback", 1.5)
+
+        if is_pullback:
+            # ── Gate 2.1: Volume Filter (Don't short squeezes) ──────
+            if rvol is not None and rvol > max_rvol_pullback:
+                return None
+                
+            # ── Gate 2.2: Momentum Confirmation (MACD) ──────────────
+            if macd_hist is not None and prev_macd_hist is not None:
+                if macd_hist > 0 and macd_hist > prev_macd_hist:
+                    return None
+                
+            factors.append(f"SHORT_PB({dist_to_ema*100:.2f}%)")
+            confidence += 0.40  # Base confidence (C-Grade)
+
+            # ── Gate 3: Overbought Momentum & Bonuses ───────────────
+            if rsi_14 > rsi_threshold:
+                factors.append(f"RSI={rsi_14:.1f}")
+                if rsi_14 > 60.0:
+                    confidence += 0.20
+                else:
+                    confidence += 0.10
+            elif stoch_k is not None and stoch_k > stoch_threshold:
+                factors.append(f"STOCH={stoch_k:.1f}")
+                if stoch_k > 80.0:
+                    confidence += 0.15
+                else:
+                    confidence += 0.05
             else:
-                confidence += 0.10
-        elif stoch_k is not None and stoch_k > stoch_threshold:
-            factors.append(f"STOCH={stoch_k:.1f}")
-            if stoch_k > 80.0:
-                confidence += 0.15
-            else:
-                confidence += 0.05
-        else:
-            return None
+                return None
+                
+        elif is_breakdown:
+            factors.append(f"SHORT_BREAKDOWN(MACD={macd_hist:.2f})")
+            confidence += 0.60  # Base confidence (B-Grade)
+            if rvol is not None and rvol > 1.2:
+                factors.append(f"RVOL={rvol:.1f}")
+                confidence += 0.20  # A-Grade if high volume breakdown
+            
+            # For breakdowns, use tighter overrides for the broker
+            sl_mult_override = params.get("breakdown_sl_mult", 1.2)
+            tp_mult_override = params.get("breakdown_tp_mult", 1.5)
             
         # ── Bonus Factors (A-Grade Boosters) ────────────────────
         # 1. MACD strong deterioration

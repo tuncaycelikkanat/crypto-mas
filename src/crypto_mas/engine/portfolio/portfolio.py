@@ -2,9 +2,18 @@ from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
 from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, TimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+from crypto_mas.engine.regime import MarketRegime
 
 # BTC-correlated asset group for concentration risk control
 BTC_CORRELATED = {"BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "AVAXUSDT"}
+
+# Asset groups for dynamic regime weighting
+COIN_GROUPS = {
+    "TOP10": {"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "LINKUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "DOTUSDT"},
+    "MEMES": {"DOGEUSDT", "SHIBUSDT", "FLOKIUSDT", "PEPEUSDT", "BONKUSDT", "WIFUSDT"},
+    "L1": {"SOLUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "FTMUSDT", "APTUSDT", "SUIUSDT", "INJUSDT"},
+    "AI_HYPE": {"INJUSDT", "RNDRUSDT", "FETUSDT", "OCEANUSDT", "AGIXUSDT", "TAOUSDT"}
+}
 
 
 class PortfolioEngine:
@@ -42,6 +51,27 @@ class PortfolioEngine:
         # Remove symbols that have a CLOSE decision from the retained list
         retained_symbols = open_symbols - set(close_decisions.keys())
         
+        # Apply Regime-Based Dynamic Adjustments
+        for decision in decisions:
+            if decision.regime:
+                regime = decision.regime.regime
+                
+                # Filter BEAR Market Longs to only TOP10 (Flight to Quality)
+                if regime == MarketRegime.BEAR_TREND and decision.action == DecisionAction.CONSIDER_LONG:
+                    if decision.symbol not in COIN_GROUPS["TOP10"]:
+                        decision.confidence = 0.0  # Reject non-TOP10 longs in Bear Market
+                        decision.reason = f"[Filtered] Non-TOP10 Long in BEAR: {decision.reason}"
+                
+                # Boost MEMES in BULL Market (Risk On)
+                if regime == MarketRegime.BULL_TREND and decision.symbol in COIN_GROUPS["MEMES"]:
+                    decision.confidence = min(0.99, decision.confidence + 0.15)
+                    decision.reason = f"[MEME Boost] {decision.reason}"
+                    
+                # Boost AI and L1 in SIDEWAYS Market (Idiosyncratic Alpha)
+                if regime == MarketRegime.SIDEWAYS and (decision.symbol in COIN_GROUPS["AI_HYPE"] or decision.symbol in COIN_GROUPS["L1"]):
+                    decision.confidence = min(0.99, decision.confidence + 0.10)
+                    decision.reason = f"[Alpha Boost] {decision.reason}"
+
         # 2. Process NEW entry candidates
         new_candidates = [
             decision
