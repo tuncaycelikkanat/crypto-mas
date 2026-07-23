@@ -26,8 +26,16 @@ class RegimeModel(BaseRiskModel):
                 decision.reason = f"REJECTED by Regime Shield (HIGH_VOLATILITY). Original: {decision.reason}"
             return decision
 
-        # 2. Bear Trend Long Filter (Strongly discouraged but let multi_agent handle scoring thresholds normally,
-        # unless we want to hard reject it here. If multi_agent gave CONSIDER_LONG despite Bear Trend, we let it pass
-        # because multi_agent already applied the threshold penalty. But we could add stricter rules here).
+        # 2. Timeframe Filter for Bear and Sideways (Noise Reduction)
+        if regime in (MarketRegime.BEAR_TREND, MarketRegime.SIDEWAYS):
+            from crypto_mas.services.market_data_service.schemas import Timeframe
+            if decision.timeframe == Timeframe.FIFTEEN_MINUTES:
+                if decision.action in (DecisionAction.CONSIDER_LONG, DecisionAction.CONSIDER_SHORT):
+                    decision.action = DecisionAction.HOLD
+                    decision.reason = f"REJECTED by Regime Shield (15m is too noisy for {regime.name}). Use 1h/4h. Original: {decision.reason}"
+                return decision
+
+        # 3. Bear Trend Long Filter
+        # Let multi_agent handle scoring thresholds normally.
 
         return decision

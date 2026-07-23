@@ -104,8 +104,8 @@ class SidewaysTactic(BaseTactic):
         min_confidence = params.get("min_confidence", 0.70)
         
         # In sideways, we want tighter TP (revert to mean) and wider SL (allow chop)
-        sl_mult_override = params.get("sl_mult", 2.5)
-        tp_mult_override = params.get("tp_mult", 2.0)
+        sl_mult_override = params.get("sl_mult", 1.5)
+        tp_mult_override = params.get("tp_mult", 1.2)
 
         confidence = 0.0
         factors = []

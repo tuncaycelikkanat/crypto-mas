@@ -60,8 +60,8 @@ class BearTactic(BaseTactic):
             
             # Rule 1: Low RSI (Oversold) + Overextended downwards
             # Rule 1: Low RSI (Oversold) + Overextended downwards
-            tp_rsi = params.get("tp_rsi", 21.0)
-            tp_dist_ema = params.get("tp_dist_ema", -0.016)
+            tp_rsi = params.get("tp_rsi", 28.0)
+            tp_dist_ema = params.get("tp_dist_ema", -0.012)
             
             if rsi_14 < tp_rsi and dist_to_ema < tp_dist_ema:
                 should_close = True
@@ -127,8 +127,8 @@ class BearTactic(BaseTactic):
         min_confidence = params.get("min_confidence", 0.55)
         
         # Override ATR multipliers for broker execution
-        sl_mult_override = params.get("sl_mult", 2.0)
-        tp_mult_override = params.get("tp_mult", 4.0)
+        sl_mult_override = params.get("sl_mult", 1.5)
+        tp_mult_override = params.get("tp_mult", 2.0)
 
         confidence = 0.0
         factors = []
