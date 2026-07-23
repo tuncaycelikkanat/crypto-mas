@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FlaskConical, Bot, Terminal,
+  LayoutDashboard, FlaskConical, Bot, Terminal, Zap,
   Sun, Moon, TrendingUp, Activity, Wifi, WifiOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: '/radar',       label: 'Market Radar',   icon: TrendingUp },
   { to: '/paper',       label: 'Paper Trading',  icon: Bot },
   { to: '/backtesting', label: 'Backtesting',    icon: FlaskConical },
+  { to: '/optimization',label: 'Auto-Optimizer', icon: Zap },
   { to: '/logs',        label: 'System Logs',    icon: Terminal },
 ];
 

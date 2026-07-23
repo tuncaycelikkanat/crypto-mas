@@ -31,3 +31,4 @@ __all__ = [
     "analytics_router",
     "scanner_router",
 ]
+from .optimization import router as optimization_router

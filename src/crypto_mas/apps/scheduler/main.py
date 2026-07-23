@@ -45,17 +45,13 @@ async def scheduled_trading_cycle() -> None:
         timeframe = Timeframe(settings.scheduled_timeframe)
         symbols = settings.scheduled_symbols
         
-        # Read the latest optimal configuration if available
+        # Read the latest optimal configuration from DB
         config_json = {}
-        config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data', 'current_optimal_config.json')
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, "r") as f:
-                    data = json.load(f)
-                    config_json = data.get("best_params", {})
-                    logger.info(f"Loaded auto-optimized config: {config_json}")
-            except Exception as e:
-                logger.error(f"Failed to read auto-optimized config: {e}")
+        from crypto_mas.domain.models.optimization_history import OptimizationHistory
+        latest_opt = db.query(OptimizationHistory).filter(OptimizationHistory.status == 'COMPLETED').order_by(OptimizationHistory.id.desc()).first()
+        if latest_opt and latest_opt.best_params_json:
+            config_json = latest_opt.best_params_json
+            logger.info(f"Loaded auto-optimized config from DB: {config_json}")
         
         cycle = await service.run_cycle(
             account_name="default-paper",  # Daha dinamik hale getirilebilir

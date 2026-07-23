@@ -27,3 +27,4 @@ __all__ = [
     "BackfillState",
     "BacktestResult",
 ]
+from crypto_mas.domain.models.optimization_history import OptimizationHistory

@@ -14,6 +14,7 @@ from crypto_mas.apps.api.routers import (
     health_router,
     logs_router,
     market_router,
+    optimization_router,
     paper_router,
     portfolio_router,
     risk_router,
@@ -75,6 +76,7 @@ app.include_router(decision_router)
 app.include_router(portfolio_router)
 app.include_router(risk_router)
 app.include_router(paper_router)
+app.include_router(optimization_router)
 app.include_router(cycle_router)
 app.include_router(backtest_router)
 app.include_router(bot_router)
