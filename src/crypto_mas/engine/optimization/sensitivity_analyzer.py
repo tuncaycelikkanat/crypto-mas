@@ -1,6 +1,6 @@
-import logging
-from typing import Callable, Coroutine
 import asyncio
+import logging
+from collections.abc import Callable, Coroutine
 
 from crypto_mas.domain.models.backtest_result import BacktestResult
 from crypto_mas.engine.optimization.composite_score import FitnessCalculator
@@ -22,7 +22,7 @@ class SensitivityAnalyzer:
         """
         logger.info(f"Running Sensitivity Analysis on {target_param}...")
         
-        results = {}
+        results: dict[float, BacktestResult] = {}
         base_val = best_params.get(target_param)
         if base_val is None:
             logger.warning(f"Parameter {target_param} not found in best_params.")
