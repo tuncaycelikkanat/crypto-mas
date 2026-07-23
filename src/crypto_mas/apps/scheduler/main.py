@@ -14,6 +14,9 @@ from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
 from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
+from crypto_mas.services.auto_optimizer_service import AutoOptimizerService
+import os
+import json
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
@@ -42,11 +45,24 @@ async def scheduled_trading_cycle() -> None:
         timeframe = Timeframe(settings.scheduled_timeframe)
         symbols = settings.scheduled_symbols
         
+        # Read the latest optimal configuration if available
+        config_json = {}
+        config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data', 'current_optimal_config.json')
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    data = json.load(f)
+                    config_json = data.get("best_params", {})
+                    logger.info(f"Loaded auto-optimized config: {config_json}")
+            except Exception as e:
+                logger.error(f"Failed to read auto-optimized config: {e}")
+        
         cycle = await service.run_cycle(
             account_name="default-paper",  # Daha dinamik hale getirilebilir
             symbols=symbols,
             timeframe=timeframe,
             trigger="SCHEDULED",
+            config_json=config_json,
         )
         
         logger.info(f"Scheduled cycle {cycle.id} completed with status: {cycle.status}. PnL: {cycle.cycle_pnl}")
@@ -55,6 +71,23 @@ async def scheduled_trading_cycle() -> None:
         logger.exception(f"Scheduled cycle failed: {e}")
     finally:
         db.close()
+
+async def scheduled_optimization_cycle() -> None:
+    """Zamanlanmış görev olarak Geçmiş Veriyi Optimize Eder ve Config dosyasını günceller."""
+    logger.info("Starting background Auto-Optimization cycle...")
+    db = SessionLocal()
+    try:
+        service = AutoOptimizerService(db=db)
+        timeframe = Timeframe(settings.scheduled_timeframe)
+        symbols = settings.scheduled_symbols
+        # Runs 50 trials on the past 3 months to find optimal settings for these symbols
+        service.run_optimization_job(symbols=symbols, timeframe=timeframe, lookback_months=3, n_trials=50)
+        logger.info("Background Auto-Optimization cycle completed successfully.")
+    except Exception as e:
+        logger.exception(f"Scheduled optimization failed: {e}")
+    finally:
+        db.close()
+
 
 
 def main() -> None:
@@ -70,6 +103,17 @@ def main() -> None:
         trigger=cron_trigger,
         id="trading_cycle_job",
         name="Main Trading Cycle",
+        replace_existing=True,
+    )
+    
+    # Yeni eklendi: Pazar geceleri otomatik optimizasyon!
+    # Saat Pazar 00:00 (UTC)
+    opt_trigger = CronTrigger(day_of_week="sun", hour=0, minute=0, timezone=UTC)
+    scheduler.add_job(
+        scheduled_optimization_cycle,
+        trigger=opt_trigger,
+        id="optimization_cycle_job",
+        name="Weekly Auto Optimization",
         replace_existing=True,
     )
     

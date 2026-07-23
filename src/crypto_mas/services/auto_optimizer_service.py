@@ -1,0 +1,138 @@
+import os
+import json
+import logging
+import asyncio
+import optuna
+from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
+from sqlalchemy.orm import Session
+import uuid
+
+from crypto_mas.engine.optimization.composite_score import FitnessCalculator
+from crypto_mas.services.backtesting.engine import BacktestEngineService
+from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
+logger = logging.getLogger(__name__)
+
+# Config save path
+DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data')
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok=True)
+CONFIG_PATH = os.path.join(DATA_DIR, 'current_optimal_config.json')
+
+
+class AutoOptimizerService:
+    def __init__(self, db: Session):
+        self.db = db
+        self.engine_service = BacktestEngineService(db)
+
+    def _run_async(self, coro):
+        try:
+            loop = asyncio.get_event_loop()
+            import nest_asyncio
+            nest_asyncio.apply()
+            return loop.run_until_complete(coro)
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(coro)
+
+    def run_optimization_job(self, symbols: list[str], timeframe: Timeframe, strategy_name: str = "regime_adaptive", lookback_months: int = 3, n_trials: int = 50):
+        """
+        Runs optimization on the past `lookback_months` to find the best parameters for LIVE trading,
+        and saves them to a JSON config file.
+        """
+        logger.info(f"Starting scheduled Auto-Optimization for {strategy_name} on {len(symbols)} symbols over the last {lookback_months} months.")
+        
+        now = datetime.now(timezone.utc)
+        train_start = now - relativedelta(months=lookback_months)
+        train_end = now
+        exchange = Exchange.BINANCE
+        
+        # 1. Pre-warm memory caches for speed
+        from crypto_mas.domain.repositories.candle_repository import CandleRepository
+        from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
+        from crypto_mas.services.backtesting.memory_cache import InMemoryCandleRepository, InMemoryFeatureSnapshotRepository
+        from crypto_mas.services.market_data_service.provider_factory import get_market_data_provider
+        from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
+        from crypto_mas.services.feature_pipeline.service import FeaturePipelineService
+        from crypto_mas.services.trading_cycle_service.utils import get_timedelta
+        
+        shared_candle_cache = InMemoryCandleRepository(CandleRepository(self.db))
+        shared_feature_cache = InMemoryFeatureSnapshotRepository(FeatureSnapshotRepository(self.db))
+        
+        provider = get_market_data_provider(exchange)
+        fetcher = HistoricalFetcherService(provider=provider, db=self.db)
+        
+        async def warmup():
+            delta = get_timedelta(timeframe)
+            fetch_symbols = list(set(symbols + ["BTCUSDT"]))
+            await fetcher.backfill_universe(fetch_symbols, timeframe, train_start - delta*60, train_end)
+            
+            temp_feature_svc = FeaturePipelineService(self.db, candle_repo=CandleRepository(self.db), feature_repo=FeatureSnapshotRepository(self.db))
+            for sym in fetch_symbols:
+                all_candles = CandleRepository(self.db).list_by_symbol(exchange.value, sym, timeframe.value, end_time=train_end, limit=None)
+                if all_candles:
+                    all_snaps = temp_feature_svc.calculator.calculate(all_candles)
+                    if all_snaps:
+                        shared_feature_cache.bulk_upsert(all_snaps)
+                        
+        self._run_async(warmup())
+        logger.info("Memory caches warmed up. Starting live adaptation trials...")
+
+        def objective(trial):
+            tp_mult = trial.suggest_float("tp_mult", 1.2, 2.5, step=0.1)
+            sl_mult = trial.suggest_float("sl_mult", 0.8, 1.8, step=0.1)
+            breakdown_tp_mult = trial.suggest_float("breakdown_tp_mult", 1.0, 2.0, step=0.1)
+            breakdown_sl_mult = trial.suggest_float("breakdown_sl_mult", 0.8, 1.5, step=0.1)
+            max_dist_ema = trial.suggest_float("max_dist_ema", 0.020, 0.040, step=0.005)
+            
+            config_json = {
+                "tp_mult": tp_mult,
+                "sl_mult": sl_mult,
+                "breakdown_tp_mult": breakdown_tp_mult,
+                "breakdown_sl_mult": breakdown_sl_mult,
+                "max_dist_ema": max_dist_ema,
+            }
+            
+            run_id = uuid.uuid4().hex[:6]
+            job_id = f"auto-opt-t{trial.number}-{run_id}"
+            
+            async def run_trial():
+                return await self.engine_service.run_backtest(
+                    job_id=job_id,
+                    exchange=exchange,
+                    symbols=symbols,
+                    timeframe=timeframe,
+                    strategy_name=strategy_name,
+                    start_time=train_start,
+                    end_time=train_end,
+                    initial_balance=10000.0,
+                    config_json=config_json,
+                    _shared_candle_cache=shared_candle_cache,
+                    _shared_feature_cache=shared_feature_cache
+                )
+                
+            result = self._run_async(run_trial())
+            score = FitnessCalculator.calculate_composite_score(result, min_trades=10)
+            return score
+            
+        study = optuna.create_study(direction="maximize", pruner=optuna.pruners.MedianPruner(n_warmup_steps=5))
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+        study.optimize(objective, n_trials=n_trials)
+        
+        best_params = study.best_params
+        logger.info(f"Auto-Optimization complete! Best params found: {best_params}")
+        
+        # Save to JSON
+        with open(CONFIG_PATH, "w") as f:
+            json.dump({
+                "last_optimized_at": now.isoformat(),
+                "strategy": strategy_name,
+                "symbols": symbols,
+                "best_params": best_params
+            }, f, indent=4)
+            
+        logger.info(f"New optimal config saved to {CONFIG_PATH}")
+        return best_params
+
