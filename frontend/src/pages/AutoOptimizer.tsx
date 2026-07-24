@@ -23,7 +23,13 @@ export const AutoOptimizer: React.FC = () => {
       const res = await fetch('/api/v1/optimization/history');
       if (res.ok) {
         const data = await res.json();
-        setHistory(data);
+        if (Array.isArray(data)) {
+          setHistory(data);
+        } else {
+          console.error("Invalid data format received:", data);
+        }
+      } else {
+        console.error(`API Error: ${res.status} ${res.statusText}`);
       }
     } catch (e) {
       console.error("Failed to fetch optimization history", e);
@@ -90,9 +96,21 @@ export const AutoOptimizer: React.FC = () => {
         </button>
       </div>
 
+      <div className="card bg-accent-soft border-accent-border mb-6">
+        <h2 className="text-xl font-semibold mb-2 flex items-center gap-2 text-accent">
+          <span>ℹ️</span> Nasıl Kullanılır?
+        </h2>
+        <ul className="list-disc list-inside space-y-2 text-text-secondary">
+          <li>Bu sayfa, botunuzun piyasa koşullarına uyum sağlamak için bulduğu en iyi ayarları (Take Profit, Stop Loss vb.) gösterir.</li>
+          <li>Normalde sistem bunu otomatik (zamanlanmış görev olarak) yapar. Ancak piyasada ani bir değişim seziyorsanız, beklemek yerine <strong>"⚡ Force Optimize"</strong> butonuna basarak botun hemen yeni ayarlar bulmasını sağlayabilirsiniz.</li>
+          <li>Optimizasyon işlemi arka planda Optuna yapay zekası ile çalışır ve yaklaşık 3-5 dakika sürer. Bu süreçte tablo durumunda <span className="badge-warning inline-block ml-1">Çalışıyor</span> ibaresini göreceksiniz.</li>
+          <li>İşlem bittiğinde, bulunan yeni ayarlar bot tarafından bir sonraki alım-satım döngüsünde <strong>otomatik olarak</strong> kullanılmaya başlar.</li>
+        </ul>
+      </div>
+
       <div className="card">
         <h2 className="section-label mb-4">Optimizasyon Geçmişi</h2>
-        {loading ? (
+        {loading && history.length === 0 ? (
           <div className="text-center p-8 text-muted">Yükleniyor...</div>
         ) : history.length === 0 ? (
           <div className="text-center p-8 text-muted border border-dashed border-border-strong rounded-xl">
@@ -121,17 +139,29 @@ export const AutoOptimizer: React.FC = () => {
                     <td>{run.lookback_months} Ay</td>
                     <td>{getStatusBadge(run.status)}</td>
                     <td>
-                      {run.best_params_json ? (
-                        <div className="flex flex-wrap gap-1">
-                          {Object.entries(run.best_params_json).map(([k, v]) => (
-                            <span key={k} className="bg-surface px-2 py-1 rounded text-xs border border-border text-text-secondary">
-                              {k}: <span className="text-accent font-bold">{v}</span>
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted italic">-</span>
-                      )}
+                      {(() => {
+                        let paramsObj = run.best_params_json;
+                        if (typeof paramsObj === 'string') {
+                          try {
+                            paramsObj = JSON.parse(paramsObj);
+                          } catch (e) {
+                            paramsObj = null;
+                          }
+                        }
+                        
+                        if (paramsObj && typeof paramsObj === 'object') {
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              {Object.entries(paramsObj).map(([k, v]) => (
+                                <span key={k} className="bg-surface px-2 py-1 rounded text-xs border border-border text-text-secondary">
+                                  {k}: <span className="text-accent font-bold">{String(v)}</span>
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return <span className="text-muted italic">-</span>;
+                      })()}
                     </td>
                     <td className="text-sm text-danger max-w-xs truncate">
                       {run.error_message || '-'}
