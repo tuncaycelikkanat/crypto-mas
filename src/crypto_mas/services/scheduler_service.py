@@ -60,6 +60,9 @@ class SchedulerService:
                 "mode": args[1] if len(args) > 1 else "swing",
                 "exchange": args[2] if len(args) > 2 else "BINANCE",
                 "risk_level": args[3] if len(args) > 3 else 50,
+                "use_btc_shield": args[4] if len(args) > 4 else True,
+                "use_htf_shield": args[5] if len(args) > 5 else True,
+                "use_regime_shield": args[6] if len(args) > 6 else True,
             })
             
         # Merge with event driven bots
@@ -76,6 +79,9 @@ class SchedulerService:
         mode: str = "swing",
         exchange: str = "BINANCE",
         risk_level: int = 50,
+        use_btc_shield: bool = True,
+        use_htf_shield: bool = True,
+        use_regime_shield: bool = True,
     ) -> dict[str, Any]:
         if self.is_bot_running(bot_id):
             return self.get_status()
@@ -88,13 +94,14 @@ class SchedulerService:
         effective_interval = interval_seconds if interval_seconds is not None else default_interval
 
         if mode == "scalping" and "AUTO_GAINERS" not in symbols and "HIDDEN_GEMS" not in symbols:
+            # Scalping with fixed symbols → event_service
             self._event_service.start_bot(bot_id, symbols, mode, exchange, risk_level)
         else:
             interval_trigger = IntervalTrigger(seconds=effective_interval, timezone=UTC)
             self._scheduler.add_job(
                 self._run_cycle_task,
                 trigger=interval_trigger,
-                args=[symbols, mode, exchange.upper(), risk_level],
+                args=[symbols, mode, exchange.upper(), risk_level, use_btc_shield, use_htf_shield, use_regime_shield],
                 id=bot_id,
                 name=f"Bot Instance: {bot_id}",
                 replace_existing=True,
@@ -156,7 +163,7 @@ class SchedulerService:
                     logger.info(f"Bot {bot_id} (POLLING) updated | new risk_level: {risk_level}")
         return self.get_status()
 
-    async def _run_cycle_task(self, symbols: list[str], mode: str = "swing", exchange_str: str = "BINANCE", risk_level: int = 50) -> None:
+    async def _run_cycle_task(self, symbols: list[str], mode: str = "swing", exchange_str: str = "BINANCE", risk_level: int = 50, use_btc_shield: bool = True, use_htf_shield: bool = True, use_regime_shield: bool = True) -> None:
         logger.info(f"[{mode.upper()}][{exchange_str}] Running cycle for {len(symbols)} symbols... (risk={risk_level})")
 
         timeframe_str, strategy_name, _ = MODE_CONFIG.get(mode, MODE_CONFIG["swing"])
@@ -187,6 +194,9 @@ class SchedulerService:
                 strategy_name=strategy_name,
                 trigger="SCHEDULED",
                 risk_level=risk_level,
+                use_btc_shield=use_btc_shield,
+                use_htf_shield=use_htf_shield,
+                use_regime_shield=use_regime_shield,
             )
 
             logger.info(f"[{mode.upper()}] Cycle {cycle.id} done. PnL: {cycle.cycle_pnl}")

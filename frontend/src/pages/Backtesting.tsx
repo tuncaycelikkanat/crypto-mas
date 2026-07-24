@@ -16,6 +16,9 @@ const Backtesting: React.FC = () => {
   const [timeframe, setTimeframe] = useState(() => localStorage.getItem('bt_timeframe') || "15m");
   const [symbolSource, setSymbolSource] = useState<'manual' | 'auto'>(() => (localStorage.getItem('bt_symbolSource') as any) || 'manual');
   const [manualSymbols, setManualSymbols] = useState(() => localStorage.getItem('bt_manualSymbols') || "BTCUSDT, ETHUSDT");
+  const [btcShield, setBtcShield] = useState(() => localStorage.getItem('bt_btcShield') !== 'false');
+  const [htfShield, setHtfShield] = useState(() => localStorage.getItem('bt_htfShield') !== 'false');
+  const [regimeShield, setRegimeShield] = useState(() => localStorage.getItem('bt_regimeShield') !== 'false');
   const [startDate, setStartDate] = useState(() => localStorage.getItem('bt_startDate') || new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(() => localStorage.getItem('bt_endDate') || new Date().toISOString().split('T')[0]);
   const [initialBalance, setInitialBalance] = useState(() => parseInt(localStorage.getItem('bt_initialBalance') || "10000", 10));
@@ -27,7 +30,9 @@ const Backtesting: React.FC = () => {
     localStorage.setItem('bt_manualSymbols', manualSymbols); localStorage.setItem('bt_startDate', startDate);
     localStorage.setItem('bt_endDate', endDate); localStorage.setItem('bt_initialBalance', initialBalance.toString());
     localStorage.setItem('bt_riskLevel', riskLevel.toString());
-  }, [exchange, configMode, timeframe, symbolSource, manualSymbols, startDate, endDate, initialBalance, riskLevel]);
+    localStorage.setItem('bt_btcShield', btcShield.toString()); localStorage.setItem('bt_htfShield', htfShield.toString());
+    localStorage.setItem('bt_regimeShield', regimeShield.toString());
+  }, [exchange, configMode, timeframe, symbolSource, manualSymbols, startDate, endDate, initialBalance, riskLevel, btcShield, htfShield, regimeShield]);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -61,7 +66,7 @@ const Backtesting: React.FC = () => {
         strategy_name: configMode === 'scalping' ? 'hft_momentum' : (configMode === 'swing' ? 'macd_cross' : (configMode === 'regime_adaptive' ? 'regime_adaptive' : 'ema_golden_cross')),
         start_time: new Date(startDate).toISOString(), end_time: new Date(endDate).toISOString(),
         initial_balance: Number(initialBalance), risk_level: riskLevel,
-        use_btc_shield: true, use_htf_shield: true, use_regime_shield: true,
+        use_btc_shield: btcShield, use_htf_shield: htfShield, use_regime_shield: regimeShield,
       };
       const res = await axios.post('/api/v1/backtest/run', payload);
       setSelectedJobId(res.data.job_id); setLogs([]); 
@@ -113,6 +118,16 @@ const Backtesting: React.FC = () => {
                 </div>
                 <div><label className="section-label" style={{display:'block', marginBottom:'8px'}}>SYMBOL SOURCE</label><select className="form-input" value={symbolSource} onChange={e => setSymbolSource(e.target.value as any)}><option value="manual">MANUAL (CSV)</option><option value="auto">AUTO GAINERS (LIVE)</option></select></div>
                 {symbolSource === 'manual' && <div><label className="section-label" style={{display:'block', marginBottom:'8px'}}>SYMBOLS</label><input type="text" className="form-input" value={manualSymbols} onChange={e => setManualSymbols(e.target.value)} required /></div>}
+                
+                <div>
+                  <div className="section-label" style={{ marginBottom: '8px' }}>SHIELDS</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-primary)', fontFamily: '"JetBrains Mono", monospace' }}><input type="checkbox" checked={btcShield} onChange={e => setBtcShield(e.target.checked)} /> BTC SHIELD</label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-primary)', fontFamily: '"JetBrains Mono", monospace' }}><input type="checkbox" checked={htfShield} onChange={e => setHtfShield(e.target.checked)} /> HTF SHIELD</label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-primary)', fontFamily: '"JetBrains Mono", monospace' }}><input type="checkbox" checked={regimeShield} onChange={e => setRegimeShield(e.target.checked)} /> REGIME SHIELD</label>
+                  </div>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div><label className="section-label" style={{display:'block', marginBottom:'8px'}}>START_DATE</label><input type="date" className="form-input" value={startDate} onChange={e => setStartDate(e.target.value)} required /></div>
                   <div><label className="section-label" style={{display:'block', marginBottom:'8px'}}>END_DATE</label><input type="date" className="form-input" value={endDate} onChange={e => setEndDate(e.target.value)} required /></div>

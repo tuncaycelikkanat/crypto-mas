@@ -18,6 +18,9 @@ class StartBotRequest(BaseModel):
     mode: str = "swing"   # scalping | swing | hodl
     exchange: str = "BINANCE"
     risk_level: int = 50
+    use_btc_shield: bool = True
+    use_htf_shield: bool = True
+    use_regime_shield: bool = True
 
 
 @router.get("/status")
@@ -34,6 +37,9 @@ def start_bot(request: StartBotRequest, scheduler: SchedulerService = Depends(ge
         mode=request.mode,
         exchange=request.exchange,
         risk_level=request.risk_level,
+        use_btc_shield=request.use_btc_shield,
+        use_htf_shield=request.use_htf_shield,
+        use_regime_shield=request.use_regime_shield,
     )
 
 

@@ -24,6 +24,9 @@ const PaperTrading: React.FC = () => {
   const [configExchange, setConfigExchange] = useState(() => get('configExchange', 'BINANCE'));
   const [configRiskLevel, setConfigRiskLevel] = useState(() => get('configRiskLevel', '100'));
   const [configSymbolSource, setConfigSymbolSource] = useState<'manual' | 'auto'>(() => (get('configSymbolSource', 'manual') as any));
+  const [configBtcShield, setConfigBtcShield] = useState(() => get('configBtcShield', 'true') === 'true');
+  const [configHtfShield, setConfigHtfShield] = useState(() => get('configHtfShield', 'true') === 'true');
+  const [configRegimeShield, setConfigRegimeShield] = useState(() => get('configRegimeShield', 'true') === 'true');
 
   useEffect(() => { localStorage.setItem('configSymbols', configSymbols); }, [configSymbols]);
   useEffect(() => { localStorage.setItem('configMode', configMode); }, [configMode]);
@@ -31,6 +34,9 @@ const PaperTrading: React.FC = () => {
   useEffect(() => { localStorage.setItem('configExchange', configExchange); }, [configExchange]);
   useEffect(() => { localStorage.setItem('configRiskLevel', configRiskLevel); }, [configRiskLevel]);
   useEffect(() => { localStorage.setItem('configSymbolSource', configSymbolSource); }, [configSymbolSource]);
+  useEffect(() => { localStorage.setItem('configBtcShield', configBtcShield.toString()); }, [configBtcShield]);
+  useEffect(() => { localStorage.setItem('configHtfShield', configHtfShield.toString()); }, [configHtfShield]);
+  useEffect(() => { localStorage.setItem('configRegimeShield', configRegimeShield.toString()); }, [configRegimeShield]);
 
   const fetchAccount = async () => {
     try {
@@ -66,6 +72,9 @@ const PaperTrading: React.FC = () => {
         mode: configMode,
         exchange: configExchange,
         risk_level: parseInt(configRiskLevel, 10),
+        use_btc_shield: configBtcShield,
+        use_htf_shield: configHtfShield,
+        use_regime_shield: configRegimeShield,
       });
       setBotStatus(res.data);
       setShowConfig(false);
@@ -261,6 +270,15 @@ const PaperTrading: React.FC = () => {
                   <div>
                     <div className="section-label" style={{ marginBottom: '8px' }}>RISK_LEVEL: {configRiskLevel}%</div>
                     <input type="range" min="1" max="100" className="form-input" style={{ padding: '0', cursor: 'pointer' }} value={configRiskLevel} onChange={e => setConfigRiskLevel(e.target.value)} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="section-label" style={{ marginBottom: '8px' }}>SHIELDS</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-primary)', fontFamily: '"JetBrains Mono", monospace' }}><input type="checkbox" checked={configBtcShield} onChange={e => setConfigBtcShield(e.target.checked)} /> BTC SHIELD</label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-primary)', fontFamily: '"JetBrains Mono", monospace' }}><input type="checkbox" checked={configHtfShield} onChange={e => setConfigHtfShield(e.target.checked)} /> HTF SHIELD</label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-primary)', fontFamily: '"JetBrains Mono", monospace' }}><input type="checkbox" checked={configRegimeShield} onChange={e => setConfigRegimeShield(e.target.checked)} /> REGIME SHIELD</label>
                   </div>
                 </div>
               </div>
