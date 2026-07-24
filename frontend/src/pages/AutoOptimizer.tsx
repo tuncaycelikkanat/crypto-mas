@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 
 interface OptimizationRun {
   id: number;
@@ -23,163 +22,105 @@ export const AutoOptimizer: React.FC = () => {
       const res = await fetch('/api/v1/optimization/history');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
-          setHistory(data);
-        } else {
-          console.error("Invalid data format received:", data);
-        }
-      } else {
-        console.error(`API Error: ${res.status} ${res.statusText}`);
+        if (Array.isArray(data)) setHistory(data);
       }
-    } catch (e) {
-      console.error("Failed to fetch optimization history", e);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) {} finally { setLoading(false); }
   };
 
   useEffect(() => {
-    fetchHistory();
-    const interval = setInterval(fetchHistory, 10000);
-    return () => clearInterval(interval);
+    fetchHistory(); const interval = setInterval(fetchHistory, 10000); return () => clearInterval(interval);
   }, []);
 
   const handleForceOptimize = async () => {
-    const isRunning = history.some(h => h.status === 'RUNNING');
-    if (isRunning) {
-      if (!window.confirm("Halihazırda 'Çalışıyor' durumunda görünen bir optimizasyon var. Sunucu yeniden başlatıldıysa bu kayıt askıda kalmış olabilir. Yine de yeni bir optimizasyon başlatmak istiyor musunuz?")) {
-        return;
-      }
-    } else {
-      if (!window.confirm("Bu işlem arka planda yoğun bir Optuna optimizasyon süreci başlatacaktır (Yaklaşık 3-5 dakika sürebilir). Onaylıyor musunuz?")) {
-        return;
-      }
-    }
-    
+    if (history.some(h => h.status === 'RUNNING') && !window.confirm("A RUNNING process exists. Force trigger?")) return;
+    if (!window.confirm("Trigger heavy Optuna process?")) return;
     setTriggering(true);
     try {
       const res = await fetch('/api/v1/optimization/force', { method: 'POST' });
-      if (res.ok) {
-        alert("Optimizasyon tetiklendi! Durumu aşağıdaki tablodan (RUNNING) takip edebilirsiniz.");
-        await fetchHistory();
-      } else {
-        alert("Tetikleme başarısız oldu.");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("Bir hata oluştu.");
-    } finally {
-      setTriggering(false);
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'COMPLETED': return <span className="badge-success">Tamamlandı</span>;
-      case 'RUNNING': return <span className="badge-warning animate-pulse">Çalışıyor</span>;
-      case 'FAILED': return <span className="badge-danger">Hata</span>;
-      default: return <span className="badge-muted">{status}</span>;
-    }
+      if (res.ok) { alert("Triggered!"); await fetchHistory(); }
+    } catch (e) {} finally { setTriggering(false); }
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className="p-6 space-y-8"
-    >
-      <div className="flex justify-between items-center">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+      
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
         <div>
-          <h1 className="text-3xl font-bold mb-2">🤖 Auto-Optimizer</h1>
-          <p className="text-muted">Paper Trading motorunuzun kendi kendini eğittiği geçmiş kayıtları ve manuel tetikleyici.</p>
+          <h1 style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '1.5rem', marginBottom: '8px' }}>[AUTO_OPTIMIZER]</h1>
+          <p style={{ margin: 0, fontSize: '0.85rem' }}>AI hyperparameter tuning engine</p>
         </div>
-        <button 
-          onClick={handleForceOptimize} 
-          disabled={triggering}
-          className="btn-primary flex items-center gap-2 px-6 py-3 font-semibold text-lg"
-        >
-          {triggering ? "Tetikleniyor..." : "⚡ Force Optimize"}
+        <button onClick={handleForceOptimize} disabled={triggering} className="btn-primary">
+          {triggering ? "TRIGGERING..." : "FORCE_OPTIMIZE"}
         </button>
       </div>
 
-      <div className="card bg-accent-soft border-accent-border mb-6">
-        <h2 className="text-xl font-semibold mb-2 flex items-center gap-2 text-accent">
-          <span>ℹ️</span> Nasıl Kullanılır?
-        </h2>
-        <ul className="list-disc list-inside space-y-2 text-text-secondary">
-          <li>Bu sayfa, botunuzun piyasa koşullarına uyum sağlamak için bulduğu en iyi ayarları (Take Profit, Stop Loss vb.) gösterir.</li>
-          <li>Normalde sistem bunu otomatik (zamanlanmış görev olarak) yapar. Ancak piyasada ani bir değişim seziyorsanız, beklemek yerine <strong>"⚡ Force Optimize"</strong> butonuna basarak botun hemen yeni ayarlar bulmasını sağlayabilirsiniz.</li>
-          <li>Optimizasyon işlemi arka planda Optuna yapay zekası ile çalışır ve yaklaşık 3-5 dakika sürer. Bu süreçte tablo durumunda <span className="badge-warning inline-block ml-1">Çalışıyor</span> ibaresini göreceksiniz.</li>
-          <li>İşlem bittiğinde, bulunan yeni ayarlar bot tarafından bir sonraki alım-satım döngüsünde <strong>otomatik olarak</strong> kullanılmaya başlar.</li>
-        </ul>
+      {/* ── Instructions ── */}
+      <div style={{ border: '1px solid var(--border)', padding: '20px', background: 'var(--bg-raised)', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', lineHeight: '1.6' }}>
+        <div style={{ color: 'var(--accent)', marginBottom: '8px', fontWeight: 600 }}>&gt; SYSTEM_INFO</div>
+        <div style={{ color: 'var(--text-muted)' }}>
+          - ML engine constantly evaluates best (TP/SL) parameters.<br/>
+          - Runs asynchronously via Optuna.<br/>
+          - Best parameters automatically applied to active bots.
+        </div>
       </div>
 
-      <div className="card">
-        <h2 className="section-label mb-4">Optimizasyon Geçmişi</h2>
-        {loading && history.length === 0 ? (
-          <div className="text-center p-8 text-muted">Yükleniyor...</div>
-        ) : history.length === 0 ? (
-          <div className="text-center p-8 text-muted border border-dashed border-border-strong rounded-xl">
-            Henüz bir optimizasyon kaydı bulunmuyor. Sol üstteki butonla ilk optimizasyonu başlatabilirsiniz!
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="glass-table w-full text-left">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Tarih</th>
-                  <th>Tetikleyici</th>
-                  <th>Geçmiş Süre</th>
-                  <th>Durum</th>
-                  <th>Bulunan Ayarlar</th>
-                  <th>Hata / Mesaj</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map(run => (
-                  <tr key={run.id}>
-                    <td className="mono text-muted">#{run.id}</td>
-                    <td>{new Date(run.created_at).toLocaleString()}</td>
-                    <td><span className="badge-primary">{run.triggered_by}</span></td>
-                    <td>{run.lookback_months} Ay</td>
-                    <td>{getStatusBadge(run.status)}</td>
-                    <td>
-                      {(() => {
-                        let paramsObj = run.best_params_json;
-                        if (typeof paramsObj === 'string') {
-                          try {
-                            paramsObj = JSON.parse(paramsObj);
-                          } catch (e) {
-                            paramsObj = null;
-                          }
-                        }
-                        
-                        if (paramsObj && typeof paramsObj === 'object') {
-                          return (
-                            <div className="flex flex-wrap gap-1">
-                              {Object.entries(paramsObj).map(([k, v]) => (
-                                <span key={k} className="bg-surface px-2 py-1 rounded text-xs border border-border text-text-secondary">
-                                  {k}: <span className="text-accent font-bold">{String(v)}</span>
-                                </span>
-                              ))}
-                            </div>
-                          );
-                        }
-                        return <span className="text-muted italic">-</span>;
-                      })()}
-                    </td>
-                    <td className="text-sm text-danger max-w-xs truncate">
-                      {run.error_message || '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {/* ── History Table ── */}
+      <div>
+        <h3 style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '1rem', marginBottom: '16px' }}>&gt; OPTIMIZATION_RUNS</h3>
+        <table className="glass-table">
+          <thead>
+            <tr style={{ background: '#050505' }}>
+              <th>ID</th>
+              <th>TIMESTAMP</th>
+              <th>TRIGGER</th>
+              <th>LOOKBACK</th>
+              <th>STATUS</th>
+              <th>BEST_PARAMS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && history.length === 0 ? (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>[ LOADING ]</td></tr>
+            ) : history.length === 0 ? (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>[ NO DATA ]</td></tr>
+            ) : history.map(run => (
+              <tr key={run.id}>
+                <td style={{ color: 'var(--text-muted)' }}>#{run.id}</td>
+                <td>{new Date(run.created_at).toLocaleString('en-US', { hour12: false })}</td>
+                <td><span style={{ color: 'var(--accent)' }}>{run.triggered_by}</span></td>
+                <td>{run.lookback_months}m</td>
+                <td style={{ color: run.status === 'COMPLETED' ? 'var(--success)' : run.status === 'RUNNING' ? 'var(--warning)' : 'var(--danger)' }}>
+                  [{run.status}]
+                </td>
+                <td>
+                  {(() => {
+                    let p = run.best_params_json;
+                    if (typeof p === 'string') { try { p = JSON.parse(p); } catch { p = null; } }
+                    if (p && typeof p === 'object') {
+                      return (
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {Object.entries(p).map(([k, v]) => (
+                            <span key={k}>
+                              <span style={{ fontSize: '0.75rem', background: 'var(--bg-raised)', border: '1px solid var(--border-strong)', padding: '2px 6px', borderRadius: '4px' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>{k}:</span> <span style={{ color: 'var(--accent)' }}>{String(v)}</span>
+                              </span>
+                              {' '}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return <span style={{ color: 'var(--text-muted)' }}>-</span>;
+                  })()}
+                  {run.error_message && <div style={{ color: 'var(--danger)', fontSize: '0.75rem', marginTop: '4px' }}>ERR: {run.error_message}</div>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </motion.div>
+
+    </div>
   );
 };
