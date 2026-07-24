@@ -149,20 +149,15 @@ class EventEngine:
             )
             return
 
-        # ── Real spike! ──────────────────────────────────────────
-        self.metrics_store.set_metric(symbol, "volume_spike", True)
-        logger.info(
-            f"💥 [SPIKE] {symbol}! RVOL={rvol:.2f}x | Buy%={imbalance*100:.1f}% | "
-            f"Window=${total_notional:,.0f} | CVD={self._cvd[symbol]:+,.0f}"
-        )
-
         # Cooldown check
         if now - self._last_trigger_time[symbol] > TRIGGER_COOLDOWN_SECONDS:
+            self.metrics_store.set_metric(symbol, "volume_spike", True)
+            logger.info(
+                f"💥 [SPIKE] {symbol}! RVOL={rvol:.2f}x | Buy%={imbalance*100:.1f}% | "
+                f"Window=${total_notional:,.0f} | CVD={self._cvd[symbol]:+,.0f}"
+            )
             self._last_trigger_time[symbol] = now
             asyncio.create_task(self._trigger_cycle(symbol))
-        else:
-            remaining = TRIGGER_COOLDOWN_SECONDS - (now - self._last_trigger_time[symbol])
-            logger.debug(f"[EVENT] {symbol} cooldown active ({remaining:.0f}s remaining).")
 
     # ── Order book processing ────────────────────────────────────
     async def _process_depth(self, symbol: str, payload: dict[str, Any]):
