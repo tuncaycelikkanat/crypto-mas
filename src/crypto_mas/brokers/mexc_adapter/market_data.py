@@ -84,10 +84,12 @@ class MexcMarketDataProvider(MarketDataProvider):
     ) -> list[OHLCVCandle]:
         url = f"{self.base_url}/api/v3/klines"
 
-        # MEXC expects uppercase W and M for week and month
+        # MEXC expects uppercase W and M for week and month, and 60m for 1h
         interval = timeframe.value
         if interval == "1w":
             interval = "1W"
+        elif interval == "1h":
+            interval = "60m"
 
         params: dict[str, str | int] = {
             "symbol": symbol,
