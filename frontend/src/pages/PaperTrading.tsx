@@ -23,12 +23,14 @@ const PaperTrading: React.FC = () => {
   const [configInterval, setConfigInterval] = useState(() => get('configInterval', '120'));
   const [configExchange, setConfigExchange] = useState(() => get('configExchange', 'BINANCE'));
   const [configRiskLevel, setConfigRiskLevel] = useState(() => get('configRiskLevel', '100'));
+  const [configSymbolSource, setConfigSymbolSource] = useState<'manual' | 'auto'>(() => (get('configSymbolSource', 'manual') as any));
 
   useEffect(() => { localStorage.setItem('configSymbols', configSymbols); }, [configSymbols]);
   useEffect(() => { localStorage.setItem('configMode', configMode); }, [configMode]);
   useEffect(() => { localStorage.setItem('configInterval', configInterval); }, [configInterval]);
   useEffect(() => { localStorage.setItem('configExchange', configExchange); }, [configExchange]);
   useEffect(() => { localStorage.setItem('configRiskLevel', configRiskLevel); }, [configRiskLevel]);
+  useEffect(() => { localStorage.setItem('configSymbolSource', configSymbolSource); }, [configSymbolSource]);
 
   const fetchAccount = async () => {
     try {
@@ -56,7 +58,7 @@ const PaperTrading: React.FC = () => {
   const handleStartBot = async () => {
     setLoading(true);
     try {
-      const symbolsList = configSymbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
+      const symbolsList = configSymbolSource === 'auto' ? ['AUTO_GAINERS'] : configSymbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
       const res = await axios.post('/api/v1/bot/start', {
         bot_id: `bot-${Date.now()}`,
         interval_seconds: parseInt(configInterval, 10),
@@ -235,9 +237,19 @@ const PaperTrading: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="section-label" style={{ marginBottom: '8px' }}>TARGET_SYMBOLS</div>
-                  <input type="text" className="form-input" value={configSymbols} onChange={e => setConfigSymbols(e.target.value)} placeholder="BTCUSDT, ETHUSDT" style={{ background: '#000', border: '1px solid var(--border)' }} />
+                  <div className="section-label" style={{ marginBottom: '8px' }}>SYMBOL SOURCE</div>
+                  <select className="form-input" value={configSymbolSource} onChange={e => setConfigSymbolSource(e.target.value as any)} style={{ background: '#000', border: '1px solid var(--border)' }}>
+                    <option value="manual">MANUAL (CSV)</option>
+                    <option value="auto">AUTO GAINERS (LIVE)</option>
+                  </select>
                 </div>
+
+                {configSymbolSource === 'manual' && (
+                  <div>
+                    <div className="section-label" style={{ marginBottom: '8px' }}>TARGET_SYMBOLS</div>
+                    <input type="text" className="form-input" value={configSymbols} onChange={e => setConfigSymbols(e.target.value)} placeholder="BTCUSDT, ETHUSDT" style={{ background: '#000', border: '1px solid var(--border)' }} />
+                  </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   {configMode !== 'scalping' && (
