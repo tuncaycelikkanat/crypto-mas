@@ -31,13 +31,17 @@ class AutoOptimizerService:
 
     def _run_async(self, coro):
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop is None:
+            # We are in a thread with no active running loop (like a FastAPI background task thread).
+            return asyncio.run(coro)
+        else:
+            # A loop is actively running (e.g., in a Jupyter Notebook cell).
             import nest_asyncio
             nest_asyncio.apply()
-            return loop.run_until_complete(coro)
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
             return loop.run_until_complete(coro)
 
     def run_optimization_job(self, symbols: list[str], timeframe: Timeframe, strategy_name: str = "regime_adaptive", lookback_months: int = 3, n_trials: int = 50, triggered_by: str = "SCHEDULED"):
@@ -141,37 +145,37 @@ class AutoOptimizerService:
             score = FitnessCalculator.calculate_composite_score(result, min_trades=10)
             return score
             
-            try:
-                study = optuna.create_study(direction="maximize", pruner=optuna.pruners.MedianPruner(n_warmup_steps=5))
-                optuna.logging.set_verbosity(optuna.logging.WARNING)
-                study.optimize(objective, n_trials=n_trials)
+        try:
+            study = optuna.create_study(direction="maximize", pruner=optuna.pruners.MedianPruner(n_warmup_steps=5))
+            optuna.logging.set_verbosity(optuna.logging.WARNING)
+            study.optimize(objective, n_trials=n_trials)
+            
+            best_params = study.best_params
+            logger.info(f"Auto-Optimization complete! Best params found: {best_params}")
+            
+            # Save to DB
+            history_record.status = "COMPLETED"
+            history_record.best_params_json = best_params
+            history_record.completed_at = datetime.now(UTC)
+            self.db.commit()
+            
+            # Save to JSON for quick read by scheduler
+            with open(CONFIG_PATH, "w") as f:
+                json.dump({
+                    "last_optimized_at": now.isoformat(),
+                    "strategy": strategy_name,
+                    "symbols": symbols,
+                    "best_params": best_params,
+                    "history_id": history_record.id
+                }, f, indent=4)
                 
-                best_params = study.best_params
-                logger.info(f"Auto-Optimization complete! Best params found: {best_params}")
-                
-                # Save to DB
-                history_record.status = "COMPLETED"
-                history_record.best_params_json = best_params
-                history_record.completed_at = datetime.now(UTC)
-                self.db.commit()
-                
-                # Save to JSON for quick read by scheduler
-                with open(CONFIG_PATH, "w") as f:
-                    json.dump({
-                        "last_optimized_at": now.isoformat(),
-                        "strategy": strategy_name,
-                        "symbols": symbols,
-                        "best_params": best_params,
-                        "history_id": history_record.id
-                    }, f, indent=4)
-                    
-                logger.info(f"New optimal config saved to DB and {CONFIG_PATH}")
-                return best_params
-            except Exception as e:
-                logger.error(f"Auto-Optimization failed: {e}")
-                history_record.status = "FAILED"
-                history_record.error_message = str(e)
-                history_record.completed_at = datetime.now(UTC)
-                self.db.commit()
-                raise e
+            logger.info(f"New optimal config saved to DB and {CONFIG_PATH}")
+            return best_params
+        except Exception as e:
+            logger.error(f"Auto-Optimization failed: {e}")
+            history_record.status = "FAILED"
+            history_record.error_message = str(e)
+            history_record.completed_at = datetime.now(UTC)
+            self.db.commit()
+            raise e
 
