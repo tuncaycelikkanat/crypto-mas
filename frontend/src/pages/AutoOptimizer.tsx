@@ -45,8 +45,15 @@ export const AutoOptimizer: React.FC = () => {
   }, []);
 
   const handleForceOptimize = async () => {
-    if (!window.confirm("Bu işlem arka planda yoğun bir Optuna optimizasyon süreci başlatacaktır (Yaklaşık 3-5 dakika sürebilir). Onaylıyor musunuz?")) {
-      return;
+    const isRunning = history.some(h => h.status === 'RUNNING');
+    if (isRunning) {
+      if (!window.confirm("Halihazırda 'Çalışıyor' durumunda görünen bir optimizasyon var. Sunucu yeniden başlatıldıysa bu kayıt askıda kalmış olabilir. Yine de yeni bir optimizasyon başlatmak istiyor musunuz?")) {
+        return;
+      }
+    } else {
+      if (!window.confirm("Bu işlem arka planda yoğun bir Optuna optimizasyon süreci başlatacaktır (Yaklaşık 3-5 dakika sürebilir). Onaylıyor musunuz?")) {
+        return;
+      }
     }
     
     setTriggering(true);
@@ -89,7 +96,7 @@ export const AutoOptimizer: React.FC = () => {
         </div>
         <button 
           onClick={handleForceOptimize} 
-          disabled={triggering || history.some(h => h.status === 'RUNNING')}
+          disabled={triggering}
           className="btn-primary flex items-center gap-2 px-6 py-3 font-semibold text-lg"
         >
           {triggering ? "Tetikleniyor..." : "⚡ Force Optimize"}
