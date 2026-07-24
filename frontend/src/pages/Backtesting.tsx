@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { motion } from 'framer-motion';
+
 import { BacktestHistory } from './BacktestHistory';
 
 const Backtesting: React.FC = () => {
@@ -9,6 +9,7 @@ const Backtesting: React.FC = () => {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'run' | 'history'>('run');
+  const [autoScroll, setAutoScroll] = useState(false);
   
   const [exchange, setExchange] = useState(() => localStorage.getItem('bt_exchange') || "BINANCE");
   const [configMode, setConfigMode] = useState<'scalping' | 'swing' | 'hodl' | 'regime_adaptive'>(() => (localStorage.getItem('bt_configMode') as any) || 'regime_adaptive');
@@ -49,7 +50,7 @@ const Backtesting: React.FC = () => {
     fetchLogs(); const iv = setInterval(fetchLogs, 2000); return () => clearInterval(iv);
   }, [selectedJobId]);
 
-  useEffect(() => { logsEndRef.current?.scrollIntoView(); }, [logs]);
+  useEffect(() => { if(autoScroll) logsEndRef.current?.scrollIntoView(); }, [logs, autoScroll]);
 
   const handleRunBacktest = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true);
@@ -150,7 +151,13 @@ const Backtesting: React.FC = () => {
             )}
             
             <div style={{ flex: 1, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: '#000' }}>
-              <div style={{ padding: '8px 16px', background: 'var(--bg-raised)', borderBottom: '1px solid var(--border)', fontSize: '0.75rem', fontFamily: '"JetBrains Mono", monospace', color: 'var(--accent)' }}>&gt; SIMULATION_LOGS</div>
+              <div style={{ padding: '8px 16px', background: 'var(--bg-raised)', borderBottom: '1px solid var(--border)', fontSize: '0.75rem', fontFamily: '"JetBrains Mono", monospace', color: 'var(--accent)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>&gt; SIMULATION_LOGS</span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                  <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} />
+                  AUTO_SCROLL
+                </label>
+              </div>
               <div style={{ flex: 1, height: '400px', overflowY: 'auto', padding: '16px', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.75rem', lineHeight: '1.6' }}>
                 {logs.length === 0 ? <div style={{ color: 'var(--text-muted)' }}>[ NO LOGS ]</div> : logs.map(log => (
                   <div key={log.id} style={{ display: 'flex', gap: '12px' }}>
