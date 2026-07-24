@@ -1,15 +1,16 @@
-import logging
+# ruff: noqa: B023
 import asyncio
+import logging
 import uuid
-import optuna
 
+import optuna
 from sqlalchemy.orm import Session
 
-from crypto_mas.engine.optimization.schemas import Fold
+from crypto_mas.domain.models.backtest_result import BacktestResult
 from crypto_mas.engine.optimization.composite_score import FitnessCalculator
+from crypto_mas.engine.optimization.schemas import Fold
 from crypto_mas.services.backtesting.engine import BacktestEngineService
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
-from crypto_mas.domain.models.backtest_result import BacktestResult
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +54,20 @@ class WalkForwardOptimizer:
             
             # --- 1. Pre-fetch Data for Train (Memory Caching) ---
             from crypto_mas.domain.repositories.candle_repository import CandleRepository
-            from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
-            from crypto_mas.services.backtesting.memory_cache import InMemoryCandleRepository, InMemoryFeatureSnapshotRepository
-            from crypto_mas.services.market_data_service.provider_factory import get_market_data_provider
-            from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
+            from crypto_mas.domain.repositories.feature_snapshot_repository import (
+                FeatureSnapshotRepository,
+            )
+            from crypto_mas.services.backtesting.memory_cache import (
+                InMemoryCandleRepository,
+                InMemoryFeatureSnapshotRepository,
+            )
             from crypto_mas.services.feature_pipeline.service import FeaturePipelineService
+            from crypto_mas.services.market_data_service.historical_fetcher import (
+                HistoricalFetcherService,
+            )
+            from crypto_mas.services.market_data_service.provider_factory import (
+                get_market_data_provider,
+            )
             from crypto_mas.services.trading_cycle_service.utils import get_timedelta
             
             shared_candle_cache = InMemoryCandleRepository(CandleRepository(self.db))
@@ -67,7 +77,7 @@ class WalkForwardOptimizer:
             provider = get_market_data_provider(exchange)
             fetcher = HistoricalFetcherService(provider=provider, db=self.db)
             
-            async def warmup():
+            async def warmup():  # noqa: B023
                 delta = get_timedelta(timeframe)
                 fetch_symbols = list(set(symbols + ["BTCUSDT"]))
                 await fetcher.backfill_universe(fetch_symbols, timeframe, fold.train_start - delta*60, fold.train_end)
@@ -102,7 +112,7 @@ class WalkForwardOptimizer:
                 run_id = uuid.uuid4().hex[:6]
                 job_id = f"wfo-train-f{fold.fold_id}-t{trial.number}-{run_id}"
                 
-                async def run_trial():
+                async def run_trial():  # noqa: B023
                     return await self.engine_service.run_backtest(
                         job_id=job_id,
                         exchange=exchange,
@@ -142,7 +152,7 @@ class WalkForwardOptimizer:
             test_run_id = uuid.uuid4().hex[:6]
             test_job_id = f"wfo-test-f{fold.fold_id}-{test_run_id}"
             
-            async def run_test():
+            async def run_test():  # noqa: B023
                 return await self.engine_service.run_backtest(
                     job_id=test_job_id,
                     exchange=exchange,

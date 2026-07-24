@@ -202,13 +202,19 @@ class BacktestEngineService:
             # 1. Force synchronous execution queue so trades don't lag behind the simulated time loop
             from crypto_mas.services.backtesting.memory_cache import InMemoryPositionRepository
             from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
-            queue = OrderExecutorQueue.get_instance()
+            
+            # Create a completely isolated execution queue for this specific backtest run
+            # This prevents collisions with the live Trading Scheduler singleton
+            queue = OrderExecutorQueue()
             queue.sync_mode = True
             
             # Reuse a SINGLE broker instance — don't call factory() on every cycle
             _backtest_broker = cycle_service.paper_broker
             _backtest_broker.is_backtest = True  # disables per-operation commit/flush/logging
             queue.set_broker_factory(lambda: _backtest_broker)
+            
+            # Inject the isolated queue into the orchestrator
+            cycle_service.executor_queue = queue
             
             # Replace broker's DB-backed position repository with a pure in-memory version
             # This eliminates ALL SQLite reads/writes for positions during the simulation loop
@@ -330,10 +336,8 @@ class BacktestEngineService:
                     import asyncio
                     await asyncio.sleep(0)
                 
-            # Reset sync mode to avoid breaking live paper trading which runs in the same process
-            OrderExecutorQueue.get_instance().sync_mode = False
-                
-            # Step 5: Final metrics
+            # We no longer need to restore sync_mode because we used an isolated queue
+            logger.info(f"Backtest {job_id} complete. Simulated {cycle_count} cycles.")
             account_repo.get_by_name(account_name)
             
             # 6. Calculate Performance Analytics

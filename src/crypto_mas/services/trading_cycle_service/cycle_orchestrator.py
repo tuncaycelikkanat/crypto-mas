@@ -42,11 +42,13 @@ class TradingCycleService:
         candle_repo = None,
         feature_repo = None,
         ws_client = None,
+        executor_queue: OrderExecutorQueue | None = None,
     ) -> None:
         self.db = db
         self.time_provider = time_provider or SystemTimeProvider()
         self.strategy_mode = strategy_mode
         self.ws_client = ws_client
+        self.executor_queue = executor_queue or OrderExecutorQueue.get_instance()
 
         self.cycle_repository = TradingCycleRepository(db)
         self.feature_snapshot_repository = feature_repo or FeatureSnapshotRepository(db)
@@ -332,8 +334,7 @@ class TradingCycleService:
         logger.debug(f"[Cycle {cycle.id}] Enqueuing portfolio target for execution.")
         _log("EXECUTION", "Enqueuing approved portfolio to asynchronous OrderExecutorQueue")
         
-        queue = OrderExecutorQueue.get_instance()
-        queue.enqueue(
+        self.executor_queue.enqueue(
             account_name=account_name,
             target=approved_portfolio,
             cycle_id=cycle.id

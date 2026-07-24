@@ -1,6 +1,9 @@
 from datetime import datetime
+
 from dateutil.relativedelta import relativedelta
+
 from crypto_mas.engine.optimization.schemas import Fold
+
 
 class FoldGenerator:
     @staticmethod

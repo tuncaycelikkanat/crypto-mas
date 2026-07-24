@@ -1,5 +1,6 @@
 from crypto_mas.domain.models.backtest_result import BacktestResult
 
+
 class FitnessCalculator:
     @staticmethod
     def calculate_composite_score(result: BacktestResult, min_trades: int = 30) -> float:

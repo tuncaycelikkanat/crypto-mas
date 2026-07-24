@@ -7,11 +7,11 @@ from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.optimization_history import OptimizationHistory
 from crypto_mas.infrastructure.config.settings import get_settings
-from crypto_mas.infrastructure.db.session import get_db
+from crypto_mas.infrastructure.db.session import get_db_session
 from crypto_mas.services.auto_optimizer_service import AutoOptimizerService
 from crypto_mas.services.market_data_service.schemas import Timeframe
 
-router = APIRouter(prefix="/optimization", tags=["Optimization"])
+router = APIRouter(prefix="/api/v1/optimization", tags=["Optimization"])
 logger = logging.getLogger(__name__)
 
 
@@ -33,7 +33,7 @@ def background_optimization_task(db: Session, symbols: list[str], timeframe: Tim
 
 
 @router.post("/force")
-def force_optimization(background_tasks: BackgroundTasks, db: Session = Depends(get_db)) -> dict[str, Any]:
+def force_optimization(background_tasks: BackgroundTasks, db: Session = Depends(get_db_session)) -> dict[str, Any]:
     """
     Manually triggers the Auto-Optimizer job to run in the background.
     """
@@ -63,7 +63,7 @@ def force_optimization(background_tasks: BackgroundTasks, db: Session = Depends(
 
 
 @router.get("/history")
-def get_optimization_history(limit: int = 50, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def get_optimization_history(limit: int = 50, db: Session = Depends(get_db_session)) -> list[dict[str, Any]]:
     """
     Retrieves the history of all optimization runs.
     """
