@@ -211,7 +211,7 @@ const PaperTrading: React.FC = () => {
       <AnimatePresence>
         {showConfig && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} style={{ width: '500px', background: '#000', border: '1px solid var(--accent)', padding: '32px' }}>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} style={{ width: '500px', background: 'var(--bg-base)', border: '1px solid var(--accent)', padding: '32px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                 <h2 style={{ margin: 0, fontFamily: '"JetBrains Mono", monospace', fontSize: '1.25rem', color: 'var(--accent)' }}>DEPLOY_PARAMETERS</h2>
                 <button className="btn-ghost" onClick={() => setShowConfig(false)}>[X]</button>
@@ -220,7 +220,7 @@ const PaperTrading: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 <div>
                   <div className="section-label" style={{ marginBottom: '8px' }}>EXCHANGE</div>
-                  <select className="form-input" value={configExchange} onChange={e => setConfigExchange(e.target.value)} style={{ background: '#000', border: '1px solid var(--border)' }}>
+                  <select className="form-input" value={configExchange} onChange={e => setConfigExchange(e.target.value)} style={{ background: 'var(--bg-base)', border: '1px solid var(--border)' }}>
                     <option value="BINANCE">BINANCE</option>
                     <option value="MEXC">MEXC</option>
                   </select>
@@ -238,7 +238,7 @@ const PaperTrading: React.FC = () => {
 
                 <div>
                   <div className="section-label" style={{ marginBottom: '8px' }}>SYMBOL SOURCE</div>
-                  <select className="form-input" value={configSymbolSource} onChange={e => setConfigSymbolSource(e.target.value as any)} style={{ background: '#000', border: '1px solid var(--border)' }}>
+                  <select className="form-input" value={configSymbolSource} onChange={e => setConfigSymbolSource(e.target.value as any)} style={{ background: 'var(--bg-base)', border: '1px solid var(--border)' }}>
                     <option value="manual">MANUAL (CSV)</option>
                     <option value="auto">AUTO GAINERS (LIVE)</option>
                   </select>
@@ -247,7 +247,7 @@ const PaperTrading: React.FC = () => {
                 {configSymbolSource === 'manual' && (
                   <div>
                     <div className="section-label" style={{ marginBottom: '8px' }}>TARGET_SYMBOLS</div>
-                    <input type="text" className="form-input" value={configSymbols} onChange={e => setConfigSymbols(e.target.value)} placeholder="BTCUSDT, ETHUSDT" style={{ background: '#000', border: '1px solid var(--border)' }} />
+                    <input type="text" className="form-input" value={configSymbols} onChange={e => setConfigSymbols(e.target.value)} placeholder="BTCUSDT, ETHUSDT" style={{ background: 'var(--bg-base)', border: '1px solid var(--border)' }} />
                   </div>
                 )}
 
@@ -259,8 +259,8 @@ const PaperTrading: React.FC = () => {
                     </div>
                   )}
                   <div>
-                    <div className="section-label" style={{ marginBottom: '8px' }}>RISK_LEVEL</div>
-                    <input type="number" className="form-input" value={configRiskLevel} onChange={e => setConfigRiskLevel(e.target.value)} style={{ background: '#000', border: '1px solid var(--border)' }} />
+                    <div className="section-label" style={{ marginBottom: '8px' }}>RISK_LEVEL: {configRiskLevel}%</div>
+                    <input type="range" min="1" max="100" className="form-input" style={{ padding: '0', cursor: 'pointer' }} value={configRiskLevel} onChange={e => setConfigRiskLevel(e.target.value)} />
                   </div>
                 </div>
               </div>

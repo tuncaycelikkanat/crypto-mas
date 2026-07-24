@@ -109,7 +109,7 @@ const Backtesting: React.FC = () => {
                 <div><label className="section-label" style={{display:'block', marginBottom:'8px'}}>STRATEGY</label><select className="form-input" value={configMode} onChange={e => setConfigMode(e.target.value as any)}><option value="regime_adaptive">REGIME ADAPTIVE</option><option value="scalping">SCALPING</option><option value="swing">SWING</option><option value="hodl">HODL</option></select></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div><label className="section-label" style={{display:'block', marginBottom:'8px'}}>TIMEFRAME</label><select className="form-input" value={timeframe} onChange={e => setTimeframe(e.target.value)}><option value="1m">1m</option><option value="15m">15m</option><option value="1h">1h</option><option value="4h">4h</option><option value="1d">1d</option></select></div>
-                  <div><label className="section-label" style={{display:'block', marginBottom:'8px'}}>RISK_LEVEL</label><input type="number" className="form-input" value={riskLevel} onChange={e => setRiskLevel(Number(e.target.value))} required /></div>
+                  <div><label className="section-label" style={{display:'block', marginBottom:'8px'}}>RISK_LEVEL: {riskLevel}%</label><input type="range" min="1" max="100" className="form-input" style={{ padding: '0', cursor: 'pointer' }} value={riskLevel} onChange={e => setRiskLevel(Number(e.target.value))} required /></div>
                 </div>
                 <div><label className="section-label" style={{display:'block', marginBottom:'8px'}}>SYMBOL SOURCE</label><select className="form-input" value={symbolSource} onChange={e => setSymbolSource(e.target.value as any)}><option value="manual">MANUAL (CSV)</option><option value="auto">AUTO GAINERS (LIVE)</option></select></div>
                 {symbolSource === 'manual' && <div><label className="section-label" style={{display:'block', marginBottom:'8px'}}>SYMBOLS</label><input type="text" className="form-input" value={manualSymbols} onChange={e => setManualSymbols(e.target.value)} required /></div>}
@@ -150,7 +150,7 @@ const Backtesting: React.FC = () => {
               </div>
             )}
             
-            <div style={{ flex: 1, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: '#000' }}>
+            <div style={{ flex: 1, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg-base)' }}>
               <div style={{ padding: '8px 16px', background: 'var(--bg-raised)', borderBottom: '1px solid var(--border)', fontSize: '0.75rem', fontFamily: '"JetBrains Mono", monospace', color: 'var(--accent)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>&gt; SIMULATION_LOGS</span>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-primary)' }}>
