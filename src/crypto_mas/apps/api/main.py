@@ -2,7 +2,10 @@ import asyncio
 from contextlib import asynccontextmanager
 
 import uvloop
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from crypto_mas.apps.api.routers import (
     analytics_router,
@@ -83,3 +86,21 @@ app.include_router(bot_router)
 app.include_router(logs_router)
 app.include_router(analytics_router)
 app.include_router(scanner_router)
+
+# Mount frontend static files
+frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../frontend/dist"))
+
+if os.path.exists(frontend_dir):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dir, "assets")), name="assets")
+    
+    @app.get("/{full_path:path}")
+    async def serve_frontend(request: Request, full_path: str):
+        # Serve API routes normally, fallback others to index.html for React Router
+        if full_path.startswith("api/"):
+            return None
+            
+        file_path = os.path.join(frontend_dir, full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        
+        return FileResponse(os.path.join(frontend_dir, "index.html"))
