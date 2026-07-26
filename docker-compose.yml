@@ -8,56 +8,16 @@ services:
       - .env
     ports:
       - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     volumes:
       - .:/app
-      - ./logs:/app/logs
-    command: uv run uvicorn crypto_mas.apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+      - /app/frontend/dist
+      - /app/.venv
+      - /opt/venv
+    command: sh -c "uv run alembic upgrade head && uv run uvicorn crypto_mas.apps.api.main:app --host 0.0.0.0 --port 8000"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
-
-  postgres:
-    image: timescale/timescaledb:latest-pg16
-    container_name: crypto_mas_postgres
-    environment:
-      POSTGRES_USER: crypto
-      POSTGRES_PASSWORD: crypto
-      POSTGRES_DB: crypto_mas
-    ports:
-      - "5432:5432"
-    volumes:
-      - crypto_mas_postgres_data:/var/lib/postgresql/data
-    restart: always
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U crypto -d crypto_mas"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  redis:
-    image: redis:7-alpine
-    container_name: crypto_mas_redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - crypto_mas_redis_data:/data
-    restart: always
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-volumes:
-  crypto_mas_postgres_data:
-  crypto_mas_redis_data:
+      start_period: 15s
