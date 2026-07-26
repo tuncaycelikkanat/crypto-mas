@@ -26,7 +26,7 @@ def test_start_bot_already_running():
     service._scheduler.get_jobs.return_value = [job_mock]
     
     status = service.start_bot("bot_1")
-    assert status == {"bots": [{"bot_id": "bot_1", "status": "RUNNING", "next_run_time": "2023-01-01T00:00:00+00:00", "trigger": "interval", "symbols": ["BTCUSDT"], "mode": "swing", "exchange": "BINANCE", "risk_level": 50}]}
+    assert status == {"bots": [{"bot_id": "bot_1", "status": "RUNNING", "next_run_time": "2023-01-01T00:00:00+00:00", "trigger": "interval", "symbols": ["BTCUSDT"], "mode": "swing", "exchange": "BINANCE", "risk_level": 50, "use_btc_shield": True, "use_htf_shield": True, "use_regime_shield": True}]}
 
 def test_start_bot_symbols_none():
     service = SchedulerService()

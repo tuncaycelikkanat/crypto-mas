@@ -9,6 +9,22 @@ logger = logging.getLogger(__name__)
 
 class SensitivityAnalyzer:
     @staticmethod
+    def _run_coro(coro):
+        try:
+            asyncio.get_running_loop()
+            in_loop = True
+        except RuntimeError:
+            in_loop = False
+
+        if not in_loop:
+            return asyncio.run(coro)
+
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(asyncio.run, coro)
+            return future.result()
+
+    @staticmethod
     def analyze(
         best_params: dict,
         target_param: str,
@@ -27,15 +43,13 @@ class SensitivityAnalyzer:
         if base_val is None:
             logger.warning(f"Parameter {target_param} not found in best_params.")
             return results
-            
-        loop = asyncio.get_event_loop()
         
         for delta in deltas:
             test_params = dict(best_params)
             test_params[target_param] = base_val + delta
             
             # Execute backtest with perturbed parameter
-            bt_result: BacktestResult = loop.run_until_complete(run_backtest_fn(test_params))
+            bt_result: BacktestResult = SensitivityAnalyzer._run_coro(run_backtest_fn(test_params))
             score = FitnessCalculator.calculate_composite_score(bt_result, min_trades)
             
             logger.info(f"Sensitivity [ {target_param} = {test_params[target_param]:.3f} (Δ {delta:+.2f}) ] => Score: {score:.3f}")

@@ -83,9 +83,6 @@ def test_composite_score_penalty():
 
 @pytest.mark.asyncio
 async def test_sensitivity_analyzer():
-    import nest_asyncio
-    nest_asyncio.apply()
-    
     async def mock_run_backtest(params: dict) -> BacktestResult:
         # Mocking a scenario where higher TP mult yields worse results
         tp = params.get("tp_mult", 2.0)

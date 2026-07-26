@@ -4,16 +4,13 @@ from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, Tim
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.engine.regime import MarketRegime
 
+from crypto_mas.infrastructure.config.settings import get_settings
+
 # BTC-correlated asset group for concentration risk control
-BTC_CORRELATED = {"BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "AVAXUSDT"}
+BTC_CORRELATED = get_settings().btc_correlated_symbols
 
 # Asset groups for dynamic regime weighting
-COIN_GROUPS = {
-    "TOP10": {"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "LINKUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "DOTUSDT"},
-    "MEMES": {"DOGEUSDT", "SHIBUSDT", "FLOKIUSDT", "PEPEUSDT", "BONKUSDT", "WIFUSDT"},
-    "L1": {"SOLUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "FTMUSDT", "APTUSDT", "SUIUSDT", "INJUSDT"},
-    "AI_HYPE": {"INJUSDT", "RNDRUSDT", "FETUSDT", "OCEANUSDT", "AGIXUSDT", "TAOUSDT"}
-}
+COIN_GROUPS = get_settings().coin_groups
 
 
 class PortfolioEngine:

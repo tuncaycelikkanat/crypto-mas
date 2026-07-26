@@ -21,18 +21,18 @@ class WalkForwardOptimizer:
         
     def _run_async(self, coro):
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Cannot run_until_complete inside a running loop easily without nest_asyncio
-                # But since this will likely run from a synchronous script, it should be fine.
-                import nest_asyncio
-                nest_asyncio.apply()
-                return loop.run_until_complete(coro)
-            return loop.run_until_complete(coro)
+            asyncio.get_running_loop()
+            in_loop = True
         except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            return loop.run_until_complete(coro)
+            in_loop = False
+
+        if not in_loop:
+            return asyncio.run(coro)
+
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(asyncio.run, coro)
+            return future.result()
 
     def optimize(
         self,

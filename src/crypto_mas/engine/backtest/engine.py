@@ -13,12 +13,13 @@ from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 logger = logging.getLogger("backtest_engine")
 
 class Position:
-    def __init__(self, symbol: str, entry_price: float, quantity: float, entry_time: datetime, open_fee: float = 0.0):
+    def __init__(self, symbol: str, entry_price: float, quantity: float, entry_time: datetime, open_fee: float = 0.0, side: str = "LONG"):
         self.symbol = symbol
         self.entry_price = entry_price
         self.quantity = quantity
         self.entry_time = entry_time
         self.open_fee = open_fee
+        self.side = side
 
 class BacktestEngine:
     def __init__(
@@ -49,7 +50,7 @@ class BacktestEngine:
         Runs the backtest over the provided historical candles using the specified strategy.
         """
         if not candles:
-            return self._generate_report(symbol, strategy.name)  # type: ignore
+            return self._generate_report(symbol, strategy.__class__.__name__)  # type: ignore
             
         logger.info(f"Starting backtest for {symbol} with {len(candles)} candles. Strategy: {strategy.__class__.__name__}")
         
@@ -92,7 +93,7 @@ class BacktestEngine:
             )
             
             if decision:
-                self._process_decision(decision, current_price, current_time)
+                self._process_decision(decision, current_price, current_time, features_json=features_json)
                 
         # Close any open positions at the end of the backtest
         if symbol in self.positions and feature_snapshots:
@@ -102,74 +103,87 @@ class BacktestEngine:
             
         return self._generate_report(symbol, strategy.__class__.__name__)
         
-    def _process_decision(self, decision, current_price: float, current_time: datetime):
+    def _process_decision(self, decision, current_price: float, current_time: datetime, features_json: dict[str, Any] | None = None):
         symbol = decision.symbol
         
-        # Simple Logic: 
-        # If CONSIDER_LONG and no position -> BUY
-        # If CONSIDER_SHORT or NEUTRAL or HOLD -> Check if we should SELL
-        # For this basic backtest, we will simulate a fixed Take Profit / Stop Loss, or let the strategy dictate SELL.
-        # Currently, our strategies don't explicitly emit SELL (CONSIDER_SHORT is used for shorting, not closing longs).
-        # So we'll implement a simple Trailing Stop or fixed TP/SL for the backtest.
-        
-        # Let's add a basic Take Profit (2%) and Stop Loss (1%)
-        TP_PCT = 0.02
-        SL_PCT = 0.01
+        # Dynamic ATR-based Take Profit and Stop Loss
+        atr_val = features_json.get("atr_14") if features_json else None
+        if atr_val and float(atr_val) > 0 and current_price > 0:
+            atr_pct = float(atr_val) / current_price
+            SL_PCT = max(0.005, min(0.05, atr_pct * 1.5))
+            TP_PCT = max(0.01, min(0.10, SL_PCT * 2.0))
+        else:
+            TP_PCT = 0.02
+            SL_PCT = 0.01
         
         if symbol in self.positions:
-            # Check TP/SL
             pos = self.positions[symbol]
-            pnl_pct = (current_price - pos.entry_price) / pos.entry_price
-            
-            if pnl_pct >= TP_PCT:
-                self._close_position(symbol, current_price, current_time, reason="Take Profit")
-            elif pnl_pct <= -SL_PCT:
-                self._close_position(symbol, current_price, current_time, reason="Stop Loss")
-            # Or if strategy says SHORT, close long
-            elif decision.action == DecisionAction.CONSIDER_SHORT:
-                self._close_position(symbol, current_price, current_time, reason="Strategy Reversal")
+            if pos.side == "LONG":
+                pnl_pct = (current_price - pos.entry_price) / pos.entry_price
+                if pnl_pct >= TP_PCT:
+                    self._close_position(symbol, current_price, current_time, reason="Take Profit")
+                elif pnl_pct <= -SL_PCT:
+                    self._close_position(symbol, current_price, current_time, reason="Stop Loss")
+                elif decision.action == DecisionAction.CONSIDER_SHORT:
+                    self._close_position(symbol, current_price, current_time, reason="Strategy Reversal")
+            else:  # SHORT
+                pnl_pct = (pos.entry_price - current_price) / pos.entry_price
+                if pnl_pct >= TP_PCT:
+                    self._close_position(symbol, current_price, current_time, reason="Take Profit")
+                elif pnl_pct <= -SL_PCT:
+                    self._close_position(symbol, current_price, current_time, reason="Stop Loss")
+                elif decision.action == DecisionAction.CONSIDER_LONG:
+                    self._close_position(symbol, current_price, current_time, reason="Strategy Reversal")
                 
-        elif decision.action == DecisionAction.CONSIDER_LONG:
-            # Open Position
-            # Risk 10% of balance per trade
-            trade_amount = self.balance * 0.10
-            
-            # Apply slippage (buy higher)
-            execution_price = current_price * (1 + self.slippage_pct)
-            
-            quantity = trade_amount / execution_price
-            fee = trade_amount * self.fee_rate
-            
-            self.balance -= (trade_amount + fee)
-            self.positions[symbol] = Position(symbol, execution_price, quantity, current_time, open_fee=fee)
-            
-            self.trades.append({
-                "time": current_time,
-                "symbol": symbol,
-                "type": "BUY",
-                "price": execution_price,
-                "quantity": quantity,
-                "fee": fee,
-                "reason": decision.reason
-            })
+        if symbol not in self.positions:
+            if decision.action in (DecisionAction.CONSIDER_LONG, DecisionAction.CONSIDER_SHORT):
+                side = "LONG" if decision.action == DecisionAction.CONSIDER_LONG else "SHORT"
+                trade_amount = self.balance * 0.10
+                
+                if side == "LONG":
+                    execution_price = current_price * (1 + self.slippage_pct)
+                else:
+                    execution_price = current_price * (1 - self.slippage_pct)
+                    
+                quantity = trade_amount / execution_price
+                fee = trade_amount * self.fee_rate
+                
+                self.balance -= (trade_amount + fee)
+                self.positions[symbol] = Position(symbol, execution_price, quantity, current_time, open_fee=fee, side=side)
+                
+                self.trades.append({
+                    "time": current_time,
+                    "symbol": symbol,
+                    "type": f"OPEN_{side}",
+                    "side": side,
+                    "price": execution_price,
+                    "quantity": quantity,
+                    "fee": fee,
+                    "reason": decision.reason
+                })
 
     def _close_position(self, symbol: str, current_price: float, current_time: datetime, reason: str):
         pos = self.positions.pop(symbol)
         
-        # Apply slippage (sell lower)
-        execution_price = current_price * (1 - self.slippage_pct)
-        
-        notional = pos.quantity * execution_price
-        fee = notional * self.fee_rate
-        
-        self.balance += (notional - fee)
-        
-        pnl = notional - fee - (pos.quantity * pos.entry_price) - pos.open_fee
+        if pos.side == "LONG":
+            execution_price = current_price * (1 - self.slippage_pct)
+            notional = pos.quantity * execution_price
+            fee = notional * self.fee_rate
+            self.balance += (notional - fee)
+            pnl = notional - fee - (pos.quantity * pos.entry_price) - pos.open_fee
+        else:  # SHORT
+            execution_price = current_price * (1 + self.slippage_pct)
+            entry_notional = pos.quantity * pos.entry_price
+            exit_notional = pos.quantity * execution_price
+            fee = exit_notional * self.fee_rate
+            pnl = entry_notional - exit_notional - fee - pos.open_fee
+            self.balance += (entry_notional + pnl)
         
         self.trades.append({
             "time": current_time,
             "symbol": symbol,
-            "type": "SELL",
+            "type": f"CLOSE_{pos.side}",
+            "side": pos.side,
             "price": execution_price,
             "quantity": pos.quantity,
             "fee": fee,
@@ -178,16 +192,16 @@ class BacktestEngine:
         })
         
     def _generate_report(self, symbol: str, strategy_name: str) -> dict[str, Any]:
-        closed_trades = [t for t in self.trades if t['type'] == 'SELL' and t['symbol'] == symbol]
+        closed_trades = [t for t in self.trades if (t['type'].startswith('CLOSE_') or t['type'] == 'SELL') and t['symbol'] == symbol]
         
-        winning_trades = [t for t in closed_trades if t['realized_pnl'] > 0]
-        losing_trades = [t for t in closed_trades if t['realized_pnl'] <= 0]
+        winning_trades = [t for t in closed_trades if t.get('realized_pnl', 0.0) > 0]
+        losing_trades = [t for t in closed_trades if t.get('realized_pnl', 0.0) <= 0]
         
         total_profit = sum(t['realized_pnl'] for t in winning_trades)
         total_loss = abs(sum(t['realized_pnl'] for t in losing_trades))
         total_pnl = total_profit - total_loss
         
-        profit_factor = (total_profit / total_loss) if total_loss > 0 else float('inf')
+        profit_factor = (total_profit / total_loss) if total_loss > 0 else (float('inf') if total_profit > 0 else 0.0)
         win_rate = (len(winning_trades) / len(closed_trades)) * 100 if closed_trades else 0.0
         
         # Calculate Max Drawdown

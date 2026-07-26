@@ -12,11 +12,12 @@ from crypto_mas.engine.risk import RiskDecisionStatus, RiskLimits
 from crypto_mas.engine.risk.risk import RiskEngine
 from crypto_mas.infrastructure.db.session import get_db_session
 from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider
+from crypto_mas.apps.api.security import verify_api_key
 from crypto_mas.services.decision_orchestrator.multi_symbol_runner import MultiSymbolDecisionRunner
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
 
-router = APIRouter(prefix="/api/v1/paper", tags=["Paper Trading"])
+router = APIRouter(prefix="/api/v1/paper", tags=["Paper Trading"], dependencies=[Depends(verify_api_key)])
 
 @router.post("/mock/account/init")
 def initialize_mock_paper_account(

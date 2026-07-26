@@ -31,18 +31,18 @@ class AutoOptimizerService:
 
     def _run_async(self, coro):
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
+            in_loop = True
         except RuntimeError:
-            loop = None
+            in_loop = False
 
-        if loop is None:
-            # We are in a thread with no active running loop (like a FastAPI background task thread).
+        if not in_loop:
             return asyncio.run(coro)
-        else:
-            # A loop is actively running (e.g., in a Jupyter Notebook cell).
-            import nest_asyncio
-            nest_asyncio.apply()
-            return loop.run_until_complete(coro)
+
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(asyncio.run, coro)
+            return future.result()
 
     def run_optimization_job(self, symbols: list[str], timeframe: Timeframe, strategy_name: str = "regime_adaptive", lookback_months: int = 3, n_trials: int = 50, triggered_by: str = "SCHEDULED"):
         """

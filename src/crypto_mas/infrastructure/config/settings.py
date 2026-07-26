@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     database_url: str = ""
     redis_url: str = ""
 
+    api_security_key: str = ""
+    cors_origins: list[str] = ["*"]
+
     binance_api_key: str = ""
     binance_api_secret: str = ""
 
@@ -29,6 +32,20 @@ class Settings(BaseSettings):
     scheduled_symbols: list[str] = ["BTCUSDT", "ETHUSDT"]
     scheduled_timeframe: str = "1h"
     schedule_cron: str = "0 * * * *"  # Every hour at minute 0
+
+    # Domain Constants & Strategy Groups (Externalized for flexibility)
+    btc_correlated_symbols: set[str] = {"BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "AVAXUSDT"}
+    coin_groups: dict[str, set[str]] = {
+        "TOP10": {"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "LINKUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "DOTUSDT"},
+        "MEMES": {"DOGEUSDT", "SHIBUSDT", "FLOKIUSDT", "PEPEUSDT", "BONKUSDT", "WIFUSDT"},
+        "L1": {"SOLUSDT", "ADAUSDT", "AVAXUSDT", "NEARUSDT", "FTMUSDT", "APTUSDT", "SUIUSDT", "INJUSDT"},
+        "AI_HYPE": {"INJUSDT", "RNDRUSDT", "FETUSDT", "OCEANUSDT", "AGIXUSDT", "TAOUSDT"}
+    }
+    mode_config: dict[str, tuple[str, str, int]] = {
+        "scalping": ("15m", "hft_momentum", 60),
+        "swing":    ("4h",  "macd_cross",   120),
+        "hodl":     ("1d",  "ema_golden_cross", 3600),
+    }
 
     model_config = SettingsConfigDict(
         env_file=".env",

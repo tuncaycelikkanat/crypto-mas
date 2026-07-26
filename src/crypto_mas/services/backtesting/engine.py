@@ -372,7 +372,12 @@ class BacktestEngineService:
             result.completed_at = datetime.now(UTC)  # type: ignore
             self.db.commit()
             
-            logger.info(f"[{job_id}] Backtest completed successfully. Final Equity: {result.final_equity}, Win Rate: {result.win_rate}, Max DD: {result.max_drawdown}")
+            logger.info(
+                f"[{job_id}] Backtest completed successfully. "
+                f"Final Equity: {result.final_equity}, Win Rate: {result.win_rate}, "
+                f"Max DD: {result.max_drawdown}, Sharpe: {result.sharpe_ratio}, "
+                f"Sortino: {result.sortino_ratio}, Calmar: {result.calmar_ratio}"
+            )
             
             # 7. Archive Data
             try:
@@ -408,8 +413,17 @@ class BacktestEngineService:
             "total_trades": result.total_trades,
             "win_rate": result.win_rate,
             "max_drawdown": result.max_drawdown,
-            "start_time": result.start_time.isoformat(),
-            "end_time": result.end_time.isoformat(),
+            "sharpe_ratio": result.sharpe_ratio,
+            "sortino_ratio": result.sortino_ratio,
+            "calmar_ratio": result.calmar_ratio,
+            "profit_factor": result.profit_factor,
+            "expectancy": result.expectancy,
+            "avg_win": result.avg_win,
+            "avg_loss": result.avg_loss,
+            "avg_trade_duration_s": result.avg_trade_duration_s,
+            "total_fees_paid": result.total_fees_paid,
+            "start_time": result.start_time.isoformat() if result.start_time else None,
+            "end_time": result.end_time.isoformat() if result.end_time else None,
             "strategy": result.strategy_name,
             "symbols": result.symbols,
         }

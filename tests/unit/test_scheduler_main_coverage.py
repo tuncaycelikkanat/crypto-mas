@@ -68,6 +68,6 @@ def test_main():
         
         main()
         
-        mock_scheduler.add_job.assert_called_once()
+        assert mock_scheduler.add_job.call_count == 2
         mock_scheduler.start.assert_called_once()
         mock_scheduler.shutdown.assert_called_once()
