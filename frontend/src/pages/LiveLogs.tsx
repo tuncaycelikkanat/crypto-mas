@@ -178,10 +178,15 @@ const DetailPanel: React.FC<{ log: LogEntry | null }> = ({ log }) => {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', height: '100%', gap: 12
+        justifyContent: 'center', height: '100%', gap: 12, padding: 32, textAlign: 'center'
       }} className="text-muted">
-        <Terminal size={40} opacity={0.3} />
-        <p style={{ fontSize: '0.9rem' }}>Detay görmek için bir log satırına tıkla</p>
+        <Terminal size={48} opacity={0.3} />
+        <p style={{ fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-secondary)', margin: 0 }}>
+          Detay Panel Bekleniyor
+        </p>
+        <p style={{ fontSize: '0.85rem', maxWidth: 280, margin: 0 }}>
+          Soldaki listeden herhangi bir log kaydına tıkladığınızda tüm işlem parametreleri ve JSON verisi burada görüntülenecektir.
+        </p>
       </div>
     );
   }
@@ -347,6 +352,7 @@ const LiveLogs: React.FC = () => {
         setLogs(res.data.logs);
         setLiveCount(res.data.count);
         setLastUpdated(new Date().toLocaleTimeString('tr-TR'));
+        setSelectedLog(prev => prev || (res.data.logs.length > 0 ? res.data.logs[0] : null));
       }
     } catch (err) {
       console.error('Error fetching logs:', err);
