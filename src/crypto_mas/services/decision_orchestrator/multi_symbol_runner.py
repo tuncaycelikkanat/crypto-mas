@@ -4,6 +4,7 @@ from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSn
 from crypto_mas.domain.repositories.symbol_repository import SymbolRepository
 from crypto_mas.engine.strategy.factory import StrategyFactory
 from crypto_mas.engine.strategy.schemas import DecisionAction, TradingDecision
+from crypto_mas.services.audit_service.decision_audit_service import DecisionAuditService
 from crypto_mas.services.decision_orchestrator.multi_symbol import MultiSymbolDecisionResult
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
@@ -47,6 +48,33 @@ class MultiSymbolDecisionRunner:
 
             if decision is not None:
                 decisions.append(decision)
+                try:
+                    audit_trail = {
+                        "trend_engine": {
+                            "signal": decision.signal.signal_type.value,
+                            "confidence": decision.signal.confidence,
+                        },
+                        "scoring_engine": {
+                            "score": decision.score.total_score,
+                            "components": decision.score.components,
+                        },
+                        "regime_filter": (
+                            decision.regime.model_dump(mode="json")
+                            if decision.regime
+                            else {"status": "NOT_EVALUATED"}
+                        ),
+                        "reason": decision.reason,
+                    }
+                    DecisionAuditService.get_instance().log_decision(
+                        symbol=symbol.symbol,
+                        decision=decision.action.value,
+                        audit_trail=audit_trail,
+                        exchange=exchange.value,
+                        timeframe=timeframe.value,
+                        notes=decision.reason,
+                    )
+                except Exception:
+                    pass
 
         sorted_decisions = sorted(
             decisions,

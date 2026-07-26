@@ -13,6 +13,7 @@ from slowapi.util import get_remote_address
 
 from crypto_mas.apps.api.routers import (
     analytics_router,
+    audit_router,
     backtest_router,
     bot_router,
     cycle_router,
@@ -27,6 +28,7 @@ from crypto_mas.apps.api.routers import (
     risk_router,
     scanner_router,
     signals_router,
+    ws_risk_router,
 )
 from crypto_mas.domain.models.config_version import ConfigVersion
 from crypto_mas.infrastructure.config.settings import get_settings
@@ -114,6 +116,8 @@ app.include_router(bot_router)
 app.include_router(logs_router)
 app.include_router(analytics_router)
 app.include_router(scanner_router)
+app.include_router(audit_router)
+app.include_router(ws_risk_router)
 
 # Mount frontend static files
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../frontend/dist"))

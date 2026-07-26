@@ -3,6 +3,7 @@ import axios from 'axios';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import LiveConsole from '../components/LiveConsole';
+import RiskRegimeShield from '../components/RiskRegimeShield';
 
 const MarketRadar: React.FC = () => {
   const [symbols, setSymbols] = useState<string[]>([]);
@@ -75,6 +76,7 @@ const MarketRadar: React.FC = () => {
 
       {/* ── Right Main Area ───────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', paddingRight: '8px' }}>
+        <RiskRegimeShield />
         {loading && !coinData && <div className="text-muted">Loading {selectedSymbol}...</div>}
         
         <AnimatePresence mode="wait">
