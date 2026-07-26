@@ -8,6 +8,7 @@ import {
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer
 } from 'recharts';
+import RiskRegimeShield from '../components/RiskRegimeShield';
 
 // ── Stat Card ────────────────────────────────────────────────
 const StatCard: React.FC<{
@@ -158,6 +159,9 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
       </motion.div>
+
+      {/* Real-Time Risk & Regime Shield */}
+      <RiskRegimeShield />
 
       {/* Stat Cards */}
       <div className="grid-cols-4">
