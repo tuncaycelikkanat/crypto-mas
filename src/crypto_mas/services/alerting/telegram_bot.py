@@ -123,30 +123,34 @@ class TelegramAlerter:
             return
 
         text = message.get("text", "").strip()
-        if text.startswith("/"):
+        if text:
             await self._dispatch_command(text)
 
     async def _dispatch_command(self, text: str) -> None:
         """Execute interactive commands (/help, /status, /positions, /balance, /regime, /panic)."""
-        parts = text.split()
-        command = parts[0].lower()
+        try:
+            parts = text.split()
+            command = parts[0].lower().lstrip("/")
 
-        if command in ("/help", "/start"):
-            await self._cmd_help()
-        elif command in ("/test", "/ping"):
-            await self._cmd_test()
-        elif command == "/status":
-            await self._cmd_status()
-        elif command == "/positions":
-            await self._cmd_positions()
-        elif command == "/balance":
-            await self._cmd_balance()
-        elif command == "/regime":
-            await self._cmd_regime()
-        elif command in ("/panic", "/stop_all"):
-            await self._cmd_panic()
-        else:
-            await self.send(f"❓ Bilinmeyen komut: <code>{command}</code>. Yardım menüsü için <b>/help</b> yazabilirsin.")
+            if command in ("help", "start"):
+                await self._cmd_help()
+            elif command in ("test", "ping"):
+                await self._cmd_test()
+            elif command == "status":
+                await self._cmd_status()
+            elif command == "positions":
+                await self._cmd_positions()
+            elif command == "balance":
+                await self._cmd_balance()
+            elif command == "regime":
+                await self._cmd_regime()
+            elif command in ("panic", "stop_all"):
+                await self._cmd_panic()
+            else:
+                await self.send(f"❓ Bilinmeyen komut: <code>{command}</code>. Yardım menüsü için <b>/help</b> yazabilirsin.")
+        except Exception as exc:
+            logger.error("[TelegramService] Error executing command '%s': %s", text, exc, exc_info=True)
+            await self.send(f"❌ Komut çalıştırılırken bir hata oluştu: <code>{exc}</code>")
 
     async def _cmd_help(self) -> None:
         """Send rich HTML help menu."""
@@ -159,7 +163,8 @@ class TelegramAlerter:
             "<b>/positions</b> — Açık olan pozisyonları, giriş fiyatlarını ve PnL durumunu listeler.\n"
             "<b>/balance</b> — Portföy bakiyesini (Cash & Equity) raporlar.\n"
             "<b>/regime</b> — Mevcut piyasa rejimini (BULL_TREND / BEAR_TREND vs.) denetler.\n"
-            "🚨 <b>/panic</b> — <b>ACİL DURDURMA:</b> Çalışan tüm algoritmik botları anında durdurur!"
+            "🚨 <b>/panic</b> — <b>ACİL DURDURMA:</b> Çalışan tüm algoritmik botları anında durdurur!\n\n"
+            "💡 <i>Not: Komutları başında / işareti olmadan da (örn: <b>status</b>, <b>ping</b>) yazabilirsiniz.</i>"
         )
         await self.send(msg)
 
@@ -177,7 +182,12 @@ class TelegramAlerter:
         settings = get_settings()
         active_jobs = 0
         if self.app_state and getattr(self.app_state, "scheduler", None):
-            active_jobs = len(self.app_state.scheduler.list_jobs())
+            try:
+                status_dict = self.app_state.scheduler.get_status()
+                bots_info = status_dict.get("bots", [])
+                active_jobs = len(bots_info)
+            except Exception as exc:
+                logger.warning("[TelegramService] _cmd_status error getting scheduler status: %s", exc)
 
         msg = (
             f"⚙️ <b>Crypto MAS Sistem Durumu</b>\n\n"

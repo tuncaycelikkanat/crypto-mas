@@ -108,3 +108,29 @@ async def test_telegram_alert_helpers():
         await service.alert_drawdown_limit(0.15, 0.10, "default")
 
         assert mock_send.call_count == 6
+
+
+@pytest.mark.asyncio
+async def test_telegram_slash_optional():
+    service = TelegramService(token="123:ABC", chat_id="999888")
+    with patch.object(service, "send", new_callable=AsyncMock) as mock_send:
+        await service._handle_message({"chat": {"id": "999888"}, "text": "status"})
+        mock_send.assert_called_once()
+        assert "Sistem Durumu" in mock_send.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_telegram_cmd_status_with_scheduler():
+    service = TelegramService(token="123:ABC", chat_id="999888")
+    mock_scheduler = MagicMock()
+    mock_scheduler.get_status.return_value = {"bots": [{"id": "bot1"}, {"id": "bot2"}]}
+    app_state = MagicMock()
+    app_state.scheduler = mock_scheduler
+    service.app_state = app_state
+
+    with patch.object(service, "send", new_callable=AsyncMock) as mock_send:
+        await service._dispatch_command("status")
+        mock_send.assert_called_once()
+        text = mock_send.call_args[0][0]
+        assert "2" in text  # 2 active bots
+
