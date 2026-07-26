@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, FlaskConical, Bot, Terminal, Zap,
   Sun, Moon, TrendingUp, Activity, Wifi, WifiOff
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import axios from 'axios';
 
 const NAV_ITEMS = [
@@ -21,7 +21,7 @@ const Layout: React.FC = () => {
     (localStorage.getItem('theme') as 'light' | 'dark') || 'dark'
   );
   const [sysOnline, setSysOnline] = useState<boolean | null>(null);
-  const location = useLocation();
+
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
@@ -169,18 +169,9 @@ const Layout: React.FC = () => {
 
         {/* Page */}
         <div style={{ flex: 1, padding: '28px 32px' }}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+          <Outlet />
         </div>
+
       </main>
     </div>
   );
