@@ -10,6 +10,7 @@ Configuration (via .env):
     TELEGRAM_CHAT_ID=<your chat id>
 """
 import asyncio
+from decimal import Decimal
 import logging
 from typing import Any
 
@@ -189,11 +190,13 @@ class TelegramAlerter:
             except Exception as exc:
                 logger.warning("[TelegramService] _cmd_status error getting scheduler status: %s", exc)
 
+        bot_status_str = f"{active_jobs} Aktif Bot Çalışıyor" if active_jobs > 0 else "0 (Aktif Al-Sat Botu Yok)"
         msg = (
-            f"⚙️ <b>Crypto MAS Sistem Durumu</b>\n\n"
-            f"🟢 <b>Durum:</b> AKTİF & ÇALIŞIYOR\n"
-            f"🕹️ <b>Mod:</b> <code>{settings.trading_mode}</code>\n"
-            f"⏱️ <b>Zamanlanmış İş (Job) Sayısı:</b> <code>{active_jobs}</code>\n"
+            f"⚙️ <b>Crypto MAS — Sistem ve Bot Durumu</b>\n\n"
+            f"🟢 <b>Sistem Altyapısı:</b> AKTİF (7/24 Dinliyor)\n"
+            f"🕹️ <b>İşlem Modu:</b> <code>{settings.trading_mode}</code>\n"
+            f"🤖 <b>Çalışan Al-Sat Botu:</b> <code>{bot_status_str}</code>\n"
+            f"ℹ️ <i>Not: Mod PAPER olarak ayarlıdır. Arayüzden veya API'den bot başlattığınızda burada görünecektir.</i>\n"
             f"🔗 <b>Korele Varlık Listesi:</b> <code>{len(settings.btc_correlated_symbols)} coin</code>"
         )
         await self.send(msg)
@@ -203,12 +206,12 @@ class TelegramAlerter:
         try:
             with SessionLocal() as db:
                 repo = PositionRepository(db)
-                positions = repo.list_open_positions("paper_default")
+                positions = repo.list_open_positions("default-paper")
                 if not positions:
-                    await self.send("📂 <b>Açık Pozisyon Bulunmuyor</b>\nŞu anda aktif alım-satım pozisyonu yok.")
+                    await self.send("📂 <b>Açık Pozisyon Bulunmuyor</b>\nŞu anda <code>default-paper</code> hesabında aktif alım-satım pozisyonu yok.")
                     return
 
-                lines = ["📊 <b>Açık Pozisyonlar (Paper Default)</b>\n"]
+                lines = ["📊 <b>Açık Pozisyonlar (default-paper)</b>\n"]
                 for p in positions:
                     lines.append(
                         f"🔹 <b>{p.symbol} ({p.status})</b>\n"
@@ -225,10 +228,14 @@ class TelegramAlerter:
         try:
             with SessionLocal() as db:
                 repo = PaperAccountRepository(db)
-                account = repo.get_by_name("paper_default")
+                account = repo.get_by_name("default-paper")
                 if not account:
-                    await self.send("💰 <b>Hesap Bulunamadı</b>\n<code>paper_default</code> hesabı henüz oluşturulmamış.")
-                    return
+                    account = repo.create_if_not_exists(
+                        name="default-paper",
+                        exchange="MOCK",
+                        base_currency="USDT",
+                        initial_balance=Decimal("10000"),
+                    )
 
                 msg = (
                     f"💰 <b>Portföy Bakiyesi ({account.name})</b>\n\n"
