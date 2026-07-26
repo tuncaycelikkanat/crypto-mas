@@ -35,6 +35,7 @@ from crypto_mas.infrastructure.logging.setup import setup_logging
 from crypto_mas.services.config_service.config_service import ConfigService
 from crypto_mas.services.config_service.schemas import TradingConfig
 from crypto_mas.services.scheduler_service import SchedulerService
+from crypto_mas.services.alerting.telegram_bot import TelegramService
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 setup_logging(env="dev")  # Production'da env var'dan okunabilir
@@ -65,8 +66,18 @@ async def lifespan(app: FastAPI):
     app.state.scheduler = scheduler_service
     scheduler_service.start()
 
+    # Start Telegram Bot & Command Center
+    telegram_service = TelegramService(
+        token=settings.telegram_bot_token,
+        chat_id=settings.telegram_chat_id,
+    )
+    app.state.telegram = telegram_service
+    if settings.telegram_enabled or (settings.telegram_bot_token and settings.telegram_chat_id):
+        await telegram_service.start_polling(app.state)
+
     yield
     # Shutdown
+    telegram_service.stop_polling()
     scheduler_service.shutdown()
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])

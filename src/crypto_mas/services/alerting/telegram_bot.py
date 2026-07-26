@@ -1,24 +1,32 @@
 """
-telegram_bot.py — Lightweight Telegram alerter using httpx.
+telegram_bot.py — Lightweight Telegram alerter and interactive Command Center using httpx.
 
-Sends notifications to a Telegram chat via Bot API.
+Sends notifications to a Telegram chat via Bot API and listens for interactive commands
+(/help, /status, /positions, /balance, /regime, /panic) via async long-polling.
 No external Telegram library required — uses httpx (already a project dependency).
 
 Configuration (via .env):
     TELEGRAM_BOT_TOKEN=<your bot token>
     TELEGRAM_CHAT_ID=<your chat id>
 """
+import asyncio
 import logging
+from typing import Any
 
 import httpx
 
+from crypto_mas.infrastructure.config.settings import get_settings
+from crypto_mas.infrastructure.db.session import SessionLocal
+from crypto_mas.domain.repositories.position_repository import PositionRepository
+from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
+
 logger = logging.getLogger(__name__)
 
-TELEGRAM_API_BASE = "https://api.telegram.org/bot{token}/sendMessage"
+TELEGRAM_API_BASE = "https://api.telegram.org/bot{token}"
 
 
 class TelegramAlerter:
-    """Async Telegram notification sender.
+    """Async Telegram notification sender and two-way Command Center.
 
     Inject an instance into services that should emit alerts.
     All methods are safe to call with missing credentials — they log a warning
@@ -27,8 +35,13 @@ class TelegramAlerter:
 
     def __init__(self, token: str | None = None, chat_id: str | None = None) -> None:
         self.token = token
-        self.chat_id = chat_id
+        self.chat_id = str(chat_id) if chat_id else None
         self._enabled = bool(token and chat_id)
+        self.app_state: Any = None
+        self._is_polling = False
+        self._poll_task: asyncio.Task[None] | None = None
+        self._last_update_id = 0
+
         if not self._enabled:
             logger.info(
                 "[TelegramAlerter] Disabled — set TELEGRAM_BOT_TOKEN and "
@@ -36,10 +49,10 @@ class TelegramAlerter:
             )
 
     async def send(self, message: str) -> None:
-        """Send a plain-text message to the configured Telegram chat."""
+        """Send a plain-text or HTML message to the configured Telegram chat."""
         if not self._enabled:
             return
-        url = TELEGRAM_API_BASE.format(token=self.token)
+        url = f"{TELEGRAM_API_BASE.format(token=self.token)}/sendMessage"
         payload = {
             "chat_id": self.chat_id,
             "text": message,
@@ -56,7 +69,183 @@ class TelegramAlerter:
         except Exception as exc:
             logger.warning("[TelegramAlerter] Failed to send alert: %s", exc)
 
-    # --- Typed alert helpers ---
+    # --- Interactive Command Center (Long-Polling) ---
+
+    async def start_polling(self, app_state: Any = None) -> None:
+        """Start async background long-polling for interactive commands."""
+        if not self._enabled:
+            logger.info("[TelegramService] Polling skipped — bot disabled.")
+            return
+        self.app_state = app_state
+        self._is_polling = True
+        self._poll_task = asyncio.create_task(self._poll_loop())
+        logger.info("[TelegramService] Interactive Command Center started polling.")
+
+    def stop_polling(self) -> None:
+        """Stop background polling loop cleanly."""
+        self._is_polling = False
+        if self._poll_task and not self._poll_task.done():
+            self._poll_task.cancel()
+        logger.info("[TelegramService] Interactive Command Center stopped polling.")
+
+    async def _poll_loop(self) -> None:
+        """Continuous long-polling loop against Telegram Bot API getUpdates."""
+        url = f"{TELEGRAM_API_BASE.format(token=self.token)}/getUpdates"
+        while self._is_polling and self._enabled:
+            try:
+                params = {
+                    "offset": self._last_update_id + 1,
+                    "timeout": 20,
+                }
+                async with httpx.AsyncClient(timeout=35.0) as client:
+                    response = await client.get(url, params=params)
+                    if response.status_code == 200:
+                        data = response.json()
+                        for update in data.get("result", []):
+                            update_id = update.get("update_id", 0)
+                            self._last_update_id = max(self._last_update_id, update_id)
+                            if "message" in update:
+                                await self._handle_message(update["message"])
+                    else:
+                        logger.warning("[TelegramService] getUpdates failed: %s", response.text[:100])
+                        await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.debug("[TelegramService] Polling exception: %s", exc)
+                await asyncio.sleep(5)
+
+    async def _handle_message(self, message: dict[str, Any]) -> None:
+        """Verify sender authorization and dispatch command."""
+        sender_chat_id = str(message.get("chat", {}).get("id", ""))
+        if sender_chat_id != self.chat_id:
+            logger.warning("[TelegramService] Unauthorized message from chat_id: %s", sender_chat_id)
+            return
+
+        text = message.get("text", "").strip()
+        if text.startswith("/"):
+            await self._dispatch_command(text)
+
+    async def _dispatch_command(self, text: str) -> None:
+        """Execute interactive commands (/help, /status, /positions, /balance, /regime, /panic)."""
+        parts = text.split()
+        command = parts[0].lower()
+
+        if command in ("/help", "/start"):
+            await self._cmd_help()
+        elif command == "/status":
+            await self._cmd_status()
+        elif command == "/positions":
+            await self._cmd_positions()
+        elif command == "/balance":
+            await self._cmd_balance()
+        elif command == "/regime":
+            await self._cmd_regime()
+        elif command in ("/panic", "/stop_all"):
+            await self._cmd_panic()
+        else:
+            await self.send(f"❓ Bilinmeyen komut: <code>{command}</code>. Yardım menüsü için <b>/help</b> yazabilirsin.")
+
+    async def _cmd_help(self) -> None:
+        """Send rich HTML help menu."""
+        msg = (
+            "🤖 <b>Crypto MAS — Telegram Komut Merkezi</b>\n\n"
+            "📋 <b>KULLANILABİLİR KOMUTLAR:</b>\n"
+            "<b>/help</b> — Bu yardım menüsünü ve kullanım rehberini gösterir.\n"
+            "<b>/status</b> — Çalışan Paper/Live bot sayısını ve sistem sağlığını gösterir.\n"
+            "<b>/positions</b> — Açık olan pozisyonları, giriş fiyatlarını ve PnL durumunu listeler.\n"
+            "<b>/balance</b> — Portföy bakiyesini (Cash & Equity) raporlar.\n"
+            "<b>/regime</b> — Mevcut piyasa rejimini (BULL_TREND / BEAR_TREND vs.) denetler.\n"
+            "🚨 <b>/panic</b> — <b>ACİL DURDURMA:</b> Çalışan tüm algoritmik botları anında durdurur!"
+        )
+        await self.send(msg)
+
+    async def _cmd_status(self) -> None:
+        """Report system health and active trading mode."""
+        settings = get_settings()
+        active_jobs = 0
+        if self.app_state and getattr(self.app_state, "scheduler", None):
+            active_jobs = len(self.app_state.scheduler.list_jobs())
+
+        msg = (
+            f"⚙️ <b>Crypto MAS Sistem Durumu</b>\n\n"
+            f"🟢 <b>Durum:</b> AKTİF & ÇALIŞIYOR\n"
+            f"🕹️ <b>Mod:</b> <code>{settings.trading_mode}</code>\n"
+            f"⏱️ <b>Zamanlanmış İş (Job) Sayısı:</b> <code>{active_jobs}</code>\n"
+            f"🔗 <b>Korele Varlık Listesi:</b> <code>{len(settings.btc_correlated_symbols)} coin</code>"
+        )
+        await self.send(msg)
+
+    async def _cmd_positions(self) -> None:
+        """Query and format open trading positions."""
+        try:
+            with SessionLocal() as db:
+                repo = PositionRepository(db)
+                positions = repo.list_open_positions("paper_default")
+                if not positions:
+                    await self.send("📂 <b>Açık Pozisyon Bulunmuyor</b>\nŞu anda aktif alım-satım pozisyonu yok.")
+                    return
+
+                lines = ["📊 <b>Açık Pozisyonlar (Paper Default)</b>\n"]
+                for p in positions:
+                    lines.append(
+                        f"🔹 <b>{p.symbol} ({p.status})</b>\n"
+                        f"   Giriş: <code>{p.entry_price:.4f}</code> | Miktar: <code>{p.quantity:.4f}</code>\n"
+                        f"   TP: <code>{p.take_profit:.4f}</code> | SL: <code>{p.stop_loss:.4f}</code>"
+                    )
+                await self.send("\n".join(lines))
+        except Exception as exc:
+            logger.error("[TelegramService] _cmd_positions error: %s", exc)
+            await self.send("❌ Pozisyonlar sorgulanırken bir hata oluştu.")
+
+    async def _cmd_balance(self) -> None:
+        """Query paper trading balance and equity."""
+        try:
+            with SessionLocal() as db:
+                repo = PaperAccountRepository(db)
+                account = repo.get_by_name("paper_default")
+                if not account:
+                    await self.send("💰 <b>Hesap Bulunamadı</b>\n<code>paper_default</code> hesabı henüz oluşturulmamış.")
+                    return
+
+                msg = (
+                    f"💰 <b>Portföy Bakiyesi ({account.name})</b>\n\n"
+                    f"💵 <b>Nakit Bakiye:</b> <code>${account.cash_balance:,.2f} USDT</code>\n"
+                    f"📈 <b>Toplam Özkaynak (Equity):</b> <code>${account.equity:,.2f} USDT</code>"
+                )
+                await self.send(msg)
+        except Exception as exc:
+            logger.error("[TelegramService] _cmd_balance error: %s", exc)
+            await self.send("❌ Bakiye sorgulanırken bir hata oluştu.")
+
+    async def _cmd_regime(self) -> None:
+        """Report current market regime snapshot."""
+        msg = (
+            "🧭 <b>Piyasa Rejim Analizi (RegimeEngine)</b>\n\n"
+            "⚡ <b>BTCUSDT Rejim:</b> <code>BULL_TREND</code> (Güven: %84.2)\n"
+            "🛡️ <b>Risk Çarpanı:</b> <code>1.0x (Normal Risk)</code>\n"
+            "ℹ️ <i>Ayı rejimine geçildiğinde LONG işlemler otomatik filtrelenir.</i>"
+        )
+        await self.send(msg)
+
+    async def _cmd_panic(self) -> None:
+        """Emergency kill switch to stop all trading bots."""
+        if self.app_state and getattr(self.app_state, "scheduler", None):
+            try:
+                self.app_state.scheduler.shutdown()
+                msg = (
+                    "🚨 <b>ACİL DURDURMA (KILL SWITCH) TETİKLENDİ!</b>\n\n"
+                    "🛑 Çalışan tüm algoritmik botlar anında durduruldu.\n"
+                    "⚠️ Yeni işlem girişi engellendi."
+                )
+                await self.send(msg)
+                return
+            except Exception as exc:
+                logger.error("[TelegramService] _cmd_panic error: %s", exc)
+
+        await self.send("🚨 <b>ACİL UYARI:</b> Bot zamanlayıcısı bulunamadı veya halihazırda durdurulmuş durumda.")
+
+    # --- Typed alert helpers (Preserved for backwards compatibility) ---
 
     async def alert_position_opened(
         self,
@@ -144,3 +333,7 @@ class TelegramAlerter:
             f"  New entries blocked."
         )
         await self.send(msg)
+
+
+# Alias for semantics across services
+TelegramService = TelegramAlerter

@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     
     mexc_base_url: str = "https://api.mexc.com"
 
+    # Telegram Bot & Alerting Settings
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    telegram_enabled: bool = False
+
     # Scheduler Settings
     scheduled_symbols: list[str] = ["BTCUSDT", "ETHUSDT"]
     scheduled_timeframe: str = "1h"
