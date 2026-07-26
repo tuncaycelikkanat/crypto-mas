@@ -50,6 +50,17 @@ async def test_telegram_cmd_help():
 
 
 @pytest.mark.asyncio
+async def test_telegram_cmd_test():
+    service = TelegramService(token="123:ABC", chat_id="999888")
+    with patch.object(service, "send", new_callable=AsyncMock) as mock_send:
+        await service._dispatch_command("/test")
+        mock_send.assert_called_once()
+        text = mock_send.call_args[0][0]
+        assert "PONG!" in text
+        assert "Bağlantısı Başarılı" in text
+
+
+@pytest.mark.asyncio
 async def test_telegram_cmd_status():
     service = TelegramService(token="123:ABC", chat_id="999888")
     with patch.object(service, "send", new_callable=AsyncMock) as mock_send:

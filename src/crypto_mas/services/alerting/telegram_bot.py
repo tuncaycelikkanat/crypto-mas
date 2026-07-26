@@ -133,6 +133,8 @@ class TelegramAlerter:
 
         if command in ("/help", "/start"):
             await self._cmd_help()
+        elif command in ("/test", "/ping"):
+            await self._cmd_test()
         elif command == "/status":
             await self._cmd_status()
         elif command == "/positions":
@@ -152,11 +154,21 @@ class TelegramAlerter:
             "🤖 <b>Crypto MAS — Telegram Komut Merkezi</b>\n\n"
             "📋 <b>KULLANILABİLİR KOMUTLAR:</b>\n"
             "<b>/help</b> — Bu yardım menüsünü ve kullanım rehberini gösterir.\n"
+            "<b>/test</b> (veya <b>/ping</b>) — Telegram bot bağlantısının çalıştığını test eder.\n"
             "<b>/status</b> — Çalışan Paper/Live bot sayısını ve sistem sağlığını gösterir.\n"
             "<b>/positions</b> — Açık olan pozisyonları, giriş fiyatlarını ve PnL durumunu listeler.\n"
             "<b>/balance</b> — Portföy bakiyesini (Cash & Equity) raporlar.\n"
             "<b>/regime</b> — Mevcut piyasa rejimini (BULL_TREND / BEAR_TREND vs.) denetler.\n"
             "🚨 <b>/panic</b> — <b>ACİL DURDURMA:</b> Çalışan tüm algoritmik botları anında durdurur!"
+        )
+        await self.send(msg)
+
+    async def _cmd_test(self) -> None:
+        """Send a quick ping/test verification message."""
+        msg = (
+            "🏓 <b>PONG! — Telegram Bağlantısı Başarılı!</b>\n\n"
+            "✅ <b>Bot Durumu:</b> Aktif ve komutlarınızı dinlemeye hazır.\n"
+            "💬 <b>Yetkili Chat ID:</b> Doğrulandı."
         )
         await self.send(msg)
 
