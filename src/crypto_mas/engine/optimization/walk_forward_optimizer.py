@@ -180,8 +180,8 @@ class WalkForwardOptimizer:
             
             logger.info(f"Fold {fold.fold_id} Test Score: {test_score}, PnL: {test_result.final_equity}, WinRate: {test_result.win_rate}")
             test_results.append(test_result)
-            net_p = getattr(test_result, "net_profit", 0.0) if test_result else 0.0
-            trades_c = getattr(test_result, "trades_executed", 0) if test_result else 0
+            net_p = float(test_result.final_equity - test_result.initial_balance) if (test_result and test_result.final_equity and test_result.initial_balance) else 0.0
+            trades_c = getattr(test_result, "total_trades", 0) if test_result else 0
             win_r = getattr(test_result, "win_rate", 0.0) if test_result else 0.0
             print(f"      ✅ SONUÇ -> Test PnL: ${net_p:+.2f} | Başarı: %{win_r:.1f} | İşlem Sayısı: {trades_c}", flush=True)
             
