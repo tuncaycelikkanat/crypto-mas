@@ -1,5 +1,5 @@
 """
-colab_4year_comprehensive_backtest.py — Institutional 4-Year (48 Months & 200+ Weeks) WFO & Sensitivity Suite.
+colab_4year_comprehensive_backtest.py — Institutional 4.5-Year (54 Months & 230+ Weeks, 2022-01-01 -> 2026-07-01) WFO & Sensitivity Suite.
 
 Usage in Google Colab or CLI:
     python colab/colab_4year_comprehensive_backtest.py --mode all
@@ -120,16 +120,16 @@ def run_4year_comprehensive_suite(mode: str = "all"):
     engine_service = BacktestEngineService(db)
     optimizer = WalkForwardOptimizer(db, engine_service)
 
-    # 4-Year Institutional Window: 2022-01-01 -> 2026-01-01 (or current date)
+    # 4.5-Year Institutional Window: 2022-01-01 -> 2026-07-01 (54 Months & 230+ Weeks)
     start_date = datetime(2022, 1, 1, tzinfo=timezone.utc)
-    end_date = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end_date = datetime(2026, 7, 1, tzinfo=timezone.utc)
     timeframe = Timeframe.ONE_HOUR
     strategy_name = "regime_adaptive"
 
     results_dir = create_results_dir()
 
     print("====================================================================")
-    print("      CRYPTO MAS — 4-YEAR COMPREHENSIVE BACKTEST SUITE             ")
+    print("      CRYPTO MAS — 4.5-YEAR COMPREHENSIVE BACKTEST SUITE           ")
     print(f"      Period: {start_date.strftime('%Y-%m-%d')} -> {end_date.strftime('%Y-%m-%d')}")
     print(f"      Mode:   {mode.upper()}")
     print("====================================================================")
