@@ -42,3 +42,39 @@ class FoldGenerator:
             fold_id += 1
             
         return folds
+
+    @staticmethod
+    def generate_weekly_rolling_folds(
+        start_date: datetime,
+        end_date: datetime,
+        train_weeks: int = 4,
+        test_weeks: int = 1,
+        step_weeks: int = 1,
+    ) -> list[Fold]:
+        from datetime import timedelta
+        folds = []
+        current_train_start = start_date
+        fold_id = 1
+        
+        while True:
+            current_train_end = current_train_start + timedelta(weeks=train_weeks)
+            current_test_start = current_train_end
+            current_test_end = current_test_start + timedelta(weeks=test_weeks)
+            
+            if current_test_end > end_date:
+                break
+                
+            folds.append(
+                Fold(
+                    fold_id=fold_id,
+                    train_start=current_train_start,
+                    train_end=current_train_end,
+                    test_start=current_test_start,
+                    test_end=current_test_end
+                )
+            )
+            
+            current_train_start += timedelta(weeks=step_weeks)
+            fold_id += 1
+            
+        return folds
