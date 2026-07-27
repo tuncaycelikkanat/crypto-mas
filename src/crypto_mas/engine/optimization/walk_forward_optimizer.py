@@ -47,7 +47,8 @@ class WalkForwardOptimizer:
         
         test_results = []
         
-        for fold in folds:
+        for idx, fold in enumerate(folds, 1):
+            print(f"   ⏳ [Fold {idx:02d}/{len(folds)}] ({fold.train_start.strftime('%Y-%m')} -> {fold.test_end.strftime('%Y-%m')})... ", end="", flush=True)
             logger.info(f"\n{'='*50}\nStarting Walk-Forward Fold {fold.fold_id}\n{'='*50}")
             logger.info(f"Train: {fold.train_start} -> {fold.train_end}")
             logger.info(f"Test:  {fold.test_start} -> {fold.test_end}")
@@ -170,5 +171,8 @@ class WalkForwardOptimizer:
             
             logger.info(f"Fold {fold.fold_id} Test Score: {test_score}, PnL: {test_result.final_equity}, WinRate: {test_result.win_rate}")
             test_results.append(test_result)
+            net_p = getattr(test_result, "net_profit", 0.0) if test_result else 0.0
+            trades_c = getattr(test_result, "trades_executed", 0) if test_result else 0
+            print(f"Done! | Test PnL: ${net_p:+.2f} ({trades_c} trades)", flush=True)
             
         return test_results

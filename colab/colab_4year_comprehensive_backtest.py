@@ -66,13 +66,14 @@ def evaluate_pool(optimizer: WalkForwardOptimizer, pool_name: str, symbols: list
 
     try:
         # Run Optuna optimization on rolling folds
+        n_trials = 15 if granularity == "monthly" else 8
         test_results = optimizer.optimize(
             folds=folds,
             exchange=Exchange.BINANCE,
             symbols=symbols,
             timeframe=timeframe,
             strategy_name=strategy_name,
-            n_trials=40,
+            n_trials=n_trials,
             min_trades=5,
         )
 
