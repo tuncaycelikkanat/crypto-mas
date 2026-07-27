@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     trading_mode: TradingMode = "PAPER"
     log_level: str = "INFO"
 
-    database_url: str = ""
-    redis_url: str = ""
+    database_url: str = "sqlite:///crypto_mas.db"
+    redis_url: str = "redis://localhost:6379/0"
 
     api_security_key: str = ""
     cors_origins: list[str] = ["*"]

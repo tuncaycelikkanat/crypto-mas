@@ -15,11 +15,18 @@ if _project_root not in sys.path:
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from crypto_mas.infrastructure.db.session import SessionLocal
-from crypto_mas.services.backtesting.engine import BacktestEngineService
+os.environ.setdefault("DATABASE_URL", "sqlite:///crypto_mas.db")
+
+from crypto_mas.domain.models.backtest_result import BacktestResult
+from crypto_mas.domain.models.trading_cycle import TradingCycle
 from crypto_mas.engine.optimization.fold_generator import FoldGenerator
 from crypto_mas.engine.optimization.walk_forward_optimizer import WalkForwardOptimizer
+from crypto_mas.infrastructure.db.base import Base
+from crypto_mas.infrastructure.db.session import SessionLocal, engine
+from crypto_mas.services.backtesting.engine import BacktestEngineService
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+
+Base.metadata.create_all(bind=engine)
 
 # Same pools as mass_backtest.py
 SYMBOL_POOLS = {
