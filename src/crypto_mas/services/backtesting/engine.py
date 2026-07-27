@@ -325,6 +325,7 @@ class BacktestEngineService:
                 total_trades += (cycle.trades_executed or 0)
                 time_provider.tick(delta)
                 
+                t2 = time.time()
                 logger.debug(f"PROFILE [{job_id}] Cycle {cycle_count}: run_cycle={t1-t0:.4f}s, tick={t2-t1:.4f}s")
 
 
