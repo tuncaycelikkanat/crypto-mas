@@ -83,11 +83,11 @@ class WalkForwardOptimizer:
             async def warmup():  # noqa: B023
                 delta = get_timedelta(timeframe)
                 fetch_symbols = list(set(symbols + ["BTCUSDT"]))
-                await fetcher.backfill_universe(fetch_symbols, timeframe, fold.train_start - delta*60, fold.train_end)
+                await fetcher.backfill_universe(fetch_symbols, timeframe, fold.train_start - delta*60, fold.test_end)
                 
                 temp_feature_svc = FeaturePipelineService(self.db, candle_repo=CandleRepository(self.db), feature_repo=FeatureSnapshotRepository(self.db))
                 for sym in fetch_symbols:
-                    all_candles = CandleRepository(self.db).list_by_symbol(exchange.value, sym, timeframe.value, end_time=fold.train_end, limit=None)
+                    all_candles = CandleRepository(self.db).list_by_symbol(exchange.value, sym, timeframe.value, end_time=fold.test_end, limit=None)
                     if all_candles:
                         all_snaps = temp_feature_svc.calculator.calculate(all_candles)
                         if all_snaps:
@@ -170,6 +170,8 @@ class WalkForwardOptimizer:
                     end_time=fold.test_end,
                     initial_balance=10000.0,
                     config_json=study.best_params,
+                    _shared_candle_cache=shared_candle_cache,
+                    _shared_feature_cache=shared_feature_cache
                 )
                 
             test_result = self._run_async(run_test())
