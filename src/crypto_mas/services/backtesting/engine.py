@@ -179,8 +179,7 @@ class BacktestEngineService:
                         all_snaps = temp_feature_svc.calculator.calculate(all_candles)
                         if all_snaps:
                             mem_features.bulk_upsert(all_snaps)
-                
-                logger.warning(f"PROFILE [{job_id}] mem_features populated with {sum(len(v) for v in mem_features._snaps.values())} snaps!")
+                logger.debug(f"PROFILE [{job_id}] mem_features populated with {sum(len(v) for v in mem_features._snaps.values())} snaps!")
 
             
             strategy_mode = "swing"
@@ -326,8 +325,7 @@ class BacktestEngineService:
                 total_trades += (cycle.trades_executed or 0)
                 time_provider.tick(delta)
                 
-                t2 = time.time()
-                logger.warning(f"PROFILE [{job_id}] Cycle {cycle_count}: run_cycle={t1-t0:.4f}s, tick={t2-t1:.4f}s")
+                logger.debug(f"PROFILE [{job_id}] Cycle {cycle_count}: run_cycle={t1-t0:.4f}s, tick={t2-t1:.4f}s")
 
 
 
