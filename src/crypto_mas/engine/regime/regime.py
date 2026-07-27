@@ -64,8 +64,8 @@ class RegimeEngine:
         volatility_ratio = atr_14 / close if close > 0 else 0.0
         bb_width = (bb_upper - bb_lower) / bb_middle if bb_middle > 0 else 0.0
 
-        if volatility_ratio > 0.06 or bb_width > 0.12:
-            confidence = max(min(volatility_ratio / 0.10, 1.0), min(bb_width / 0.20, 1.0))
+        if volatility_ratio > 0.08 or bb_width > 0.25:
+            confidence = max(min(volatility_ratio / 0.10, 1.0), min(bb_width / 0.25, 1.0))
             return RegimeSnapshot(
                 exchange=exchange,
                 symbol=symbol,

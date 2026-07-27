@@ -124,7 +124,7 @@ class BullTactic(BaseTactic):
         min_dist_ema = params.get("min_dist_ema", -0.012)
         rsi_threshold = params.get("rsi_threshold", 50.0)
         stoch_threshold = params.get("stoch_threshold", 20.0)
-        min_confidence = params.get("min_confidence", 0.55)
+        min_confidence = params.get("min_confidence", 0.45)
         
         confidence = 0.0
         factors = []

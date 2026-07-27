@@ -99,9 +99,9 @@ class SidewaysTactic(BaseTactic):
 
         # --- Parameters ---
         # Sideways markets require wider RSI extremes to avoid chop
-        rsi_oversold = params.get("rsi_oversold", 26.0)
-        rsi_overbought = params.get("rsi_overbought", 62.0)
-        min_confidence = params.get("min_confidence", 0.70)
+        rsi_oversold = params.get("rsi_oversold", 30.0)
+        rsi_overbought = params.get("rsi_overbought", 70.0)
+        min_confidence = params.get("min_confidence", 0.60)
         
         # In sideways, we want tighter TP (revert to mean) and wider SL (allow chop)
         sl_mult_override = params.get("sl_mult", 1.5)

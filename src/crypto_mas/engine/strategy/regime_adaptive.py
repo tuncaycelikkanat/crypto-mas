@@ -60,13 +60,13 @@ class RegimeAdaptiveStrategy(BaseStrategy):
         # config_json from the UI is passed via kwargs (or kwargs could contain a 'config' dict)
         config = kwargs.get("config", {})
         
-        tactic_params = {}
+        tactic_params = dict(config)
         if regime == MarketRegime.BULL_TREND:
-            tactic_params = config.get("bull_tactic", {})
+            tactic_params.update(config.get("bull_tactic", {}))
         elif regime == MarketRegime.BEAR_TREND:
-            tactic_params = config.get("bear_tactic", {})
+            tactic_params.update(config.get("bear_tactic", {}))
         elif regime == MarketRegime.SIDEWAYS:
-            tactic_params = config.get("sideways_tactic", {})
+            tactic_params.update(config.get("sideways_tactic", {}))
 
         # Add the global risk_level so tactics can use it if they want
         tactic_params["risk_level"] = risk_level

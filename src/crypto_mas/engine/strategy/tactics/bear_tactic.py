@@ -124,7 +124,7 @@ class BearTactic(BaseTactic):
         max_dist_ema = params.get("max_dist_ema", 0.030)
         rsi_threshold = params.get("rsi_threshold", 50.0)
         stoch_threshold = params.get("stoch_threshold", 80.0)
-        min_confidence = params.get("min_confidence", 0.55)
+        min_confidence = params.get("min_confidence", 0.45)
         
         # Override ATR multipliers for broker execution
         sl_mult_override = params.get("sl_mult", 1.5)
