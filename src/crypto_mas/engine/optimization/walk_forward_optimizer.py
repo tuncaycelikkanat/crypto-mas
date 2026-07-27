@@ -42,7 +42,8 @@ class WalkForwardOptimizer:
         timeframe: Timeframe,
         strategy_name: str,
         n_trials: int = 50,
-        min_trades: int = 30
+        min_trades: int = 30,
+        n_jobs: int = 1,
     ) -> list[BacktestResult]:
         
         test_results = []
@@ -145,7 +146,7 @@ class WalkForwardOptimizer:
             
             # Reduce verbosity
             optuna.logging.set_verbosity(optuna.logging.WARNING)
-            study.optimize(objective, n_trials=n_trials)
+            study.optimize(objective, n_trials=n_trials, n_jobs=n_jobs)
             
             logger.info(f"Fold {fold.fold_id} Best Params: {study.best_params}")
             logger.info(f"Fold {fold.fold_id} Best Train Score: {study.best_value}")

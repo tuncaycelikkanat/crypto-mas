@@ -13,6 +13,7 @@ import logging
 import os
 import sys
 from datetime import UTC, datetime, timezone
+from typing import Any
 
 try:
     import nest_asyncio
@@ -32,7 +33,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///crypto_mas.db")
 
 from crypto_mas.domain.models.backtest_result import BacktestResult
 from crypto_mas.domain.models.trading_cycle import TradingCycle
-from crypto_mas.engine.optimization.fold_generator import FoldGenerator
+from crypto_mas.engine.optimization.fold_generator import Fold, FoldGenerator
 from crypto_mas.engine.optimization.walk_forward_optimizer import WalkForwardOptimizer
 from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.db.session import SessionLocal, engine
@@ -58,7 +59,16 @@ def create_results_dir():
     return results_dir
 
 
-def evaluate_pool(optimizer: WalkForwardOptimizer, pool_name: str, symbols: list[str], folds: list, timeframe: Timeframe, strategy_name: str, granularity: str):
+def evaluate_pool(
+    optimizer: WalkForwardOptimizer,
+    pool_name: str,
+    symbols: list[str],
+    folds: list[Fold],
+    timeframe: Timeframe,
+    strategy_name: str,
+    granularity: str = "monthly",
+    n_jobs: int = 1,
+) -> dict[str, Any]:
     print(f"\n====================================================================")
     print(f"🚀 [{granularity.upper()}] Running 4-Year WFO for Pool: {pool_name} ({len(symbols)} coins)")
     print(f"    Total Rolling Periods: {len(folds)}")
@@ -75,6 +85,7 @@ def evaluate_pool(optimizer: WalkForwardOptimizer, pool_name: str, symbols: list
             strategy_name=strategy_name,
             n_trials=n_trials,
             min_trades=5,
+            n_jobs=n_jobs,
         )
 
         total_net_profit = 0.0
@@ -133,7 +144,7 @@ def evaluate_pool(optimizer: WalkForwardOptimizer, pool_name: str, symbols: list
         }
 
 
-def run_4year_comprehensive_suite(mode: str = "all"):
+def run_4year_comprehensive_suite(mode: str = "all", max_folds: int | None = None, n_jobs: int = 1):
     db = SessionLocal()
     engine_service = BacktestEngineService(db)
     optimizer = WalkForwardOptimizer(db, engine_service)
@@ -164,10 +175,12 @@ def run_4year_comprehensive_suite(mode: str = "all"):
             train_months=3,
             test_months=1,
         )
+        if max_folds is not None:
+            monthly_folds = monthly_folds[:max_folds]
         print(f"Generated {len(monthly_folds)} rolling out-of-sample monthly periods.")
 
         for pool_name, symbols in SYMBOL_POOLS.items():
-            res = evaluate_pool(optimizer, pool_name, symbols, monthly_folds, timeframe, strategy_name, granularity="monthly")
+            res = evaluate_pool(optimizer, pool_name, symbols, monthly_folds, timeframe, strategy_name, granularity="monthly", n_jobs=n_jobs)
             monthly_results.append(res)
 
         monthly_path = os.path.join(results_dir, "4year_monthly_wfo.json")
@@ -185,10 +198,12 @@ def run_4year_comprehensive_suite(mode: str = "all"):
             test_weeks=1,
             step_weeks=1,
         )
+        if max_folds is not None:
+            weekly_folds = weekly_folds[:max_folds]
         print(f"Generated {len(weekly_folds)} rolling out-of-sample weekly periods.")
 
         for pool_name, symbols in SYMBOL_POOLS.items():
-            res = evaluate_pool(optimizer, pool_name, symbols, weekly_folds, timeframe, strategy_name, granularity="weekly")
+            res = evaluate_pool(optimizer, pool_name, symbols, weekly_folds, timeframe, strategy_name, granularity="weekly", n_jobs=n_jobs)
             weekly_results.append(res)
 
         weekly_path = os.path.join(results_dir, "4year_weekly_wfo.json")
@@ -202,5 +217,7 @@ def run_4year_comprehensive_suite(mode: str = "all"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Crypto MAS 4-Year Comprehensive Backtest")
     parser.add_argument("--mode", type=str, default="all", choices=["monthly", "weekly", "all"], help="Granularity mode: monthly, weekly, or all")
+    parser.add_argument("--max-folds", type=int, default=None, help="Limit number of rolling folds for fast speed testing")
+    parser.add_argument("--n-jobs", type=int, default=1, help="Number of parallel CPU workers (1 for SQLite safety)")
     args = parser.parse_args()
-    run_4year_comprehensive_suite(mode=args.mode)
+    run_4year_comprehensive_suite(mode=args.mode, max_folds=args.max_folds, n_jobs=args.n_jobs)
