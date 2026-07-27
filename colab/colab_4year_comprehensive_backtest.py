@@ -20,8 +20,13 @@ try:
 except ImportError:
     pass
 
-# Add project root to sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add project root and src/ to sys.path
+_project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+_src_dir = os.path.join(_project_root, 'src')
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
 from crypto_mas.engine.optimization.fold_generator import FoldGenerator
 from crypto_mas.engine.optimization.walk_forward_optimizer import WalkForwardOptimizer
