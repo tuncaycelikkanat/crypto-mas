@@ -107,8 +107,12 @@ def evaluate_pool(optimizer: WalkForwardOptimizer, pool_name: str, symbols: list
             })
 
         consistency_ratio = (positive_periods / len(test_results) * 100.0) if test_results else 0.0
-
-        print(f"✅ [{pool_name}] 4-Year Total PnL: ${total_net_profit:,.2f} | Trades: {total_trades} | OOS Consistency: {consistency_ratio:.1f}%")
+        print(f"\n╔═════════════════════════════════════════════════════════════════╗", flush=True)
+        print(f"║ ✅ HAVUZ TAMAMLANDI: {pool_name:<20}                        ║", flush=True)
+        print(f"║    • 4 Yıllık Toplam PnL  : ${total_net_profit:+,<18.2f}            ║", flush=True)
+        print(f"║    • Toplam İşlem Sayısı  : {total_trades:<20}               ║", flush=True)
+        print(f"║    • Tutarlılık Oranı     : %{consistency_ratio:<19.1f}              ║", flush=True)
+        print(f"╚═════════════════════════════════════════════════════════════════╝\n", flush=True)
 
         return {
             "pool_name": pool_name,

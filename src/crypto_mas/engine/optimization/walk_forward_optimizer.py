@@ -48,7 +48,8 @@ class WalkForwardOptimizer:
         test_results = []
         
         for idx, fold in enumerate(folds, 1):
-            print(f"   ⏳ [Fold {idx:02d}/{len(folds)}] ({fold.train_start.strftime('%Y-%m')} -> {fold.test_end.strftime('%Y-%m')})... ", end="", flush=True)
+            print(f"\n─────────────────────────────────────────────────────────────────", flush=True)
+            print(f"👉 [Fold {idx:02d}/{len(folds)}] Tarih: {fold.train_start.strftime('%Y-%m-%d')} -> {fold.test_end.strftime('%Y-%m-%d')}", flush=True)
             logger.info(f"\n{'='*50}\nStarting Walk-Forward Fold {fold.fold_id}\n{'='*50}")
             logger.info(f"Train: {fold.train_start} -> {fold.train_end}")
             logger.info(f"Test:  {fold.test_start} -> {fold.test_end}")
@@ -75,6 +76,7 @@ class WalkForwardOptimizer:
             shared_feature_cache = InMemoryFeatureSnapshotRepository(FeatureSnapshotRepository(self.db))
             
             logger.info("Pre-warming memory caches for Train Fold...")
+            print(f"   ├─ [1/3] Veri hazırlanıyor & indikatörler hesaplanıyor...", flush=True)
             provider = get_market_data_provider(exchange)
             fetcher = HistoricalFetcherService(provider=provider, db=self.db)
             
@@ -93,6 +95,7 @@ class WalkForwardOptimizer:
                             
             self._run_async(warmup())
             logger.info("Memory caches warmed up. Starting Optuna study...")
+            print(f"   ├─ [2/3] Optuna çalışıyor ({n_trials} strateji simülasyonu denenecek)...", flush=True)
             
             def objective(trial):
                 # Restricted Search Space to avoid overfitting
@@ -130,6 +133,8 @@ class WalkForwardOptimizer:
                     
                 result = self._run_async(run_trial())
                 score = FitnessCalculator.calculate_composite_score(result, min_trades=min_trades)
+                if (trial.number + 1) % 5 == 0 or (trial.number + 1) == n_trials:
+                    print(f"   │     • Deneme {trial.number+1}/{n_trials} -> Skor: {score:.2f}", flush=True)
                 
                 return score
                 
@@ -150,6 +155,7 @@ class WalkForwardOptimizer:
             
             # --- 3. Evaluate Best Params on Test Fold ---
             logger.info(f"\nEvaluating Fold {fold.fold_id} Best Params on UNSEEN TEST DATA...")
+            print(f"   └─ [3/3] En iyi parametrelerle Out-of-Sample Testi yapılıyor...", flush=True)
             test_run_id = uuid.uuid4().hex[:6]
             test_job_id = f"wfo-test-f{fold.fold_id}-{test_run_id}"
             
@@ -173,6 +179,7 @@ class WalkForwardOptimizer:
             test_results.append(test_result)
             net_p = getattr(test_result, "net_profit", 0.0) if test_result else 0.0
             trades_c = getattr(test_result, "trades_executed", 0) if test_result else 0
-            print(f"Done! | Test PnL: ${net_p:+.2f} ({trades_c} trades)", flush=True)
+            win_r = getattr(test_result, "win_rate", 0.0) if test_result else 0.0
+            print(f"      ✅ SONUÇ -> Test PnL: ${net_p:+.2f} | Başarı: %{win_r:.1f} | İşlem Sayısı: {trades_c}", flush=True)
             
         return test_results
