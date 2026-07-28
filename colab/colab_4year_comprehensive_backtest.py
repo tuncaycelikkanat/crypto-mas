@@ -68,6 +68,7 @@ def evaluate_pool(
     strategy_name: str,
     granularity: str = "monthly",
     n_jobs: int = 1,
+    n_trials: int | None = None,
 ) -> dict[str, Any]:
     print(f"\n====================================================================")
     print(f"🚀 [{granularity.upper()}] Running 4-Year WFO for Pool: {pool_name} ({len(symbols)} coins)")
@@ -76,14 +77,14 @@ def evaluate_pool(
 
     try:
         # Run Optuna optimization on rolling folds
-        n_trials = 15 if granularity == "monthly" else 8
+        effective_trials = n_trials if n_trials is not None else (15 if granularity == "monthly" else 8)
         test_results = optimizer.optimize(
             folds=folds,
             exchange=Exchange.BINANCE,
             symbols=symbols,
             timeframe=timeframe,
             strategy_name=strategy_name,
-            n_trials=n_trials,
+            n_trials=effective_trials,
             min_trades=5,
             n_jobs=n_jobs,
         )
@@ -120,7 +121,7 @@ def evaluate_pool(
         consistency_ratio = (positive_periods / len(test_results) * 100.0) if test_results else 0.0
         print(f"\n╔═════════════════════════════════════════════════════════════════╗", flush=True)
         print(f"║ ✅ HAVUZ TAMAMLANDI: {pool_name:<20}                        ║", flush=True)
-        print(f"║    • 4 Yıllık Toplam PnL  : ${total_net_profit:+,<18.2f}            ║", flush=True)
+        print(f"║    • 4 Yıllık Toplam PnL  : ${total_net_profit:+,.2f}            ║", flush=True)
         print(f"║    • Toplam İşlem Sayısı  : {total_trades:<20}               ║", flush=True)
         print(f"║    • Tutarlılık Oranı     : %{consistency_ratio:<19.1f}              ║", flush=True)
         print(f"╚═════════════════════════════════════════════════════════════════╝\n", flush=True)
@@ -144,14 +145,33 @@ def evaluate_pool(
         }
 
 
-def run_4year_comprehensive_suite(mode: str = "all", max_folds: int | None = None, n_jobs: int = 1):
+def run_4year_comprehensive_suite(mode: str = "all", max_folds: int | None = None, n_jobs: int = 1, part: str = "all", n_trials: int | None = None):
     db = SessionLocal()
     engine_service = BacktestEngineService(db)
     optimizer = WalkForwardOptimizer(db, engine_service)
 
-    # 4.5-Year Institutional Window: 2022-01-01 -> 2026-07-01 (54 Months & 230+ Weeks)
-    start_date = datetime(2022, 1, 1, tzinfo=timezone.utc)
-    end_date = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    # Modular 4.5-Year Breakdown (Zero OOS Gaps, Zero Overlaps)
+    if part == "1":
+        start_date = datetime(2022, 1, 1, tzinfo=timezone.utc)
+        end_date = datetime(2023, 1, 1, tzinfo=timezone.utc)
+        file_suffix = "_part1"
+    elif part == "2":
+        start_date = datetime(2022, 10, 1, tzinfo=timezone.utc)
+        end_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        file_suffix = "_part2"
+    elif part == "3":
+        start_date = datetime(2023, 10, 1, tzinfo=timezone.utc)
+        end_date = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        file_suffix = "_part3"
+    elif part == "4":
+        start_date = datetime(2024, 10, 1, tzinfo=timezone.utc)
+        end_date = datetime(2026, 7, 1, tzinfo=timezone.utc)
+        file_suffix = "_part4"
+    else:
+        start_date = datetime(2022, 1, 1, tzinfo=timezone.utc)
+        end_date = datetime(2026, 7, 1, tzinfo=timezone.utc)
+        file_suffix = ""
+
     timeframe = Timeframe.ONE_HOUR
     strategy_name = "regime_adaptive"
 
@@ -180,12 +200,12 @@ def run_4year_comprehensive_suite(mode: str = "all", max_folds: int | None = Non
         print(f"Generated {len(monthly_folds)} rolling out-of-sample monthly periods.")
 
         for pool_name, symbols in SYMBOL_POOLS.items():
-            res = evaluate_pool(optimizer, pool_name, symbols, monthly_folds, timeframe, strategy_name, granularity="monthly", n_jobs=n_jobs)
+            res = evaluate_pool(optimizer, pool_name, symbols, monthly_folds, timeframe, strategy_name, granularity="monthly", n_jobs=n_jobs, n_trials=n_trials)
             monthly_results.append(res)
 
-        monthly_path = os.path.join(results_dir, "4year_monthly_wfo.json")
+        monthly_path = os.path.join(results_dir, f"4year_monthly_wfo{file_suffix}.json")
         with open(monthly_path, "w", encoding="utf-8") as f:
-            json.dump({"mode": "monthly", "period": "2022-2026", "results": monthly_results}, f, indent=2)
+            json.dump({"mode": "monthly", "period": f"2022-2026 (Part {part})", "results": monthly_results}, f, indent=2)
         print(f"💾 Saved monthly WFO report to: {monthly_path}")
 
     # 2. Weekly Granular Breakdown (Hafta Hafta)
@@ -203,12 +223,12 @@ def run_4year_comprehensive_suite(mode: str = "all", max_folds: int | None = Non
         print(f"Generated {len(weekly_folds)} rolling out-of-sample weekly periods.")
 
         for pool_name, symbols in SYMBOL_POOLS.items():
-            res = evaluate_pool(optimizer, pool_name, symbols, weekly_folds, timeframe, strategy_name, granularity="weekly", n_jobs=n_jobs)
+            res = evaluate_pool(optimizer, pool_name, symbols, weekly_folds, timeframe, strategy_name, granularity="weekly", n_jobs=n_jobs, n_trials=n_trials)
             weekly_results.append(res)
 
-        weekly_path = os.path.join(results_dir, "4year_weekly_wfo.json")
+        weekly_path = os.path.join(results_dir, f"4year_weekly_wfo{file_suffix}.json")
         with open(weekly_path, "w", encoding="utf-8") as f:
-            json.dump({"mode": "weekly", "period": "2022-2026", "results": weekly_results}, f, indent=2)
+            json.dump({"mode": "weekly", "period": f"2022-2026 (Part {part})", "results": weekly_results}, f, indent=2)
         print(f"💾 Saved weekly WFO report to: {weekly_path}")
 
     print("\n🎉 4-Year Comprehensive Backtest Suite Completed Successfully!")
@@ -219,5 +239,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, default="all", choices=["monthly", "weekly", "all"], help="Granularity mode: monthly, weekly, or all")
     parser.add_argument("--max-folds", type=int, default=None, help="Limit number of rolling folds for fast speed testing")
     parser.add_argument("--n-jobs", type=int, default=1, help="Number of parallel CPU workers (1 for SQLite safety)")
+    parser.add_argument("--part", type=str, default="all", choices=["1", "2", "3", "4", "all"], help="Chronological part to run (1: 2022, 2: 2023, 3: 2024, 4: 2025-2026, all: full)")
+    parser.add_argument("--n-trials", type=int, default=None, help="Optuna trials per fold (default 15 for monthly)")
     args = parser.parse_args()
-    run_4year_comprehensive_suite(mode=args.mode, max_folds=args.max_folds, n_jobs=args.n_jobs)
+    run_4year_comprehensive_suite(mode=args.mode, max_folds=args.max_folds, n_jobs=args.n_jobs, part=args.part, n_trials=args.n_trials)
