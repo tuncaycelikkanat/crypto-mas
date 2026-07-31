@@ -60,8 +60,8 @@ class BearTactic(BaseTactic):
             
             # Rule 1: Low RSI (Oversold) + Overextended downwards
             # Rule 1: Low RSI (Oversold) + Overextended downwards
-            tp_rsi = params.get("tp_rsi", 28.0)
-            tp_dist_ema = params.get("tp_dist_ema", -0.012)
+            tp_rsi = params.get("tp_rsi", 36.0)
+            tp_dist_ema = params.get("tp_dist_ema", -0.007)
             
             if rsi_14 < tp_rsi and dist_to_ema < tp_dist_ema:
                 should_close = True
@@ -82,6 +82,12 @@ class BearTactic(BaseTactic):
             if deep_break or consecutive_break:
                 should_close = True
                 close_factors.append(f"EMA50_BREAK={last_price:.2f}>{ema_50:.2f}")
+
+            # Rule 3: Fast Momentum Exit (Capital Preservation in Bear Rallies)
+            if macd_hist is not None and prev_macd_hist is not None:
+                if macd_hist > 0 and prev_macd_hist <= 0:
+                    should_close = True
+                    close_factors.append("MACD_FLIP_BULLISH")
                 
             if should_close:
                 return TradingDecision(
@@ -119,7 +125,7 @@ class BearTactic(BaseTactic):
             )
 
         # --- Parameters ---
-        min_adx = params.get("min_adx", 22.0)
+        min_adx = params.get("min_adx", 24.0)
         min_dist_ema = params.get("min_dist_ema", 0.014)
         max_dist_ema = params.get("max_dist_ema", 0.030)
         rsi_threshold = params.get("rsi_threshold", 50.0)

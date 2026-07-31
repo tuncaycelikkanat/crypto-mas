@@ -134,6 +134,30 @@ class PaperBrokerService:
                 )
                 continue
 
+            is_risky, reason_msg = self._is_thin_liquidity_or_excessive_spread(latest_snapshot)
+            if is_risky:
+                skipped.append(
+                    PaperExecutionItem(
+                        symbol=target_position.symbol,
+                        side=side_enum,
+                        status=PaperExecutionStatus.SKIPPED,
+                        target_weight=target_position.target_weight,
+                        notional=0.0,
+                        price=float(price),
+                        quantity=0.0,
+                        reason=f"ABORT_THIN_LIQUIDITY: {reason_msg}",
+                    )
+                )
+                self._log_execution(
+                    account_name=account.name,
+                    level="WARNING",
+                    stage="PAPER_BROKER",
+                    message=f"Skipped {side_enum.value} for {target_position.symbol}: ABORT_THIN_LIQUIDITY — {reason_msg}.",
+                    cycle_id=cycle_id,
+                    payload={"target_weight": target_position.target_weight, "reason": reason_msg}
+                )
+                continue
+
             # Cap each trade to MAX_RISK_PER_TRADE (2%) of current equity.
             # Without this cap, the bot bets 70-85% of a compounding balance,
             # resulting in unrealistic multi-billion dollar positions.
@@ -545,6 +569,30 @@ class PaperBrokerService:
             return Decimal(str(value))
         except Exception:
             return None
+
+    @staticmethod
+    def _is_thin_liquidity_or_excessive_spread(snapshot: FeatureSnapshot | None) -> tuple[bool, str]:
+        if snapshot is None or not snapshot.features_json:
+            return False, ""
+        features = snapshot.features_json
+        close = features.get("close")
+        high = features.get("high")
+        low = features.get("low")
+        volume = features.get("volume")
+
+        if close and float(close) > 0:
+            c = float(close)
+            if high is not None and low is not None:
+                spread = (float(high) - float(low)) / c
+                if spread > 0.08:  # 8% bar range / excessive spread or flash wick
+                    return True, f"Excessive bar spread/range ({spread:.1%} > 8.0%)"
+
+            if volume is not None:
+                usdt_volume = float(volume) * c
+                if usdt_volume < 1000.0:  # < $1000 USDT bar volume -> thin liquidity
+                    return True, f"Thin liquidity bar volume (${usdt_volume:,.0f} < $1,000)"
+
+        return False, ""
 
     def update_mark_prices(
         self,

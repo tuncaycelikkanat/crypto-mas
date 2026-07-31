@@ -99,8 +99,8 @@ class SidewaysTactic(BaseTactic):
 
         # --- Parameters ---
         # Sideways markets require wider RSI extremes to avoid chop
-        rsi_oversold = params.get("rsi_oversold", 30.0)
-        rsi_overbought = params.get("rsi_overbought", 70.0)
+        rsi_oversold = params.get("rsi_oversold", 33.0)
+        rsi_overbought = params.get("rsi_overbought", 67.0)
         min_confidence = params.get("min_confidence", 0.60)
         
         # In sideways, we want tighter TP (revert to mean) and wider SL (allow chop)
@@ -111,6 +111,11 @@ class SidewaysTactic(BaseTactic):
         factors = []
         action = DecisionAction.HOLD
         direction = SignalDirection.NEUTRAL
+
+        # ── Gate 0: Bandwidth Filter (Avoid Whipsaws in Tight Squeezes) ──
+        bandwidth = (bb_upper - bb_lower) / last_price
+        if bandwidth < 0.030:
+            return None  # Tight squeeze; breakouts are imminent, mean reversion will get whipsawed
 
         # ── Gate 1: Mean Reversion using Bollinger Bands & RSI ──
         if last_price <= bb_lower and rsi_14 < rsi_oversold:  # type: ignore

@@ -99,11 +99,11 @@ class WalkForwardOptimizer:
             print(f"   ├─ [2/3] Optuna çalışıyor ({n_trials} strateji simülasyonu denenecek)...", flush=True)
             
             def objective(trial):
-                # Restricted Search Space to avoid overfitting
-                tp_mult = trial.suggest_float("tp_mult", 1.2, 2.5, step=0.1)
-                sl_mult = trial.suggest_float("sl_mult", 0.8, 1.8, step=0.1)
-                breakdown_tp_mult = trial.suggest_float("breakdown_tp_mult", 1.0, 2.0, step=0.1)
-                breakdown_sl_mult = trial.suggest_float("breakdown_sl_mult", 0.8, 1.5, step=0.1)
+                # Restricted Search Space to avoid overfitting and enforce asymmetric positive Risk/Reward
+                tp_mult = trial.suggest_float("tp_mult", 2.0, 3.5, step=0.2)
+                sl_mult = trial.suggest_float("sl_mult", 1.2, 1.8, step=0.1)
+                breakdown_tp_mult = trial.suggest_float("breakdown_tp_mult", 1.8, 2.8, step=0.2)
+                breakdown_sl_mult = trial.suggest_float("breakdown_sl_mult", 1.0, 1.5, step=0.1)
                 max_dist_ema = trial.suggest_float("max_dist_ema", 0.020, 0.040, step=0.005)
                 
                 config_json = {

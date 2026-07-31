@@ -283,6 +283,7 @@ class InMemoryPositionRepository:
         # symbol -> expiry datetime for SL cooldown
         self._sl_cooldowns: dict[str, datetime] = {}
         self._global_cooldowns: dict[str, datetime] = {}
+        self._sl_history: list[tuple[str, datetime]] = []
 
     # ── Bulk-query helpers (O(1) set returns) ─────────────────────────────────
 
@@ -308,6 +309,23 @@ class InMemoryPositionRepository:
     ) -> set[str]:
         now = _to_utc(time_now)
         return {sym for sym, exp in self._global_cooldowns.items() if now < exp}
+
+    def get_whipsaw_cooldown_symbols(
+        self,
+        account_name: str,
+        exchange: str,
+        time_now: datetime,
+        min_stop_count: int = 2,
+        cooldown_minutes: int = 2880,
+    ) -> set[str]:
+        from datetime import timedelta
+        now = _to_utc(time_now)
+        cutoff = now - timedelta(minutes=cooldown_minutes)
+        counts: dict[str, int] = {}
+        for sym, ts in self._sl_history:
+            if ts >= cutoff:
+                counts[sym] = counts.get(sym, 0) + 1
+        return {sym for sym, cnt in counts.items() if cnt >= min_stop_count}
 
     # ── Standard PositionRepository interface ─────────────────────────────────
 
@@ -417,6 +435,7 @@ class InMemoryPositionRepository:
 
         if close_reason == "STOP_LOSS":
             self._sl_cooldowns[position.symbol] = _to_utc(closed_at) + timedelta(minutes=30)
+            self._sl_history.append((position.symbol, _to_utc(closed_at)))
         self._global_cooldowns[position.symbol] = _to_utc(closed_at) + timedelta(minutes=60)
 
         return position

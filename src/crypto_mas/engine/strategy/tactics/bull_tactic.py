@@ -58,8 +58,8 @@ class BullTactic(BaseTactic):
             close_factors = []
             should_close = False
             
-            tp_rsi = params.get("tp_rsi", 84.0)
-            tp_dist_ema = params.get("tp_dist_ema", 0.021)
+            tp_rsi = params.get("tp_rsi", 86.0)
+            tp_dist_ema = params.get("tp_dist_ema", 0.030)
             
             # Rule 1: Take Profit (High RSI / Overextended)
             if rsi_14 > tp_rsi and dist_to_ema > tp_dist_ema:
@@ -68,20 +68,26 @@ class BullTactic(BaseTactic):
                 close_factors.append(f"EXT={dist_to_ema*100:.2f}%")
                 
             # Rule 2: Trend Breakdown (Price crosses below EMA50 robustly)
-            # We look for a deep break (-0.5%) or just closing below EMA50
-            deep_break = last_price < (ema_50 * 0.995)
-            # Check if previous close was also below EMA50
+            deep_break = last_price < (ema_50 * 0.990)
+            
             prev_close = snapshots[-2].features_json.get("close") if len(snapshots) >= 2 else None
             prev_ema50 = snapshots[-2].features_json.get("ema_50") if len(snapshots) >= 2 else None
             
             consecutive_break = False
             if prev_close and prev_ema50:
-                if prev_close < prev_ema50 and last_price < ema_50:
+                if prev_close < prev_ema50 and last_price < (ema_50 * 0.995):
                     consecutive_break = True
                     
             if deep_break or consecutive_break:
                 should_close = True
                 close_factors.append(f"EMA50_BREAK={last_price:.2f}<{ema_50:.2f}")
+
+            # Rule 3: Extreme Rally Momentum Exhaustion
+            prev_macd_hist = snapshots[-2].features_json.get("macd_hist") if len(snapshots) >= 2 else None
+            if rsi_14 > 80.0 and macd_hist is not None and prev_macd_hist is not None:
+                if macd_hist < prev_macd_hist:
+                    should_close = True
+                    close_factors.append("MOMENTUM_EXHAUSTION")
                 
             if should_close:
                 return TradingDecision(
@@ -133,48 +139,50 @@ class BullTactic(BaseTactic):
         if adx_14 < min_adx:
             return None
             
-        if rsi_14 > 65.0:
-            return None  # Prevent entering at overbought peaks
-            
-        factors.append(f"TREND(ADX={adx_14:.1f})")
-
         dist_to_ema = (last_price - ema_20) / ema_20  # type: ignore
         
-        if dist_to_ema > max_dist_ema or dist_to_ema < min_dist_ema:
+        is_pullback = (min_dist_ema <= dist_to_ema <= max_dist_ema) and (rsi_14 < 65.0)
+        is_trend_continuation = (
+            last_price > ema_20
+            and last_price > ema_50
+            and dist_to_ema <= 0.028
+            and 50.0 <= rsi_14 <= 78.0
+            and macd_hist is not None
+            and macd_hist > 0
+            and (prev_macd_hist is None or macd_hist >= prev_macd_hist)
+        )
+
+        if not is_pullback and not is_trend_continuation:
             return None
-            
+
         # ── Gate 2.1: Volume Filter (Don't buy dumps) ───────────
         max_rvol_pullback = params.get("max_rvol_pullback", 1.3)
-        if rvol is not None and rvol > max_rvol_pullback:
+        if rvol is not None and rvol > max_rvol_pullback and is_pullback:
             # High volume sell-off. Do not catch falling knife.
             return None
             
-        # ── Gate 2.2: Momentum Confirmation (MACD) ──────────────
-        # Only buy if MACD histogram is improving (or at least not crashing deeper)
-        if macd_hist is not None and prev_macd_hist is not None:
-            if macd_hist < 0 and macd_hist < prev_macd_hist:
-                # Momentum is still accelerating downwards
+        factors.append(f"TREND(ADX={adx_14:.1f})")
+        
+        if is_pullback:
+            factors.append(f"LONG_PB({dist_to_ema*100:.2f}%)")
+            confidence += 0.40
+            if rsi_14 < rsi_threshold:
+                factors.append(f"RSI={rsi_14:.1f}")
+                if rsi_14 < 40.0:
+                    confidence += 0.20
+                else:
+                    confidence += 0.10
+            elif stoch_k is not None and stoch_k < stoch_threshold:
+                factors.append(f"STOCH={stoch_k:.1f}")
+                if stoch_k < 20.0:
+                    confidence += 0.15
+                else:
+                    confidence += 0.05
+            else:
                 return None
-            
-        factors.append(f"LONG_PB({dist_to_ema*100:.2f}%)")
-        confidence += 0.40  # Base confidence (C-Grade)
-
-        # ── Gate 3: Oversold Momentum & Bonuses ─────────────────
-        if rsi_14 < rsi_threshold:
-            factors.append(f"RSI={rsi_14:.1f}")
-            # If deeply oversold, give massive confidence boost
-            if rsi_14 < 40.0:
-                confidence += 0.20
-            else:
-                confidence += 0.10
-        elif stoch_k is not None and stoch_k < stoch_threshold:
-            factors.append(f"STOCH={stoch_k:.1f}")
-            if stoch_k < 20.0:
-                confidence += 0.15
-            else:
-                confidence += 0.05
-        else:
-            return None
+        elif is_trend_continuation:
+            factors.append(f"BULL_MOMENTUM(RSI={rsi_14:.1f})")
+            confidence += 0.55
 
         # ── Bonus Factors (A-Grade Boosters) ────────────────────
         # 1. MACD strong improvement

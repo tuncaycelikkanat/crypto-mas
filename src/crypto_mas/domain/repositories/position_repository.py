@@ -107,6 +107,30 @@ class PositionRepository:
         )
         return set(self.db.scalars(stmt).all())
 
+    def get_whipsaw_cooldown_symbols(
+        self,
+        account_name: str,
+        exchange: str,
+        time_now: datetime,
+        min_stop_count: int = 2,
+        cooldown_minutes: int = 2880,
+    ) -> set[str]:
+        """Single query: returns symbols that hit >= min_stop_count stop-losses within cooldown_minutes."""
+        from datetime import timedelta
+        from sqlalchemy import func
+        cutoff_time = time_now - timedelta(minutes=cooldown_minutes)
+        stmt = (
+            select(Position.symbol)
+            .where(Position.account_name == account_name)
+            .where(Position.exchange == exchange)
+            .where(Position.status == "CLOSED")
+            .where(Position.close_reason == "STOP_LOSS")
+            .where(Position.closed_at >= cutoff_time)
+            .group_by(Position.symbol)
+            .having(func.count(Position.id) >= min_stop_count)
+        )
+        return set(self.db.scalars(stmt).all())
+
     def create_open_position(
         self,
         account_name: str,

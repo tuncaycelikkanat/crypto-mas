@@ -92,8 +92,9 @@ class StrategyOrchestrator:
             )
             
             if not snapshots:
-                logger.warning(f"[Cycle {display_id}] No feature snapshots for {symbol}. Skipping.")
-                _log("STRATEGY", f"No data available for {symbol}, skipped", "WARN")
+                if not is_backtest:
+                    logger.warning(f"[Cycle {display_id}] No feature snapshots for {symbol}. Skipping.")
+                    _log("STRATEGY", f"No data available for {symbol}, skipped", "WARN")
                 continue
             
             latest_snapshot = snapshots[-1]
@@ -106,8 +107,6 @@ class StrategyOrchestrator:
             if now - snap_time > max_allowed_delay:
                 err_msg = f"STALE DATA DETECTED for {symbol}: Latest snapshot timestamp {latest_snapshot.timestamp} is older than allowed {max_allowed_delay} from now {now}. Kill-Switch triggered."
                 if is_backtest:
-                    logger.warning(f"[Cycle {display_id}] {err_msg} (Skipped due to backtest data gap)")
-                    _log("STRATEGY", f"Stale data for {symbol}, skipped", "WARN")
                     continue
                 else:
                     logger.error(f"[Cycle {display_id}] {err_msg}")
@@ -156,6 +155,32 @@ class StrategyOrchestrator:
                         _log("STRATEGY", f"Decision {decision.action.value} for {symbol} REJECTED: Cooldown active (Recently Closed).", "WARN")
                         decision.action = DecisionAction.HOLD
                         decision.reason += " | REJECTED: Cooldown (60m)"
+                    else:
+                        # ── Regime-Adaptive Whipsaw Cooldown ──────────────────────
+                        whipsaw_min_stops = 2
+                        whipsaw_cooldown_mins = 2880  # Default 48h (SIDEWAYS)
+                        from crypto_mas.engine.regime import MarketRegime
+                        if decision.regime:
+                            if decision.regime.regime == MarketRegime.BULL_TREND:
+                                whipsaw_min_stops = 3
+                                whipsaw_cooldown_mins = 720   # 12h in BULL
+                            elif decision.regime.regime == MarketRegime.BEAR_TREND:
+                                whipsaw_min_stops = 2
+                                whipsaw_cooldown_mins = 1440  # 24h in BEAR
+
+                        whipsaw_symbols = pos_repo.get_whipsaw_cooldown_symbols(
+                            account_name=account_name,
+                            exchange=exchange_str,
+                            time_now=now,
+                            min_stop_count=whipsaw_min_stops,
+                            cooldown_minutes=whipsaw_cooldown_mins,
+                        ) if hasattr(pos_repo, "get_whipsaw_cooldown_symbols") else set()
+
+                        if symbol in whipsaw_symbols:
+                            regime_name = decision.regime.regime.value if decision.regime else "SIDEWAYS"
+                            _log("STRATEGY", f"Decision {decision.action.value} for {symbol} REJECTED: Whipsaw Cooldown active ({whipsaw_min_stops}+ consecutive stop-losses in {regime_name}).", "WARN")
+                            decision.action = DecisionAction.HOLD
+                            decision.reason += f" | REJECTED: Whipsaw Cooldown ({whipsaw_cooldown_mins // 60}h)"
 
                 if decision.action not in (DecisionAction.HOLD, DecisionAction.CLOSE_LONG, DecisionAction.CLOSE_SHORT):
                     context = {
