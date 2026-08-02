@@ -1,7 +1,10 @@
+import logging
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from crypto_mas.domain.models.execution_log import ExecutionLog
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
@@ -873,6 +876,8 @@ class PaperBrokerService:
     ) -> None:
         # In backtest mode, skip writing logs to DB to avoid thousands of flushes
         if self.is_backtest:
+            if level in ("WARN", "WARNING"):
+                logger.warning(f"[{stage}] {message}")
             return
         log = ExecutionLog(
             account_name=account_name,

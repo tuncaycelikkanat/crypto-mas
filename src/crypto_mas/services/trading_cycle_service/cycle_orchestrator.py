@@ -167,8 +167,11 @@ class TradingCycleService:
 
 
         def _log(stage: str, message: str, level: str = "INFO", payload: dict | None = None):
-            if trigger.startswith("BACKTEST-") and level not in ("ERROR", "SUCCESS"):
-                return
+            if trigger.startswith("BACKTEST-"):
+                if level in ("WARN", "WARNING"):
+                    logger.warning(f"[{stage}] {message}")
+                if level not in ("ERROR", "SUCCESS"):
+                    return
             from crypto_mas.domain.models.execution_log import ExecutionLog
             log = ExecutionLog(
                 account_name=account_name,

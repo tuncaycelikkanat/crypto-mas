@@ -72,8 +72,8 @@ class BacktestEngineService:
             
             # Intercept magic symbol lists like AUTO_GAINERS for backtests
             if len(symbols) == 1 and symbols[0].startswith("AUTO_"):
-                logger.warning(f"[{job_id}] Magic symbol '{symbols[0]}' is not supported for historical backtests without full exchange scans. Defaulting to Top 5 crypto assets.")
-                symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
+                logger.info(f"[{job_id}] Magic symbol '{symbols[0]}' detected. Using High-Beta Dynamic Gainers & Momentum Universe for historical backtest.")
+                symbols = ["SOLUSDT", "AVAXUSDT", "INJUSDT", "RNDRUSDT", "FETUSDT", "DOGEUSDT", "FLOKIUSDT", "SHIBUSDT", "NEARUSDT", "FTMUSDT"]
             # Step 1: Market data provider & fetcher
             provider = get_market_data_provider(exchange)
             fetcher = HistoricalFetcherService(provider=provider, db=self.db)
@@ -223,9 +223,10 @@ class BacktestEngineService:
             # Cache account object in broker to avoid account_repo.get_by_name() every cycle
             _backtest_broker._bt_account = _backtest_broker.account_repository.get_by_name(account_name)  # type: ignore
             
-            # Give the orchestrator access to the same in-memory position repo
-            # so its open_position / SL-cooldown checks are also O(1) dict lookups
+            # Give the orchestrator and strategy orchestrator access to the same in-memory position repo
+            # so their open_position / SL-cooldown checks are also O(1) dict lookups
             cycle_service._bt_position_repo = mem_positions  # type: ignore
+            cycle_service.strategy_orchestrator._bt_position_repo = mem_positions  # type: ignore
             
             # 2. Patch the broker service to use in-memory snapshots so it doesn't query SQLite 432,000 times!
             cycle_service.paper_broker.feature_snapshot_repository = mem_features
@@ -273,6 +274,7 @@ class BacktestEngineService:
             # Step 4: Time loop
             total_trades = 0
             cycle_count = 0
+            equity_curve_values = [initial_balance]
             
             while time_provider.now() <= end_time:
                 cycle_count += 1
@@ -325,6 +327,10 @@ class BacktestEngineService:
                 total_trades += (cycle.trades_executed or 0)
                 time_provider.tick(delta)
                 
+                # Track true simulated account equity after the tick
+                current_eq = float(_backtest_broker._bt_account.equity)
+                equity_curve_values.append(current_eq)
+                
                 t2 = time.time()
                 logger.debug(f"PROFILE [{job_id}] Cycle {cycle_count}: run_cycle={t1-t0:.4f}s, tick={t2-t1:.4f}s")
 
@@ -355,12 +361,27 @@ class BacktestEngineService:
             else:
                 result.final_equity = initial_balance + metrics.total_pnl  # type: ignore
 
+            # Compute true simulated hourly peak-to-trough max drawdown
+            peak = initial_balance
+            true_max_dd = 0.0
+            for eq in equity_curve_values:
+                if eq > peak:
+                    peak = eq
+                if peak > 0:
+                    dd = (peak - eq) / peak
+                    if dd > true_max_dd:
+                        true_max_dd = dd
+
             result.total_fees_paid = metrics.total_fees_paid  # type: ignore
             result.win_rate = metrics.win_rate  # type: ignore
-            result.max_drawdown = metrics.max_drawdown  # type: ignore
+            result.max_drawdown = true_max_dd  # type: ignore
             result.sharpe_ratio = metrics.sharpe_ratio  # type: ignore
             result.sortino_ratio = metrics.sortino_ratio  # type: ignore
-            result.calmar_ratio = metrics.calmar_ratio  # type: ignore
+            
+            # Annualized Calmar Ratio based on actual max drawdown
+            ann_return = float((result.final_equity - initial_balance) / initial_balance)
+            result.calmar_ratio = ann_return / true_max_dd if true_max_dd > 0 else 0.0
+            
             result.profit_factor = metrics.profit_factor  # type: ignore
             result.expectancy = metrics.expectancy  # type: ignore
             result.avg_win = metrics.avg_win  # type: ignore
