@@ -230,7 +230,7 @@ class TradingCycleService:
                 )
             
             time.time()
-            decisions, open_positions = self.strategy_orchestrator.run_strategies_and_score(
+            decisions, open_positions = await self.strategy_orchestrator.run_strategies_and_score(
                 symbols=symbols,
                 timeframe=timeframe,
                 now=now,

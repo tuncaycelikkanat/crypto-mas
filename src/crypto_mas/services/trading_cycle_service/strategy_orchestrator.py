@@ -13,6 +13,10 @@ from crypto_mas.services.feature_pipeline.service import FeaturePipelineService
 from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
 from crypto_mas.services.market_data_service.schemas import Timeframe
 from crypto_mas.services.trading_cycle_service.utils import get_timedelta
+from crypto_mas.engine.llm_committee.orchestrator import LLMCommitteeOrchestrator
+from crypto_mas.engine.llm_committee.gemini_provider import GeminiProvider
+from crypto_mas.engine.llm_committee.cost_tracker import CostTracker
+from crypto_mas.infrastructure.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +37,17 @@ class StrategyOrchestrator:
         self.feature_snapshot_repository = feature_snapshot_repository
         self.risk_manager = risk_manager
         self._bt_position_repo = bt_position_repo
+        
+        # Initialize LLM Committee
+        self.llm_orchestrator = None
+        settings = get_settings()
+        api_key = getattr(settings, "gemini_api_key", None)
+        if api_key:
+            provider = GeminiProvider(api_key=api_key)
+            cost_tracker = CostTracker()
+            self.llm_orchestrator = LLMCommitteeOrchestrator(provider=provider, cost_tracker=cost_tracker)
 
-    def run_strategies_and_score(
+    async def run_strategies_and_score(
         self, 
         symbols: list[str], 
         timeframe: Timeframe, 
@@ -194,6 +207,26 @@ class StrategyOrchestrator:
                     
                     if decision.action == DecisionAction.HOLD:
                         _log("STRATEGY", f"Decision for {symbol} REJECTED by RiskManager: {decision.reason}", "WARN")
+                        
+                    # Phase 0: Trigger LLM Committee (Shadow Mode) if there's a strong signal
+                    elif self.llm_orchestrator and decision.action in (DecisionAction.CONSIDER_LONG, DecisionAction.CONSIDER_SHORT):
+                        # Construct context for LLM
+                        llm_context = {
+                            "symbol": symbol,
+                            "market_regime": decision.regime.regime.value if decision.regime else "UNKNOWN",
+                            "score": decision.score.total_score,
+                            "recent_features": snapshots[-1].features_json if snapshots else {}
+                        }
+                        
+                        _log("LLM_COMMITTEE", f"Triggering Shadow Mode LLM Committee for {symbol}")
+                        # We pass the decision in and the orchestrator runs it
+                        # Since Phase 0 is shadow mode, the decision is not mutated.
+                        decision = await self.llm_orchestrator.evaluate_decision(
+                            symbol=symbol,
+                            context=llm_context,
+                            original_decision=decision,
+                            db=self.db
+                        )
                     
                 latest_snap = snapshots[-1].features_json if snapshots else {}
                 

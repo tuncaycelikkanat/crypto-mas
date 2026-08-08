@@ -12,6 +12,8 @@ from crypto_mas.domain.models.system_event import SystemEvent
 from crypto_mas.domain.models.trade import Trade
 from crypto_mas.domain.models.trading_cycle import TradingCycle
 from crypto_mas.domain.models.llm_audit_log import LLMAuditLog
+from crypto_mas.domain.models.committee_decision import CommitteeDecision
+from crypto_mas.domain.models.shadow_mode_trade import ShadowModeTrade
 
 __all__ = [
     "Candle",
@@ -28,5 +30,7 @@ __all__ = [
     "BackfillState",
     "BacktestResult",
     "LLMAuditLog",
+    "CommitteeDecision",
+    "ShadowModeTrade",
 ]
 from crypto_mas.domain.models.optimization_history import OptimizationHistory
