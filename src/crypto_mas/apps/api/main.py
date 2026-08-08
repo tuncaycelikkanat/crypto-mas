@@ -68,6 +68,16 @@ async def lifespan(app: FastAPI):
     app.state.scheduler = scheduler_service
     scheduler_service.start()
 
+    # Start Order Execution Queue Worker (New Fix)
+    from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
+    from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
+    queue = OrderExecutorQueue.get_instance()
+    def broker_factory():
+        db = SessionLocal()
+        return PaperBrokerService(db=db)
+    queue.set_broker_factory(broker_factory)
+    queue.start()
+
     # Start Telegram Bot & Command Center
     telegram_service = TelegramService(
         token=settings.telegram_bot_token,
@@ -81,6 +91,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     telegram_service.stop_polling()
     scheduler_service.shutdown()
+    queue.stop()
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
