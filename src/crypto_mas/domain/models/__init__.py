@@ -11,6 +11,7 @@ from crypto_mas.domain.models.symbol import Symbol
 from crypto_mas.domain.models.system_event import SystemEvent
 from crypto_mas.domain.models.trade import Trade
 from crypto_mas.domain.models.trading_cycle import TradingCycle
+from crypto_mas.domain.models.llm_audit_log import LLMAuditLog
 
 __all__ = [
     "Candle",
@@ -26,5 +27,6 @@ __all__ = [
     "TradingCycle",
     "BackfillState",
     "BacktestResult",
+    "LLMAuditLog",
 ]
 from crypto_mas.domain.models.optimization_history import OptimizationHistory
