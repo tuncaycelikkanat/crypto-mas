@@ -12,7 +12,7 @@ Configuration (via .env):
 import asyncio
 from decimal import Decimal
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
@@ -34,6 +34,8 @@ class TelegramAlerter:
     and return silently so production code is never disrupted by alerting failures.
     """
 
+    _instance: Optional["TelegramAlerter"] = None
+
     def __init__(self, token: str | None = None, chat_id: str | None = None) -> None:
         self.token = token
         self.chat_id = str(chat_id) if chat_id else None
@@ -42,12 +44,18 @@ class TelegramAlerter:
         self._is_polling = False
         self._poll_task: asyncio.Task[None] | None = None
         self._last_update_id = 0
+        TelegramAlerter._instance = self
 
         if not self._enabled:
             logger.info(
                 "[TelegramAlerter] Disabled — set TELEGRAM_BOT_TOKEN and "
                 "TELEGRAM_CHAT_ID to enable."
             )
+
+    @classmethod
+    def get_instance(cls) -> Optional["TelegramAlerter"]:
+        """Returns the active global instance of TelegramAlerter."""
+        return cls._instance
 
     async def send(self, message: str) -> None:
         """Send a plain-text or HTML message to the configured Telegram chat."""
@@ -213,10 +221,12 @@ class TelegramAlerter:
 
                 lines = ["📊 <b>Açık Pozisyonlar (default-paper)</b>\n"]
                 for p in positions:
+                    tp_val = f"{p.take_profit_price:.4f}" if p.take_profit_price is not None else "None"
+                    sl_val = f"{p.stop_loss_price:.4f}" if p.stop_loss_price is not None else "None"
                     lines.append(
                         f"🔹 <b>{p.symbol} ({p.status})</b>\n"
                         f"   Giriş: <code>{p.entry_price:.4f}</code> | Miktar: <code>{p.quantity:.4f}</code>\n"
-                        f"   TP: <code>{p.take_profit:.4f}</code> | SL: <code>{p.stop_loss:.4f}</code>"
+                        f"   TP: <code>{tp_val}</code> | SL: <code>{sl_val}</code>"
                     )
                 await self.send("\n".join(lines))
         except Exception as exc:

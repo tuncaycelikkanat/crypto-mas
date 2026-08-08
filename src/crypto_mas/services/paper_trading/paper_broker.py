@@ -320,6 +320,27 @@ class PaperBrokerService:
 
             available_cash = self._money(available_cash - total_cost)
 
+            # Send Telegram alert if not backtest
+            if not self.is_backtest:
+                from crypto_mas.services.alerting.telegram_bot import TelegramAlerter
+                alerter = TelegramAlerter.get_instance()
+                if alerter and alerter._enabled:
+                    import asyncio
+                    try:
+                        loop = asyncio.get_running_loop()
+                        asyncio.run_coroutine_threadsafe(
+                            alerter.alert_position_opened(
+                                symbol=position.symbol,
+                                entry_price=float(position.entry_price),
+                                quantity=float(position.quantity),
+                                strategy=self.strategy_mode or "multi_agent",
+                                account=account.name,
+                            ),
+                            loop
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to send Telegram alert: {e}")
+
             executed.append(
                 PaperExecutionItem(
                     symbol=target_position.symbol,
@@ -512,6 +533,27 @@ class PaperBrokerService:
                 trade_id=trade.id,
             )
             self.order_repository.add(order)
+
+            # Send Telegram alert if not backtest
+            if not self.is_backtest:
+                from crypto_mas.services.alerting.telegram_bot import TelegramAlerter
+                alerter = TelegramAlerter.get_instance()
+                if alerter and alerter._enabled:
+                    import asyncio
+                    try:
+                        loop = asyncio.get_running_loop()
+                        asyncio.run_coroutine_threadsafe(
+                            alerter.alert_position_closed(
+                                symbol=closed_position.symbol,
+                                exit_price=float(execution_price),
+                                realized_pnl=float(closed_position.realized_pnl),
+                                close_reason="REBALANCING",
+                                account=account.name,
+                            ),
+                            loop
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to send Telegram alert: {e}")
 
             available_cash = self._money(available_cash + net_recovered)
 
@@ -787,6 +829,38 @@ class PaperBrokerService:
                     executed_at=self.time_provider.now(),
                 )
                 self.trade_repository.add(trade)
+
+                # Send Telegram alert if not backtest
+                if not self.is_backtest:
+                    from crypto_mas.services.alerting.telegram_bot import TelegramAlerter
+                    alerter = TelegramAlerter.get_instance()
+                    if alerter and alerter._enabled:
+                        import asyncio
+                        try:
+                            loop = asyncio.get_running_loop()
+                            if close_reason == "STOP_LOSS":
+                                asyncio.run_coroutine_threadsafe(
+                                    alerter.alert_stop_loss(
+                                        symbol=closed.symbol,
+                                        stop_price=float(execution_price),
+                                        realized_pnl=float(closed.realized_pnl),
+                                        account=account.name,
+                                    ),
+                                    loop
+                                )
+                            else:
+                                asyncio.run_coroutine_threadsafe(
+                                    alerter.alert_position_closed(
+                                        symbol=closed.symbol,
+                                        exit_price=float(execution_price),
+                                        realized_pnl=float(closed.realized_pnl),
+                                        close_reason=close_reason,
+                                        account=account.name,
+                                    ),
+                                    loop
+                                )
+                        except Exception as e:
+                            logger.warning(f"Failed to send Telegram alert: {e}")
 
                 emoji = "🔴" if sl_hit else "🟢"
                 self._log_execution(
