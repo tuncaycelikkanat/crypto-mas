@@ -65,6 +65,7 @@ def get_mock_paper_account(
         "open_positions": [
             {
                 "symbol": position.symbol,
+                "exchange": position.exchange,
                 "side": position.side,
                 "status": position.status,
                 "quantity": str(position.quantity),
