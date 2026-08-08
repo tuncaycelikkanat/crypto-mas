@@ -26,6 +26,7 @@ class RunBacktestRequest(BaseModel):
     use_htf_shield: bool = True
     use_regime_shield: bool = True
     config_json: dict | None = None
+    run_llm: bool = False
 
 class RunBacktestResponse(BaseModel):
     job_id: str
@@ -72,6 +73,7 @@ async def run_backtest_task(
     use_htf_shield: bool,
     use_regime_shield: bool,
     config_json: dict | None = None,
+    run_llm: bool = False,
 ) -> None:
     db = SessionLocal()
     try:
@@ -90,6 +92,7 @@ async def run_backtest_task(
             use_htf_shield=use_htf_shield,
             use_regime_shield=use_regime_shield,
             config_json=config_json,
+            run_llm=run_llm,
         )
     except Exception:
         pass  # Errors are logged inside the service
@@ -122,6 +125,7 @@ async def start_backtest(
         use_htf_shield=request.use_htf_shield,
         use_regime_shield=request.use_regime_shield,
         config_json=request.config_json,
+        run_llm=request.run_llm,
     )
     
     return RunBacktestResponse(

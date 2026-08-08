@@ -37,6 +37,7 @@ class BacktestEngineService:
         use_htf_shield: bool = True,
         use_regime_shield: bool = True,
         config_json: dict | None = None,
+        run_llm: bool = False,
         # Walk-forward can inject pre-warmed caches to skip redundant data fetch
         _shared_candle_cache=None,
         _shared_feature_cache=None,
@@ -48,6 +49,7 @@ class BacktestEngineService:
             "use_btc_shield": use_btc_shield,
             "use_htf_shield": use_htf_shield,
             "use_regime_shield": use_regime_shield,
+            "run_llm": run_llm,
         }
         if config_json:
             merged_config.update(config_json)

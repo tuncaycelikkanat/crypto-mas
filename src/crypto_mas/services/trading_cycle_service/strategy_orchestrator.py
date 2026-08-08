@@ -7,16 +7,16 @@ from sqlalchemy.orm import Session
 from crypto_mas.domain.models.trading_cycle import TradingCycle
 from crypto_mas.domain.repositories.feature_snapshot_repository import FeatureSnapshotRepository
 from crypto_mas.domain.repositories.position_repository import PositionRepository
+from crypto_mas.engine.llm_committee.cost_tracker import CostTracker
+from crypto_mas.engine.llm_committee.gemini_provider import GeminiProvider
+from crypto_mas.engine.llm_committee.orchestrator import LLMCommitteeOrchestrator
 from crypto_mas.engine.risk.manager import RiskManager
 from crypto_mas.engine.strategy.schemas import DecisionAction
+from crypto_mas.infrastructure.config.settings import get_settings
 from crypto_mas.services.feature_pipeline.service import FeaturePipelineService
 from crypto_mas.services.market_data_service.historical_fetcher import HistoricalFetcherService
 from crypto_mas.services.market_data_service.schemas import Timeframe
 from crypto_mas.services.trading_cycle_service.utils import get_timedelta
-from crypto_mas.engine.llm_committee.orchestrator import LLMCommitteeOrchestrator
-from crypto_mas.engine.llm_committee.gemini_provider import GeminiProvider
-from crypto_mas.engine.llm_committee.cost_tracker import CostTracker
-from crypto_mas.infrastructure.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -209,24 +209,24 @@ class StrategyOrchestrator:
                         _log("STRATEGY", f"Decision for {symbol} REJECTED by RiskManager: {decision.reason}", "WARN")
                         
                     # Phase 0: Trigger LLM Committee (Shadow Mode) if there's a strong signal
-                    elif self.llm_orchestrator and decision.action in (DecisionAction.CONSIDER_LONG, DecisionAction.CONSIDER_SHORT):
-                        # Construct context for LLM
-                        llm_context = {
-                            "symbol": symbol,
-                            "market_regime": decision.regime.regime.value if decision.regime else "UNKNOWN",
-                            "score": decision.score.total_score,
-                            "recent_features": snapshots[-1].features_json if snapshots else {}
-                        }
-                        
-                        _log("LLM_COMMITTEE", f"Triggering Shadow Mode LLM Committee for {symbol}")
-                        # We pass the decision in and the orchestrator runs it
-                        # Since Phase 0 is shadow mode, the decision is not mutated.
-                        decision = await self.llm_orchestrator.evaluate_decision(
-                            symbol=symbol,
-                            context=llm_context,
-                            original_decision=decision,
-                            db=self.db
-                        )
+                    else:
+                        run_llm = config_json.get("run_llm", False) if config_json else False
+                        if self.llm_orchestrator and decision.action in (DecisionAction.CONSIDER_LONG, DecisionAction.CONSIDER_SHORT) and (not is_backtest or run_llm):
+                            # Construct context for LLM
+                            llm_context = {
+                                "symbol": symbol,
+                                "market_regime": decision.regime.regime.value if decision.regime else "UNKNOWN",
+                                "score": decision.score.total_score,
+                                "recent_features": snapshots[-1].features_json if snapshots else {}
+                            }
+                            
+                            _log("LLM_COMMITTEE", f"Triggering Shadow Mode LLM Committee for {symbol}")
+                            decision = await self.llm_orchestrator.evaluate_decision(
+                                symbol=symbol,
+                                context=llm_context,
+                                original_decision=decision,
+                                db=self.db
+                            )
                     
                 latest_snap = snapshots[-1].features_json if snapshots else {}
                 
