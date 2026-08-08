@@ -44,6 +44,10 @@ class TelegramAlerter:
         self._is_polling = False
         self._poll_task: asyncio.Task[None] | None = None
         self._last_update_id = 0
+        try:
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.loop = None
         TelegramAlerter._instance = self
 
         if not self._enabled:

@@ -324,10 +324,9 @@ class PaperBrokerService:
             if not self.is_backtest:
                 from crypto_mas.services.alerting.telegram_bot import TelegramAlerter
                 alerter = TelegramAlerter.get_instance()
-                if alerter and alerter._enabled:
+                if alerter and alerter._enabled and alerter.loop:
                     import asyncio
                     try:
-                        loop = asyncio.get_running_loop()
                         asyncio.run_coroutine_threadsafe(
                             alerter.alert_position_opened(
                                 symbol=position.symbol,
@@ -336,7 +335,7 @@ class PaperBrokerService:
                                 strategy=self.strategy_mode or "multi_agent",
                                 account=account.name,
                             ),
-                            loop
+                            alerter.loop
                         )
                     except Exception as e:
                         logger.warning(f"Failed to send Telegram alert: {e}")
@@ -538,10 +537,9 @@ class PaperBrokerService:
             if not self.is_backtest:
                 from crypto_mas.services.alerting.telegram_bot import TelegramAlerter
                 alerter = TelegramAlerter.get_instance()
-                if alerter and alerter._enabled:
+                if alerter and alerter._enabled and alerter.loop:
                     import asyncio
                     try:
-                        loop = asyncio.get_running_loop()
                         asyncio.run_coroutine_threadsafe(
                             alerter.alert_position_closed(
                                 symbol=closed_position.symbol,
@@ -550,7 +548,7 @@ class PaperBrokerService:
                                 close_reason="REBALANCING",
                                 account=account.name,
                             ),
-                            loop
+                            alerter.loop
                         )
                     except Exception as e:
                         logger.warning(f"Failed to send Telegram alert: {e}")
@@ -834,10 +832,9 @@ class PaperBrokerService:
                 if not self.is_backtest:
                     from crypto_mas.services.alerting.telegram_bot import TelegramAlerter
                     alerter = TelegramAlerter.get_instance()
-                    if alerter and alerter._enabled:
+                    if alerter and alerter._enabled and alerter.loop:
                         import asyncio
                         try:
-                            loop = asyncio.get_running_loop()
                             if close_reason == "STOP_LOSS":
                                 asyncio.run_coroutine_threadsafe(
                                     alerter.alert_stop_loss(
@@ -846,7 +843,7 @@ class PaperBrokerService:
                                         realized_pnl=float(closed.realized_pnl),
                                         account=account.name,
                                     ),
-                                    loop
+                                    alerter.loop
                                 )
                             else:
                                 asyncio.run_coroutine_threadsafe(
@@ -857,7 +854,7 @@ class PaperBrokerService:
                                         close_reason=close_reason,
                                         account=account.name,
                                     ),
-                                    loop
+                                    alerter.loop
                                 )
                         except Exception as e:
                             logger.warning(f"Failed to send Telegram alert: {e}")
