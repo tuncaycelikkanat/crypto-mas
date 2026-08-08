@@ -43,7 +43,9 @@ const PaperTrading: React.FC = () => {
   const [configSymbols,       setConfigSymbols]       = useState(() => get('configSymbols', 'BTCUSDT, ETHUSDT, SOLUSDT'));
   const [configInterval,      setConfigInterval]      = useState(() => get('configInterval', '120'));
   const [configMode,          setConfigMode]          = useState(() => get('configMode', 'swing'));
-  const [configExchange,      setConfigExchange]      = useState(() => get('configExchange', 'BINANCE'));
+  const [configExchanges,     setConfigExchanges]     = useState<string[]>(() => {
+    try { return JSON.parse(get('configExchanges', '["BINANCE"]')); } catch { return ['BINANCE']; }
+  });
   const [configSymbolSource, setConfigSymbolSource] = useState<'manual' | 'auto'>(() => (localStorage.getItem('configSymbolSource') as any) || 'manual');
   const [configBtcShield, setConfigBtcShield] = useState(() => localStorage.getItem('configBtcShield') !== 'false');
   const [configHtfShield, setConfigHtfShield] = useState(() => localStorage.getItem('configHtfShield') !== 'false');
@@ -58,7 +60,7 @@ const PaperTrading: React.FC = () => {
   useEffect(() => { localStorage.setItem('configSymbols', configSymbols); },       [configSymbols]);
   useEffect(() => { localStorage.setItem('configInterval', configInterval); },     [configInterval]);
   useEffect(() => { localStorage.setItem('configMode', configMode); },             [configMode]);
-  useEffect(() => { localStorage.setItem('configExchange', configExchange); },     [configExchange]);
+  useEffect(() => { localStorage.setItem('configExchanges', JSON.stringify(configExchanges)); }, [configExchanges]);
   useEffect(() => { localStorage.setItem('configSymbolSource', configSymbolSource); }, [configSymbolSource]);
   useEffect(() => { localStorage.setItem('configBtcShield', configBtcShield.toString()); }, [configBtcShield]);
   useEffect(() => { localStorage.setItem('configHtfShield', configHtfShield.toString()); }, [configHtfShield]);
@@ -104,17 +106,20 @@ const PaperTrading: React.FC = () => {
       const symbolsList = configSymbolSource === 'auto'
         ? ['AUTO_GAINERS']
         : configSymbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
-      const res = await axios.post('/api/v1/bot/start', {
-        bot_id: `bot-${Date.now()}`,
-        interval_seconds: parseInt(configInterval, 10),
-        symbols: symbolsList,
-        mode: configMode,
-        exchange: configExchange,
-        risk_level: configRiskLevel,
-        use_btc_shield: configBtcShield,
-        use_htf_shield: configHtfShield,
-        use_regime_shield: configRegimeShield,
-      });
+      for (const ex of configExchanges) {
+        await axios.post('/api/v1/bot/start', {
+          bot_id: `bot-${ex.toLowerCase()}-${Date.now()}`,
+          interval_seconds: parseInt(configInterval, 10),
+          symbols: symbolsList,
+          mode: configMode,
+          exchange: ex,
+          risk_level: configRiskLevel,
+          use_btc_shield: configBtcShield,
+          use_htf_shield: configHtfShield,
+          use_regime_shield: configRegimeShield,
+        });
+      }
+      const res = await axios.get('/api/v1/bot/status');
       setBotStatus(res.data);
       setShowConfigModal(false);
     } catch (err) { console.error(err); }
@@ -134,15 +139,18 @@ const PaperTrading: React.FC = () => {
       const symbolsList = configSymbolSource === 'auto'
         ? ['AUTO_GAINERS']
         : configSymbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
-      const res = await axios.post('/api/v1/cycle/run', {
-        account_name: 'default-paper',
-        exchange: configExchange,
-        symbols: symbolsList,
-        timeframe: configMode === 'scalping' ? '1m' : configMode === 'swing' ? '4h' : '1d',
-        strategy_name: configMode === 'scalping' ? 'hft_momentum' : configMode === 'swing' ? 'macd_cross' : 'ema_golden_cross',
-        trigger: 'MANUAL',
-      });
-      setActionLog(res.data);
+      let lastRes = null;
+      for (const ex of configExchanges) {
+        lastRes = await axios.post('/api/v1/cycle/run', {
+          account_name: 'default-paper',
+          exchange: ex,
+          symbols: symbolsList,
+          timeframe: configMode === 'scalping' ? '1m' : configMode === 'swing' ? '4h' : '1d',
+          strategy_name: configMode === 'scalping' ? 'hft_momentum' : configMode === 'swing' ? 'macd_cross' : 'ema_golden_cross',
+          trigger: 'MANUAL',
+        });
+      }
+      setActionLog(lastRes?.data || { status: "no exchange selected" });
       await fetchAccount();
     } catch (err) { console.error(err); }
     setLoading(false);
@@ -406,12 +414,24 @@ const PaperTrading: React.FC = () => {
                 </button>
               </div>
 
-              {/* Exchange */}
+              {/* Exchanges */}
               <div style={{ marginBottom: 22 }}>
-                <div className="section-label" style={{ marginBottom: 10 }}>Exchange</div>
+                <div className="section-label" style={{ marginBottom: 10 }}>Exchange(s)</div>
                 <div className="grid-cols-2">
                   {['BINANCE', 'MEXC'].map(ex => (
-                    <OptionCard key={ex} selected={configExchange === ex} onClick={() => setConfigExchange(ex)} title={ex} />
+                    <OptionCard key={ex} 
+                      selected={configExchanges.includes(ex)} 
+                      onClick={() => {
+                        if (configExchanges.includes(ex)) {
+                          if (configExchanges.length > 1) {
+                            setConfigExchanges(configExchanges.filter(e => e !== ex));
+                          }
+                        } else {
+                          setConfigExchanges([...configExchanges, ex]);
+                        }
+                      }} 
+                      title={ex} 
+                    />
                   ))}
                 </div>
               </div>
