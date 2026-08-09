@@ -1,34 +1,19 @@
-from collections.abc import Generator
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.paper_account import PaperAccount
-from crypto_mas.infrastructure.db.base import Base
 
 
-@pytest.fixture()
-def db_session() -> Generator[Session, None, None]:
-    engine = create_engine("sqlite+pysqlite:///:memory:")
-    Base.metadata.create_all(bind=engine)
 
-    session_factory = sessionmaker(bind=engine)
-    session = session_factory()
-
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
-        engine.dispose()
 
 from crypto_mas.domain.models.trading_cycle import TradingCycle
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
+from crypto_mas.domain.value_objects.enums import CycleStatus
 
 
 @pytest.fixture
@@ -79,7 +64,7 @@ async def test_run_cycle_success(db_session: Session, test_account: PaperAccount
     )
     
     assert cycle is not None
-    assert cycle.status == "COMPLETED"
+    assert cycle.status == CycleStatus.COMPLETED
     assert cycle.account_name == test_account.name
     assert cycle.exchange == Exchange.MOCK.value
     assert cycle.symbols_processed == 2
@@ -88,7 +73,7 @@ async def test_run_cycle_success(db_session: Session, test_account: PaperAccount
     # DB kontrolü
     db_cycle = db_session.get(TradingCycle, cycle.id)
     assert db_cycle is not None
-    assert db_cycle.status == "COMPLETED"
+    assert db_cycle.status == CycleStatus.COMPLETED
 
 @pytest.mark.asyncio
 async def test_run_cycle_account_not_found(db_session: Session) -> None:
@@ -134,4 +119,4 @@ async def test_run_cycle_exception_handling(db_session: Session, test_account: P
     # we have to query the latest cycle from DB since run_cycle raised
     db_cycle = db_session.query(TradingCycle).order_by(TradingCycle.id.desc()).first()
     assert db_cycle is not None
-    assert db_cycle.status == "FAILED"
+    assert db_cycle.status == CycleStatus.FAILED

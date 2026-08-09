@@ -4,21 +4,7 @@ from crypto_mas.services.auto_optimizer_service import AutoOptimizerService
 from crypto_mas.services.market_data_service.schemas import Timeframe
 from crypto_mas.domain.models.optimization_history import OptimizationHistory
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from crypto_mas.infrastructure.db.base import Base
 
-@pytest.fixture
-def db_session() -> Session: # type: ignore
-    engine = create_engine("sqlite:///:memory:")
-    import crypto_mas.domain.models
-    Base.metadata.create_all(engine)
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @pytest.fixture
 def mock_optuna_study():

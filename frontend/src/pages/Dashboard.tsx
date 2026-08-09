@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import { 
+  getHealth, getDbHealth, getBotStatus, 
+  getAnalyticsSummary, getEquityCurve, getTradeHistory, resetAnalytics 
+} from '../services/api';
+import type { 
+  HealthStatus, DatabaseHealth, BotStatusResponse, 
+  AnalyticsSummary, EquityCurvePoint, TradeRecord, BotInfo 
+} from '../types/api';
 import { motion } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, DollarSign, BarChart2,
@@ -93,23 +100,23 @@ const ChartTooltip = ({ active, payload, label }: any) => {
 
 // ── Page ───────────────────────────────────────────────────────
 const Dashboard: React.FC = () => {
-  const [sysHealth, setSysHealth] = useState<any>(null);
-  const [dbHealth, setDbHealth]   = useState<any>(null);
-  const [botStatus, setBotStatus] = useState<any>(null);
-  const [summary, setSummary]     = useState<any>(null);
-  const [equityCurve, setEquityCurve] = useState<any[]>([]);
-  const [tradeHistory, setTradeHistory] = useState<any[]>([]);
+  const [sysHealth, setSysHealth] = useState<HealthStatus | null>(null);
+  const [dbHealth, setDbHealth]   = useState<DatabaseHealth | null>(null);
+  const [botStatus, setBotStatus] = useState<BotStatusResponse | null>(null);
+  const [summary, setSummary]     = useState<AnalyticsSummary | null>(null);
+  const [equityCurve, setEquityCurve] = useState<EquityCurvePoint[]>([]);
+  const [tradeHistory, setTradeHistory] = useState<TradeRecord[]>([]);
   const [resetting, setResetting] = useState(false);
 
   const fetchAll = useCallback(async () => {
     try {
       const [healthRes, dbRes, botRes, sumRes, eqRes, histRes] = await Promise.all([
-        axios.get('/api/v1/health').catch(() => ({ data: { status: 'error' } })),
-        axios.get('/api/v1/health/db').catch(() => ({ data: { status: 'error' } })),
-        axios.get('/api/v1/bot/status').catch(() => ({ data: { status: 'STOPPED' } })),
-        axios.get('/api/v1/analytics/summary').catch(() => ({ data: null })),
-        axios.get('/api/v1/analytics/equity-curve').catch(() => ({ data: { data: [] } })),
-        axios.get('/api/v1/analytics/trade-history').catch(() => ({ data: { history: [] } })),
+        getHealth().catch(() => ({ data: { status: 'error' } as HealthStatus })),
+        getDbHealth().catch(() => ({ data: { status: 'error' } as DatabaseHealth })),
+        getBotStatus().catch(() => ({ data: { bots: [] } as BotStatusResponse })),
+        getAnalyticsSummary().catch(() => ({ data: null })),
+        getEquityCurve().catch(() => ({ data: { data: [] } })),
+        getTradeHistory().catch(() => ({ data: { history: [] } })),
       ]);
       setSysHealth(healthRes.data);
       setDbHealth(dbRes.data);
@@ -125,14 +132,14 @@ const Dashboard: React.FC = () => {
   const handleReset = async () => {
     if (!window.confirm('Tüm işlem geçmişi ve PnL sıfırlanacak. Onaylıyor musunuz?')) return;
     setResetting(true);
-    await axios.post('/api/v1/analytics/reset').catch(console.error);
+    await resetAnalytics().catch(console.error);
     await fetchAll();
     setResetting(false);
   };
 
   const totalPnl = summary?.total_pnl ?? 0;
   const bots = botStatus?.bots || [];
-  const activeBotCount = bots.filter((b: any) => b.status === 'RUNNING').length;
+  const activeBotCount = bots.filter((b: BotInfo) => b.status === 'RUNNING').length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -236,7 +243,7 @@ const Dashboard: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                tradeHistory.map((t: any) => {
+                tradeHistory.map((t: TradeRecord) => {
                   const pnl = t.realized_pnl;
                   return (
                     <tr key={t.id}>

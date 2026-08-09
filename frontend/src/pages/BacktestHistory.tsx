@@ -1,31 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-import { ArrowRight, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
-import { motion } from 'framer-motion';
-
-interface BacktestConfig {
-  risk_level: number;
-  use_btc_shield: boolean;
-  use_htf_shield: boolean;
-  use_regime_shield: boolean;
-}
-
-interface BacktestJob {
-  job_id: string;
-  status: string;
-  strategy_name: string;
-  symbols: string[];
-  start_time: string;
-  end_time: string;
-  initial_balance: number;
-  final_equity: number | null;
-  total_fees_paid: number | null;
-  total_trades: number | null;
-  win_rate: number | null;
-  max_drawdown: number | null;
-  config_json: BacktestConfig | null;
-}
+import { getBacktestJobs, deleteBacktestJob, getBacktestCompareData } from '../services/api';
+import type { BacktestJob, EquityCurvePoint } from '../types/api';
 
 export const BacktestHistory: React.FC = () => {
   const [jobs, setJobs] = useState<BacktestJob[]>([]);
@@ -38,8 +13,8 @@ export const BacktestHistory: React.FC = () => {
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('/api/v1/backtest');
-      setJobs(res.data.filter((j: any) => j.status !== 'RUNNING'));
+      const res = await getBacktestJobs();
+      setJobs(res.data.filter((j: BacktestJob) => j.status !== 'RUNNING'));
     } catch (e) {
       console.error(e);
     } finally {
@@ -76,7 +51,7 @@ export const BacktestHistory: React.FC = () => {
   const handleDelete = async (job_id: string) => {
     if (!window.confirm("Bu testi silmek istediğinize emin misiniz?")) return;
     try {
-      await axios.delete(`/api/v1/backtest/${job_id}`);
+      await deleteBacktestJob(job_id);
       setJobs(jobs.filter(j => j.job_id !== job_id));
       setSelectedIds(selectedIds.filter(id => id !== job_id));
     } catch (e) {
@@ -90,11 +65,11 @@ export const BacktestHistory: React.FC = () => {
       return;
     }
     setCompareMode(true);
-    const dataMap: Record<string, any[]> = {};
+    const dataMap: Record<string, EquityCurvePoint[]> = {};
     for (const id of selectedIds) {
       try {
-        const res = await axios.get(`/api/v1/backtest/${id}/compare-data`);
-        dataMap[id] = res.data.equity_curve.map((point: any) => ({
+        const res = await getBacktestCompareData(id);
+        dataMap[id] = res.data.equity_curve.map((point: EquityCurvePoint) => ({
           time: new Date(point.time).toLocaleString(),
           equity: point.equity
         }));

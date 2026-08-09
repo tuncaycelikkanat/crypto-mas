@@ -9,11 +9,12 @@ from crypto_mas.engine.strategy.base import BaseStrategy
 from crypto_mas.engine.strategy.schemas import DecisionAction
 from crypto_mas.services.feature_pipeline.calculator import FeatureCalculator
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
+from crypto_mas.domain.value_objects.enums import PositionSide
 
 logger = logging.getLogger("backtest_engine")
 
 class Position:
-    def __init__(self, symbol: str, entry_price: float, quantity: float, entry_time: datetime, open_fee: float = 0.0, side: str = "LONG"):
+    def __init__(self, symbol: str, entry_price: float, quantity: float, entry_time: datetime, open_fee: float = 0.0, side: str = PositionSide.LONG):
         self.symbol = symbol
         self.entry_price = entry_price
         self.quantity = quantity
@@ -22,11 +23,14 @@ class Position:
         self.side = side
 
 class BacktestEngine:
+    DEFAULT_FEE_RATE = 0.0005
+    DEFAULT_SLIPPAGE_RATE = 0.02
+
     def __init__(
         self, 
         initial_balance: float = 10000.0, 
-        fee_rate: float = 0.001, # 0.1% fee
-        slippage_pct: float = 0.0005 # 0.05% slippage
+        fee_rate: float = DEFAULT_FEE_RATE,
+        slippage_pct: float = DEFAULT_SLIPPAGE_RATE
     ):
         self.initial_balance = initial_balance
         self.balance = initial_balance
@@ -52,7 +56,7 @@ class BacktestEngine:
         if not candles:
             return self._generate_report(symbol, strategy.__class__.__name__)  # type: ignore
             
-        logger.info(f"Starting backtest for {symbol} with {len(candles)} candles. Strategy: {strategy.__class__.__name__}")
+        logger.info("Starting backtest for %s with %d candles. Strategy: %s", symbol, len(candles), strategy.__class__.__name__)
         
         # 1. Calculate Features for the entire dataset (fast)
         # FeatureCalculator takes a list of Candle objects and returns a list of dictionaries (snapshots)
@@ -118,7 +122,7 @@ class BacktestEngine:
         
         if symbol in self.positions:
             pos = self.positions[symbol]
-            if pos.side == "LONG":
+            if pos.side == PositionSide.LONG:
                 pnl_pct = (current_price - pos.entry_price) / pos.entry_price
                 if pnl_pct >= TP_PCT:
                     self._close_position(symbol, current_price, current_time, reason="Take Profit")
@@ -137,10 +141,10 @@ class BacktestEngine:
                 
         if symbol not in self.positions:
             if decision.action in (DecisionAction.CONSIDER_LONG, DecisionAction.CONSIDER_SHORT):
-                side = "LONG" if decision.action == DecisionAction.CONSIDER_LONG else "SHORT"
+                side = PositionSide.LONG if decision.action == DecisionAction.CONSIDER_LONG else PositionSide.SHORT
                 trade_amount = self.balance * 0.10
                 
-                if side == "LONG":
+                if side == PositionSide.LONG:
                     execution_price = current_price * (1 + self.slippage_pct)
                 else:
                     execution_price = current_price * (1 - self.slippage_pct)
@@ -165,7 +169,7 @@ class BacktestEngine:
     def _close_position(self, symbol: str, current_price: float, current_time: datetime, reason: str):
         pos = self.positions.pop(symbol)
         
-        if pos.side == "LONG":
+        if pos.side == PositionSide.LONG:
             execution_price = current_price * (1 - self.slippage_pct)
             notional = pos.quantity * execution_price
             fee = notional * self.fee_rate

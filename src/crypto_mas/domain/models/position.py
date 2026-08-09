@@ -5,6 +5,8 @@ from sqlalchemy import DateTime, Index, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from crypto_mas.infrastructure.db.base import Base
+from crypto_mas.domain.value_objects.enums import PositionSide, PositionStatus
+
 
 
 class Position(Base):
@@ -18,8 +20,8 @@ class Position(Base):
     exchange: Mapped[str] = mapped_column(String(32), nullable=False)
     symbol: Mapped[str] = mapped_column(String(64), nullable=False)
 
-    side: Mapped[str] = mapped_column(String(16), nullable=False, default="LONG")
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="OPEN")
+    side: Mapped[str] = mapped_column(String(16), nullable=False, default=PositionSide.LONG)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default=PositionStatus.OPEN)
 
     quantity: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
     entry_price: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)

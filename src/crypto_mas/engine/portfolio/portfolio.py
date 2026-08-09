@@ -14,10 +14,14 @@ COIN_GROUPS = get_settings().coin_groups
 
 
 class PortfolioEngine:
+    MAX_SINGLE_WEIGHT = 0.85
+    MIN_WEIGHT_THRESHOLD = 0.15
+    LOW_CONVICTION_THRESHOLD = 0.05
+
     def __init__(
         self,
         max_positions: int = 10,
-        max_gross_exposure: float = 0.85,
+        max_gross_exposure: float = MAX_SINGLE_WEIGHT,
         min_confidence: float = 0.5,
         max_correlated_group_weight: float = 0.40,
         time_provider: TimeProvider | None = None,
@@ -123,7 +127,7 @@ class PortfolioEngine:
         # Scale base A-Grade weight according to UI risk_level (0-200)
         risk_level_clamped = max(0, min(risk_level, 200))
         if risk_level_clamped <= 100:
-            a_weight_base = 0.05 + (0.15 * (risk_level_clamped / 100.0))
+            a_weight_base = self.LOW_CONVICTION_THRESHOLD + (self.MIN_WEIGHT_THRESHOLD * (risk_level_clamped / 100.0))
         else:
             a_weight_base = 0.20 + (0.30 * ((risk_level_clamped - 100.0) / 100.0))
 

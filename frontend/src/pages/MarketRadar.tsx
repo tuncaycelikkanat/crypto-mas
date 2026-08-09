@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { getCoinSymbols, getCoinData } from '../services/api';
+import type { CoinDataResponse } from '../types/api';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import LiveConsole from '../components/LiveConsole';
@@ -8,13 +9,13 @@ import RiskRegimeShield from '../components/RiskRegimeShield';
 const MarketRadar: React.FC = () => {
   const [symbols, setSymbols] = useState<string[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
-  const [coinData, setCoinData] = useState<any>(null);
+  const [coinData, setCoinData] = useState<CoinDataResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchSymbols = async () => {
       try {
-        const res = await axios.get('/api/v1/analytics/coins');
+        const res = await getCoinSymbols();
         if (res.data && res.data.symbols) {
           setSymbols(res.data.symbols);
           if (res.data.symbols.length > 0) {
@@ -34,7 +35,7 @@ const MarketRadar: React.FC = () => {
     const fetchCoinData = async (isInitial = false) => {
       if (isInitial) setLoading(true);
       try {
-        const res = await axios.get(`/api/v1/analytics/coin/${selectedSymbol}`);
+        const res = await getCoinData(selectedSymbol);
         setCoinData(res.data);
       } catch (err) {
         console.error("Error fetching coin data:", err);

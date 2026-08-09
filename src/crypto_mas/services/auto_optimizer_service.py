@@ -49,7 +49,7 @@ class AutoOptimizerService:
         Runs optimization on the past `lookback_months` to find the best parameters for LIVE trading,
         and saves them to a JSON config file and DB.
         """
-        logger.info(f"Starting {triggered_by} Auto-Optimization for {strategy_name} on {len(symbols)} symbols over the last {lookback_months} months.")
+        logger.info("Starting %s Auto-Optimization for %s on %s symbols over the last %s months.", triggered_by, strategy_name, len(symbols), lookback_months)
         
         # 0. Initialize DB History Record
         history_record = OptimizationHistory(
@@ -151,7 +151,7 @@ class AutoOptimizerService:
             study.optimize(objective, n_trials=n_trials)
             
             best_params = study.best_params
-            logger.info(f"Auto-Optimization complete! Best params found: {best_params}")
+            logger.info("Auto-Optimization complete! Best params found: %s", best_params)
             
             # Save to DB
             history_record.status = "COMPLETED"
@@ -169,10 +169,10 @@ class AutoOptimizerService:
                     "history_id": history_record.id
                 }, f, indent=4)
                 
-            logger.info(f"New optimal config saved to DB and {CONFIG_PATH}")
+            logger.info("New optimal config saved to DB and %s", CONFIG_PATH)
             return best_params
         except Exception as e:
-            logger.error(f"Auto-Optimization failed: {e}")
+            logger.error("Auto-Optimization failed: %s", e)
             history_record.status = "FAILED"
             history_record.error_message = str(e)
             history_record.completed_at = datetime.now(UTC)

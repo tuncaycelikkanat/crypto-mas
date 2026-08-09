@@ -9,10 +9,40 @@ from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
 
 
-def test_execute_target_portfolio_account_not_found():
+def _setup_mock_broker():
     db_mock = MagicMock()
     broker = PaperBrokerService(db=db_mock)
-    broker.account_repository = MagicMock()
+    
+    account_repo_mock = MagicMock()
+    position_repo_mock = MagicMock()
+    feature_snapshot_repo_mock = MagicMock()
+    trade_repo_mock = MagicMock()
+    order_repo_mock = MagicMock()
+    log_repo_mock = MagicMock()
+    
+    broker.account_repository = account_repo_mock
+    broker.position_repository = position_repo_mock
+    broker.feature_snapshot_repository = feature_snapshot_repo_mock
+    broker.trade_repository = trade_repo_mock
+    broker.order_repository = order_repo_mock
+    broker.log_repository = log_repo_mock
+    
+    broker.position_manager.account_repository = account_repo_mock
+    broker.position_manager.position_repository = position_repo_mock
+    broker.position_manager.feature_snapshot_repository = feature_snapshot_repo_mock
+    
+    broker.mark_to_market.account_repository = account_repo_mock
+    broker.mark_to_market.position_repository = position_repo_mock
+    broker.mark_to_market.feature_snapshot_repository = feature_snapshot_repo_mock
+    
+    broker.reporter.trade_repository = trade_repo_mock
+    broker.reporter.order_repository = order_repo_mock
+    broker.reporter.log_repository = log_repo_mock
+    
+    return broker
+
+def test_execute_target_portfolio_account_not_found():
+    broker = _setup_mock_broker()
     broker.account_repository.get_by_name.return_value = None
     
     target = MagicMock(spec=PortfolioTarget)
@@ -21,11 +51,7 @@ def test_execute_target_portfolio_account_not_found():
         broker.execute_target_portfolio("missing_acc", target)
 
 def test_execute_target_portfolio_existing_position():
-    db_mock = MagicMock()
-    broker = PaperBrokerService(db=db_mock)
-    broker.account_repository = MagicMock()
-    broker.position_repository = MagicMock()
-    broker.log_repository = MagicMock()
+    broker = _setup_mock_broker()
     
     account_mock = MagicMock()
     account_mock.name = "test_acc"
@@ -47,12 +73,7 @@ def test_execute_target_portfolio_existing_position():
     assert report.skipped[0].reason == "Open position already exists."
 
 def test_execute_target_portfolio_missing_price():
-    db_mock = MagicMock()
-    broker = PaperBrokerService(db=db_mock)
-    broker.account_repository = MagicMock()
-    broker.position_repository = MagicMock()
-    broker.feature_snapshot_repository = MagicMock()
-    broker.log_repository = MagicMock()
+    broker = _setup_mock_broker()
     
     account_mock = MagicMock()
     account_mock.name = "test_acc"
@@ -72,12 +93,7 @@ def test_execute_target_portfolio_missing_price():
     assert report.skipped[0].reason == "Latest close price not available."
 
 def test_execute_target_portfolio_zero_notional():
-    db_mock = MagicMock()
-    broker = PaperBrokerService(db=db_mock)
-    broker.account_repository = MagicMock()
-    broker.position_repository = MagicMock()
-    broker.feature_snapshot_repository = MagicMock()
-    broker.log_repository = MagicMock()
+    broker = _setup_mock_broker()
     
     account_mock = MagicMock()
     account_mock.name = "test_acc"
@@ -102,9 +118,7 @@ def test_execute_target_portfolio_zero_notional():
     assert report.skipped[0].reason == "Target notional is zero."
 
 def test_close_positions_not_in_target_account_not_found():
-    db_mock = MagicMock()
-    broker = PaperBrokerService(db=db_mock)
-    broker.account_repository = MagicMock()
+    broker = _setup_mock_broker()
     broker.account_repository.get_by_name.return_value = None
     
     target = MagicMock(spec=PortfolioTarget)
@@ -114,12 +128,7 @@ def test_close_positions_not_in_target_account_not_found():
         broker.close_positions_not_in_target("missing_acc", target)
 
 def test_close_positions_not_in_target_missing_price():
-    db_mock = MagicMock()
-    broker = PaperBrokerService(db=db_mock)
-    broker.account_repository = MagicMock()
-    broker.position_repository = MagicMock()
-    broker.feature_snapshot_repository = MagicMock()
-    broker.log_repository = MagicMock()
+    broker = _setup_mock_broker()
     
     account_mock = MagicMock()
     account_mock.name = "test_acc"
@@ -147,26 +156,19 @@ def test_close_positions_not_in_target_missing_price():
     assert report.skipped[0].reason == "Latest close price not available for paper SELL."
 
 def test_extract_close_price_edge_cases():
-    db_mock = MagicMock()
-    broker = PaperBrokerService(db=db_mock)
-    
-    assert broker._extract_close_price(None) is None
+    from crypto_mas.services.paper_trading.risk_calculator import RiskCalculator
+    assert RiskCalculator.extract_close_price(None) is None
     
     s1 = MagicMock(spec=FeatureSnapshot)
     s1.features_json = {}
-    assert broker._extract_close_price(s1) is None
+    assert RiskCalculator.extract_close_price(s1) is None
     
     s2 = MagicMock(spec=FeatureSnapshot)
     s2.features_json = {"close": "invalid"}
-    assert broker._extract_close_price(s2) is None
+    assert RiskCalculator.extract_close_price(s2) is None
 
 def test_update_mark_prices_missing_price():
-    db_mock = MagicMock()
-    broker = PaperBrokerService(db=db_mock)
-    broker.account_repository = MagicMock()
-    broker.position_repository = MagicMock()
-    broker.feature_snapshot_repository = MagicMock()
-    broker.log_repository = MagicMock()
+    broker = _setup_mock_broker()
     
     account_mock = MagicMock()
     account_mock.name = "test_acc"
@@ -189,8 +191,6 @@ def test_update_mark_prices_missing_price():
     assert report.skipped[0].reason == "Latest close price not available for mark-to-market."
 
 def test_zero_if_tiny():
-    db_mock = MagicMock()
-    broker = PaperBrokerService(db=db_mock)
-    
-    assert broker._zero_if_tiny(Decimal("0.000000001")) == Decimal("0.00000000")
-    assert broker._zero_if_tiny(Decimal("0.1")) == Decimal("0.10000000")
+    from crypto_mas.services.paper_trading.risk_calculator import RiskCalculator
+    assert RiskCalculator._money(Decimal("0.000000001")) == Decimal("0.00000000")
+    assert RiskCalculator._money(Decimal("0.1")) == Decimal("0.10000000")

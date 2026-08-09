@@ -3,28 +3,12 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.services.backtesting.engine import BacktestEngineService
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
 from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
 from crypto_mas.services.market_data_service.schemas import Timeframe, Exchange
 
-# In-memory DB setup
-engine = create_engine("sqlite:///:memory:")
-Base.metadata.create_all(engine)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-@pytest.fixture
-def db_session():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.rollback()
-        db.close()
 
 
 @pytest.mark.asyncio

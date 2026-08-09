@@ -21,7 +21,7 @@ class HistoryFetcher:
         """
         Fetches historical data chunk by chunk and saves to DB.
         """
-        logger.info(f"Starting fetch for {symbol} on {timeframe.value} from {start_date.date()} to {end_date.date()}")
+        logger.info("Starting fetch for %s on %s from %s to %s", symbol, timeframe.value, start_date.date(), end_date.date())
         
         current_start = start_date
         total_fetched = 0
@@ -37,7 +37,7 @@ class HistoryFetcher:
                 )
                 
                 if not candles:
-                    logger.warning(f"No candles returned for {symbol} after {current_start}. Stopping.")
+                    logger.warning("No candles returned for %s after %s. Stopping.", symbol, current_start)
                     break
                 
                 # Filter out candles beyond end_date just in case
@@ -49,7 +49,7 @@ class HistoryFetcher:
                 self.repo.bulk_upsert(valid_candles)
                 total_fetched += len(valid_candles)
                 
-                logger.info(f"Fetched and saved {len(valid_candles)} candles. Total: {total_fetched}. Reached: {valid_candles[-1].open_time}")
+                logger.info("Fetched and saved %s candles. Total: %s. Reached: %s", len(valid_candles), total_fetched, valid_candles[-1].open_time)
                 
                 # Advance current_start for the next loop
                 current_start = valid_candles[-1].open_time + timedelta(seconds=1)
@@ -57,10 +57,10 @@ class HistoryFetcher:
                 await asyncio.sleep(0.5) # Rate limit protection
                 
             except Exception as e:
-                logger.error(f"Error fetching data: {e}")
+                logger.error("Error fetching data: %s", e)
                 await asyncio.sleep(5)
                 
-        logger.info(f"Finished fetching {symbol}. Total saved: {total_fetched}")
+        logger.info("Finished fetching %s. Total saved: %s", symbol, total_fetched)
         
     def close(self):
         self.db.close()

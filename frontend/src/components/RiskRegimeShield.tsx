@@ -45,7 +45,7 @@ const RiskRegimeShield: React.FC = () => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/risk-regime`;
     let ws: WebSocket | null = null;
-    let fallbackInterval: any = null;
+    let fallbackInterval: ReturnType<typeof setInterval> | null = null;
 
     try {
       ws = new WebSocket(wsUrl);

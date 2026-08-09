@@ -78,7 +78,7 @@ class EventEngine:
                 await self._process_depth(symbol, payload)
 
         except Exception as exc:
-            logger.error(f"EventEngine processing error: {exc}", exc_info=True)
+            logger.error("EventEngine processing error: %s", exc, exc_info=True)
 
     # ── Trade processing ─────────────────────────────────────────
     async def _process_trade(self, symbol: str, payload: dict[str, Any]):
@@ -169,7 +169,7 @@ class EventEngine:
         if total_depth > 0:
             depth_imbalance = bid_vol / total_depth
             self.metrics_store.set_metric(symbol, "depth_imbalance", depth_imbalance)
-            logger.debug(f"[DEPTH] {symbol} | Bid%: {depth_imbalance*100:.1f}% | Depth: ${total_depth:,.0f}")
+            logger.debug("[DEPTH] %s | Bid%%: %.1f%% | Depth: $%,.0f", symbol, depth_imbalance*100, total_depth)
 
     # ── RVOL estimation ──────────────────────────────────────────
     def _get_rvol(self, symbol: str, window_notional: float) -> tuple[float, float]:
@@ -217,14 +217,14 @@ class EventEngine:
             finally:
                 db.close()
         except Exception as exc:
-            logger.debug(f"RVOL DB lookup failed for {symbol}: {exc}")
+            logger.debug("RVOL DB lookup failed for %s: %s", symbol, exc)
 
         # Fallback: if we can't get baseline, require $50k to trigger
         return window_notional / 25_000.0, 2.0
 
     # ── Cycle trigger ─────────────────────────────────────────────
     async def _trigger_cycle(self, symbol: str):
-        logger.warning(f"🚀 [TRIGGER] Firing event-driven HFT cycle for {symbol}")
+        logger.warning("🚀 [TRIGGER] Firing event-driven HFT cycle for %s", symbol)
         from crypto_mas.infrastructure.db.session import SessionLocal
         from crypto_mas.services.market_data_service.provider_factory import (
             get_market_data_provider,
@@ -246,6 +246,6 @@ class EventEngine:
                 trigger="EVENT_TRIGGERED",
             )
         except Exception as exc:
-            logger.error(f"Event-driven cycle failed for {symbol}: {exc}", exc_info=True)
+            logger.error("Event-driven cycle failed for %s: %s", symbol, exc, exc_info=True)
         finally:
             db.close()

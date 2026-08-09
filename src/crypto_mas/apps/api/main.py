@@ -38,6 +38,7 @@ from crypto_mas.services.config_service.config_service import ConfigService
 from crypto_mas.services.config_service.schemas import TradingConfig
 from crypto_mas.services.scheduler_service import SchedulerService
 from crypto_mas.services.alerting.telegram_bot import TelegramService
+from crypto_mas.infrastructure.db.async_compat import run_sync
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 setup_logging(env="dev")  # Production'da env var'dan okunabilir
@@ -60,8 +61,8 @@ async def lifespan(app: FastAPI):
                 is_active=True,
                 notes="System default configuration",
             )
-            config_service.repository.add(new_version)
-            db.commit()
+            await run_sync(config_service.repository.add, new_version)
+            await run_sync(db.commit)
 
     # Start Scheduler
     scheduler_service = SchedulerService()

@@ -5,6 +5,7 @@ from typing import Optional
 
 from crypto_mas.engine.portfolio import PortfolioTarget
 from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
+from crypto_mas.infrastructure.db.async_compat import run_sync
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +41,12 @@ class OrderExecutorQueue:
         task = ExecutionTask(account_name=account_name, target=target, cycle_id=cycle_id)
         
         if self.sync_mode:
-            logger.debug(f"Executing execution task synchronously for cycle {cycle_id}")
+            logger.debug("Executing execution task synchronously for cycle %s", cycle_id)
             self._execute_task_sync(task)
             return
 
         self.queue.put_nowait(task)
-        logger.debug(f"Enqueued execution task for cycle {cycle_id}, account {account_name}")
+        logger.debug("Enqueued execution task for cycle %s, account %s", cycle_id, account_name)
 
     def _execute_task_sync(self, task: ExecutionTask) -> None:
         if self._broker_factory is None:
@@ -111,7 +112,7 @@ class OrderExecutorQueue:
             try:
                 task = await self.queue.get()
                 
-                logger.info(f"Executing queue task for cycle {task.cycle_id}")
+                logger.info("Executing queue task for cycle %s", task.cycle_id)
                 
                 # Fetch a new DB session and broker for this isolated execution context
                 if self._broker_factory is None:
@@ -122,7 +123,6 @@ class OrderExecutorQueue:
                 broker: PaperBrokerService = self._broker_factory()
                 
                 # Execute synchronously inside a thread pool
-                loop = asyncio.get_running_loop()
                 def sync_execute(task=task, broker=broker):
                     db = broker.db
                     from crypto_mas.domain.repositories.trading_cycle_repository import (
@@ -176,16 +176,16 @@ class OrderExecutorQueue:
                             cycle.finished_at = broker.time_provider.now()
                             db.commit()
                 
-                await loop.run_in_executor(None, sync_execute)
+                await run_sync(sync_execute)
                 
-                logger.info(f"Execution completed for cycle {task.cycle_id}")
+                logger.info("Execution completed for cycle %s", task.cycle_id)
                 self.queue.task_done()
 
             except asyncio.CancelledError:
                 logger.info("OrderExecutorQueue worker cancelled.")
                 break
             except Exception as e:
-                logger.exception(f"Error executing queued target: {e}")
+                logger.exception("Error executing queued target: %s", e)
                 self.queue.task_done()
 
     def start(self) -> None:

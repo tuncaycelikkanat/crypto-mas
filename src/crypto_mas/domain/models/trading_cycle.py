@@ -5,6 +5,8 @@ from sqlalchemy import DateTime, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from crypto_mas.infrastructure.db.base import Base
+from crypto_mas.domain.value_objects.enums import CycleStatus
+
 
 
 class TradingCycle(Base):
@@ -16,7 +18,7 @@ class TradingCycle(Base):
     exchange: Mapped[str] = mapped_column(String(32), nullable=False)
     timeframe: Mapped[str] = mapped_column(String(16), nullable=False)
 
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="RUNNING")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default=CycleStatus.RUNNING)
     trigger: Mapped[str] = mapped_column(String(16), nullable=False)
 
     symbols_processed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

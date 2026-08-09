@@ -28,7 +28,7 @@ def background_optimization_task(db: Session, symbols: list[str], timeframe: Tim
             triggered_by="MANUAL"
         )
     except Exception as e:
-        logger.error(f"Background optimization task failed: {e}")
+        logger.error("Background optimization task failed: %s", e)
     finally:
         db.close()
 

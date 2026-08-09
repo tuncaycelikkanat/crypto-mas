@@ -3,27 +3,13 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from crypto_mas.apps.api.main import app
 from crypto_mas.domain.models.optimization_history import OptimizationHistory
-from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.db.session import get_db_session
 
 client = TestClient(app)
 
-@pytest.fixture
-def db_session() -> Session: # type: ignore
-    engine = create_engine("sqlite:///:memory:")
-    import crypto_mas.domain.models
-    Base.metadata.create_all(engine)
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+
 
 def test_get_optimization_history_empty(db_session: Session):
     app.dependency_overrides[get_db_session] = lambda: db_session

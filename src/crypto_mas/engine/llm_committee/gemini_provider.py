@@ -1,27 +1,33 @@
 import json
 import time
 from typing import Any
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from pydantic import BaseModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 from crypto_mas.engine.llm_committee.provider import LLMProvider
 
 class GeminiProvider(LLMProvider):
     def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
+        self.client = genai.Client(api_key=api_key)
         
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def complete_json(self, prompt: str, schema: type[BaseModel],
-                             model: str = "gemini-1.5-flash", timeout_s: float = 8.0) -> tuple[BaseModel, dict[str, Any]]:
+                             model: str = "gemini-3.6-flash", timeout_s: float = 8.0) -> tuple[BaseModel, dict[str, Any]]:
         start_time = time.time()
         
-        generative_model = genai.GenerativeModel(
-            model_name=model,
-            generation_config={"response_mime_type": "application/json"}
-        )
-        
-        # We must use asyncio properly, google-generativeai supports async generate_content_async
-        response = await generative_model.generate_content_async(prompt)
+        try:
+            response = await self.client.aio.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=schema,
+                )
+            )
+        except Exception as e:
+            print(f"DEBUG GEMINI ERROR: {repr(e)}")
+            raise e
         
         latency_ms = int((time.time() - start_time) * 1000)
         

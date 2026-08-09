@@ -5,6 +5,8 @@ from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from crypto_mas.infrastructure.db.base import Base
+from crypto_mas.domain.value_objects.enums import OrderStatus, PositionSide
+
 
 
 class Order(Base):
@@ -17,6 +19,7 @@ class Order(Base):
     exchange: Mapped[str] = mapped_column(String(32), nullable=False)
     symbol: Mapped[str] = mapped_column(String(64), nullable=False)
 
+    # Uses PositionSide / OrderStatus enum values
     side: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
 

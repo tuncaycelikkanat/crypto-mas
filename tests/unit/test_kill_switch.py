@@ -1,34 +1,15 @@
-from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.domain.models.paper_account import PaperAccount
 from crypto_mas.domain.models.trading_cycle import TradingCycle
-from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
-
-
-@pytest.fixture()
-def db_session() -> Generator[Session, None, None]:
-    engine = create_engine("sqlite+pysqlite:///:memory:")
-    Base.metadata.create_all(bind=engine)
-
-    session_factory = sessionmaker(bind=engine)
-    session = session_factory()
-
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
-        engine.dispose()
 
 
 

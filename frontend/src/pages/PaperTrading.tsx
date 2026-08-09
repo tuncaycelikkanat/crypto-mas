@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { 
+  getPaperAccount, initPaperAccount, getBotStatus, 
+  startBot, stopBot, runCycle, updateBotSymbols, updateBotRisk 
+} from '../services/api';
+import type { PaperAccount, BotStatusResponse, BotInfo, CycleResponse, OpenPosition } from '../types/api';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 import { PlayCircle, RefreshCw, Square, XCircle, Activity, X, Bot, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LiveConsole from '../components/LiveConsole';
@@ -30,43 +35,26 @@ const OptionCard: React.FC<{
 
 // ── Page ─────────────────────────────────────────────────────
 const PaperTrading: React.FC = () => {
-  const [account, setAccount]       = useState<any>(null);
+  const [account, setAccount]       = useState<PaperAccount | null>(null);
   const [loading, setLoading]       = useState(false);
-  const [actionLog, setActionLog]   = useState<any>(null);
-  const [botStatus, setBotStatus]   = useState<any>(null);
+  const [actionLog, setActionLog]   = useState<CycleResponse | { status: string; reason?: string } | null>(null);
+  const [botStatus, setBotStatus]   = useState<BotStatusResponse | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [editingSymbols, setEditingSymbols]   = useState<Record<string, string>>({});
   const [editingRiskLevels, setEditingRiskLevels] = useState<Record<string, number>>({});
 
   // ─ Config state ─
-  const get = (k: string, def: string) => typeof window !== 'undefined' && localStorage.getItem(k) ? localStorage.getItem(k)! : def;
-  const [configSymbols,       setConfigSymbols]       = useState(() => get('configSymbols', 'BTCUSDT, ETHUSDT, SOLUSDT'));
-  const [configInterval,      setConfigInterval]      = useState(() => get('configInterval', '120'));
-  const [configMode,          setConfigMode]          = useState(() => get('configMode', 'swing'));
-  const [configExchanges,     setConfigExchanges]     = useState<string[]>(() => {
-    try { return JSON.parse(get('configExchanges', '["BINANCE"]')); } catch { return ['BINANCE']; }
-  });
-  const [configSymbolSource, setConfigSymbolSource] = useState<'manual' | 'auto'>(() => (localStorage.getItem('configSymbolSource') as any) || 'manual');
-  const [configBtcShield, setConfigBtcShield] = useState(() => localStorage.getItem('configBtcShield') !== 'false');
-  const [configHtfShield, setConfigHtfShield] = useState(() => localStorage.getItem('configHtfShield') !== 'false');
-  const [configRegimeShield, setConfigRegimeShield] = useState(() => localStorage.getItem('configRegimeShield') !== 'false');
-  const [configRiskLevel,     setConfigRiskLevel]     = useState(() => parseInt(get('configRiskLevel', '50'), 10));
-  const [favoriteCoins, setFavoriteCoins] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('favoriteCoins') || '["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","ADAUSDT"]'); }
-    catch { return ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','ADAUSDT']; }
-  });
+  const [configSymbols,       setConfigSymbols]       = useLocalStorage('configSymbols', 'BTCUSDT, ETHUSDT, SOLUSDT');
+  const [configInterval,      setConfigInterval]      = useLocalStorage('configInterval', '120');
+  const [configMode,          setConfigMode]          = useLocalStorage('configMode', 'swing');
+  const [configExchanges,     setConfigExchanges]     = useLocalStorage<string[]>('configExchanges', ['BINANCE']);
+  const [configSymbolSource, setConfigSymbolSource] = useLocalStorage<'manual' | 'auto'>('configSymbolSource', 'manual');
+  const [configBtcShield, setConfigBtcShield] = useLocalStorage('configBtcShield', true);
+  const [configHtfShield, setConfigHtfShield] = useLocalStorage('configHtfShield', true);
+  const [configRegimeShield, setConfigRegimeShield] = useLocalStorage('configRegimeShield', true);
+  const [configRiskLevel,     setConfigRiskLevel]     = useLocalStorage('configRiskLevel', 50);
+  const [favoriteCoins, setFavoriteCoins] = useLocalStorage<string[]>('favoriteCoins', ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','ADAUSDT']);
   const [newFavorite, setNewFavorite] = useState('');
-
-  useEffect(() => { localStorage.setItem('configSymbols', configSymbols); },       [configSymbols]);
-  useEffect(() => { localStorage.setItem('configInterval', configInterval); },     [configInterval]);
-  useEffect(() => { localStorage.setItem('configMode', configMode); },             [configMode]);
-  useEffect(() => { localStorage.setItem('configExchanges', JSON.stringify(configExchanges)); }, [configExchanges]);
-  useEffect(() => { localStorage.setItem('configSymbolSource', configSymbolSource); }, [configSymbolSource]);
-  useEffect(() => { localStorage.setItem('configBtcShield', configBtcShield.toString()); }, [configBtcShield]);
-  useEffect(() => { localStorage.setItem('configHtfShield', configHtfShield.toString()); }, [configHtfShield]);
-  useEffect(() => { localStorage.setItem('configRegimeShield', configRegimeShield.toString()); }, [configRegimeShield]);
-  useEffect(() => { localStorage.setItem('configRiskLevel', String(configRiskLevel)); }, [configRiskLevel]);
-  useEffect(() => { localStorage.setItem('favoriteCoins', JSON.stringify(favoriteCoins)); }, [favoriteCoins]);
 
   const isCoinSelected = (coin: string) =>
     configSymbols.split(',').map(s => s.trim().toUpperCase()).includes(coin);
@@ -79,18 +67,18 @@ const PaperTrading: React.FC = () => {
 
   const fetchAccount = async () => {
     try {
-      const res = await axios.get('/api/v1/paper/mock/account');
+      const res = await getPaperAccount();
       setAccount(res.data);
-    } catch (e: any) {
-      if (e.response?.status === 404) {
-        const initRes = await axios.post('/api/v1/paper/mock/account/init');
+    } catch (e: unknown) {
+      if (typeof e === 'object' && e !== null && 'response' in e && (e as any).response?.status === 404) {
+        const initRes = await initPaperAccount();
         setAccount(initRes.data);
       }
     }
   };
 
   const fetchBotStatus = async () => {
-    try { const res = await axios.get('/api/v1/bot/status'); setBotStatus(res.data); }
+    try { const res = await getBotStatus(); setBotStatus(res.data); }
     catch { /* ignore */ }
   };
 
@@ -107,7 +95,7 @@ const PaperTrading: React.FC = () => {
         ? ['AUTO_GAINERS']
         : configSymbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
       for (const ex of configExchanges) {
-        await axios.post('/api/v1/bot/start', {
+        await startBot({
           bot_id: `bot-${ex.toLowerCase()}-${Date.now()}`,
           interval_seconds: parseInt(configInterval, 10),
           symbols: symbolsList,
@@ -119,7 +107,7 @@ const PaperTrading: React.FC = () => {
           use_regime_shield: configRegimeShield,
         });
       }
-      const res = await axios.get('/api/v1/bot/status');
+      const res = await getBotStatus();
       setBotStatus(res.data);
       setShowConfigModal(false);
     } catch (err) { console.error(err); }
@@ -128,7 +116,7 @@ const PaperTrading: React.FC = () => {
 
   const handleStopBot = async (bot_id: string) => {
     setLoading(true);
-    try { const res = await axios.post(`/api/v1/bot/stop/${bot_id}`); setBotStatus(res.data); }
+    try { const res = await stopBot(bot_id); setBotStatus(res.data); }
     catch (err) { console.error(err); }
     setLoading(false);
   };
@@ -141,7 +129,7 @@ const PaperTrading: React.FC = () => {
         : configSymbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
       let lastRes = null;
       for (const ex of configExchanges) {
-        lastRes = await axios.post('/api/v1/cycle/run', {
+        lastRes = await runCycle({
           account_name: 'default-paper',
           exchange: ex,
           symbols: symbolsList,
@@ -160,7 +148,7 @@ const PaperTrading: React.FC = () => {
     setLoading(true);
     try {
       const symbolsList = (editingSymbols[bot_id] || '').split(',').map(s => s.trim().toUpperCase()).filter(s => s);
-      await axios.put(`/api/v1/bot/symbols/${bot_id}`, { symbols: symbolsList });
+      await updateBotSymbols(bot_id, { symbols: symbolsList });
       await fetchBotStatus();
     } catch (err) { console.error(err); }
     setLoading(false);
@@ -168,9 +156,9 @@ const PaperTrading: React.FC = () => {
 
   const handleRiskChange = async (bot_id: string, risk: number) => {
     try {
-      await axios.put(`/api/v1/bot/risk/${bot_id}`, { risk_level: risk });
+      await updateBotRisk(bot_id, { risk_level: risk });
       setEditingRiskLevels(prev => { const n = { ...prev }; delete n[bot_id]; return n; });
-      setBotStatus((prev: any) => prev ? { ...prev, bots: prev.bots.map((b: any) => b.bot_id === bot_id ? { ...b, risk_level: risk } : b) } : prev);
+      setBotStatus((prev: BotStatusResponse | null) => prev ? { ...prev, bots: prev.bots.map((b: BotInfo) => b.bot_id === bot_id ? { ...b, risk_level: risk } : b) } : prev);
     } catch (err) { console.error(err); }
   };
 
@@ -265,7 +253,7 @@ const PaperTrading: React.FC = () => {
           </div>
         </motion.div>
       ) : (
-        bots.map((bot: any) => {
+        bots.map((bot: BotInfo) => {
           const isRunning = bot.status === 'RUNNING';
           const currentEditingStr = editingSymbols[bot.bot_id] !== undefined ? editingSymbols[bot.bot_id] : (bot.symbols?.join(', ') || '');
           const hasChanged = normalizeSymbols(currentEditingStr) !== normalizeSymbols(bot.symbols || []);
@@ -374,14 +362,14 @@ const PaperTrading: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {account?.open_positions?.length > 0 ? account.open_positions.map((pos: any, i: number) => (
+            {account?.open_positions && account.open_positions.length > 0 ? account.open_positions.map((pos: OpenPosition, i: number) => (
               <tr key={i}>
                 <td style={{ fontWeight: 600 }}>{pos.symbol}</td>
                 <td><span className={`badge badge-${pos.side === 'LONG' ? 'success' : 'danger'}`}>{pos.side}</span></td>
-                <td className="mono">{parseFloat(pos.quantity).toFixed(4)}</td>
-                <td className="mono">${parseFloat(pos.entry_price).toFixed(2)}</td>
-                <td className="mono" style={{ color: parseFloat(pos.unrealized_pnl) >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
-                  ${parseFloat(pos.unrealized_pnl).toFixed(2)}
+                <td className="mono">{parseFloat(String(pos.quantity)).toFixed(4)}</td>
+                <td className="mono">${parseFloat(String(pos.entry_price)).toFixed(2)}</td>
+                <td className="mono" style={{ color: parseFloat(String(pos.unrealized_pnl)) >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                  ${parseFloat(String(pos.unrealized_pnl)).toFixed(2)}
                 </td>
               </tr>
             )) : (

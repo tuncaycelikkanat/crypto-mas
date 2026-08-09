@@ -5,13 +5,17 @@ from fastapi.testclient import TestClient
 from crypto_mas.apps.api.main import app
 from crypto_mas.infrastructure.db.session import get_db_session
 
-client = TestClient(app)
+import pytest
 
-# Override DB dependency
-mock_db = MagicMock()
-app.dependency_overrides[get_db_session] = lambda: mock_db
+@pytest.fixture
+def client():
+    mock_db = MagicMock()
+    app.dependency_overrides[get_db_session] = lambda: mock_db
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
 
-def test_health_check():
+def test_health_check(client):
     response = client.get("/api/v1/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
@@ -26,7 +30,7 @@ from crypto_mas.apps.api.routers.bot import get_scheduler
 
 
 @patch("crypto_mas.apps.api.routers.bot.SchedulerService")
-def test_bot_endpoints(mock_scheduler):
+def test_bot_endpoints(mock_scheduler, client):
     mock_instance = mock_scheduler.return_value
     mock_instance.get_status.return_value = {"bots": []}
     
@@ -57,7 +61,7 @@ def test_bot_endpoints(mock_scheduler):
 @patch("crypto_mas.apps.api.routers.market.SymbolRepository")
 @patch("crypto_mas.apps.api.routers.market.HistoricalFetcherService")
 @patch("crypto_mas.apps.api.routers.market.httpx.AsyncClient")
-def test_market_endpoints(mock_client_class, mock_fetcher, mock_sym_repo, mock_provider):
+def test_market_endpoints(mock_client_class, mock_fetcher, mock_sym_repo, mock_provider, client):
     mock_instance = mock_provider.return_value
     mock_instance.fetch_symbols = AsyncMock(return_value=[])
     mock_instance.fetch_ohlcv = AsyncMock(return_value=[])
@@ -98,7 +102,7 @@ def test_market_endpoints(mock_client_class, mock_fetcher, mock_sym_repo, mock_p
     assert response.status_code == 200
 
 @patch("crypto_mas.apps.api.routers.paper.PaperBrokerService")
-def test_paper_endpoints(mock_broker_service):
+def test_paper_endpoints(mock_broker_service, client):
     mock_broker = mock_broker_service.return_value
     mock_broker.initialize_account.return_value = MagicMock(name="test_acc", initial_balance=1000)
     
@@ -108,7 +112,7 @@ def test_paper_endpoints(mock_broker_service):
     response = client.get("/api/v1/paper/mock/account")
     assert response.status_code == 200
 
-def test_analytics_endpoints():
+def test_analytics_endpoints(client):
     with patch("crypto_mas.apps.api.routers.analytics.PaperAccountRepository") as mock_repo, \
          patch("crypto_mas.apps.api.routers.analytics.TradingCycleRepository"), \
          patch("crypto_mas.apps.api.routers.analytics.CandleRepository"), \

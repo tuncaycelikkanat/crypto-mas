@@ -55,7 +55,7 @@ class EventDrivenService:
                 "exchange": exchange.upper(),
                 "risk_level": risk_level,
             }
-            logger.info(f"Bot {bot_id} started (EVENT_DRIVEN) | mode={mode} | exchange={exchange.upper()} | {len(symbols)} symbols | risk={risk_level}")
+            logger.info("Bot %s started (EVENT_DRIVEN) | mode=%s | exchange=%s | %s symbols | risk=%s", bot_id, mode, exchange.upper(), len(symbols), risk_level)
             
             for sym in symbols:
                 if sym not in ("AUTO_GAINERS", "HIDDEN_GEMS"):
@@ -68,7 +68,7 @@ class EventDrivenService:
             if self.is_bot_running(bot_id):
                 symbols_to_remove = self._event_bots[bot_id].get("symbols", [])
                 del self._event_bots[bot_id]
-                logger.info(f"Bot {bot_id} (EVENT_DRIVEN) stopped.")
+                logger.info("Bot %s (EVENT_DRIVEN) stopped.", bot_id)
                 
                 for sym in symbols_to_remove:
                     self._ws_client.remove_subscription(sym, "trade")
@@ -86,14 +86,14 @@ class EventDrivenService:
                 for sym in symbols:
                     if sym not in old_symbols:
                         self._ws_client.add_subscription(sym, "trade")
-                logger.info(f"Bot {bot_id} (EVENT_DRIVEN) updated | new symbols: {len(symbols)}")
+                logger.info("Bot %s (EVENT_DRIVEN) updated | new symbols: %s", bot_id, len(symbols))
             return self.get_status()
 
     def update_risk(self, bot_id: str, risk_level: int) -> dict[str, Any]:
         with self._lock:
             if self.is_bot_running(bot_id):
                 self._event_bots[bot_id]["risk_level"] = risk_level
-                logger.info(f"Bot {bot_id} (EVENT_DRIVEN) updated | new risk_level: {risk_level}")
+                logger.info("Bot %s (EVENT_DRIVEN) updated | new risk_level: %s", bot_id, risk_level)
             return self.get_status()
 
     def get_ws_client(self):

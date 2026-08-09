@@ -4,6 +4,8 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.order import Order
+from crypto_mas.domain.value_objects.enums import OrderStatus
+
 
 
 class OrderRepository:
@@ -22,7 +24,7 @@ class OrderRepository:
         stmt = (
             select(Order)
             .where(Order.account_name == account_name)
-            .where(Order.status.in_(["OPEN", "PARTIALLY_FILLED", "NEW"]))
+            .where(Order.status.in_([OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED, OrderStatus.NEW]))
             .order_by(Order.created_at.asc())
         )
         return self.session.scalars(stmt).all()

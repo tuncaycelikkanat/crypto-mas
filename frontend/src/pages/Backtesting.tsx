@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { getBacktestJobs, runBacktest, cancelBacktestJob, getRecentLogs } from '../services/api';
+import type { BacktestJob, LogEntry } from '../types/api';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Play, Terminal as TerminalIcon, CheckCircle, XCircle, Activity, History } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BacktestHistory } from './BacktestHistory';
@@ -36,52 +38,36 @@ function formatTime(iso: string) {
 
 const Backtesting: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<BacktestJob[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [activeTab, setActiveTab] = useState<'rule-based' | 'llm-shadow' | 'history'>('rule-based');
-  
-  const [exchange, setExchange] = useState(() => localStorage.getItem('bt_exchange') || "BINANCE");
-  const [configMode, setConfigMode] = useState<'scalping' | 'swing' | 'hodl' | 'regime_adaptive'>(() => (localStorage.getItem('bt_configMode') as any) || 'regime_adaptive');
-  const [timeframe, setTimeframe] = useState(() => localStorage.getItem('bt_timeframe') || "15m");
-  const [symbolSource, setSymbolSource] = useState<'manual' | 'auto'>(() => (localStorage.getItem('bt_symbolSource') as any) || 'manual');
-  const [manualSymbols, setManualSymbols] = useState(() => localStorage.getItem('bt_manualSymbols') || "BTCUSDT, ETHUSDT");
   const [autoScroll, setAutoScroll] = useState(false);
-  const [startDate, setStartDate] = useState(() => localStorage.getItem('bt_startDate') || new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(() => localStorage.getItem('bt_endDate') || new Date().toISOString().split('T')[0]);
-  const [initialBalance, setInitialBalance] = useState(() => parseInt(localStorage.getItem('bt_initialBalance') || "10000", 10));
-  const [riskLevel, setRiskLevel] = useState(() => parseInt(localStorage.getItem('bt_riskLevel') || "100", 10));
-  const [useBtcShield, setUseBtcShield] = useState(() => localStorage.getItem('bt_useBtcShield') !== 'false');
-  const [useHtfShield, setUseHtfShield] = useState(() => localStorage.getItem('bt_useHtfShield') !== 'false');
-  const [useRegimeShield, setUseRegimeShield] = useState(() => localStorage.getItem('bt_useRegimeShield') !== 'false');
-  const [configJsonText, setConfigJsonText] = useState(() => localStorage.getItem('bt_configJsonText') || JSON.stringify({
+  
+  const [exchange, setExchange] = useLocalStorage('bt_exchange', "BINANCE");
+  const [configMode, setConfigMode] = useLocalStorage<'scalping' | 'swing' | 'hodl' | 'regime_adaptive'>('bt_configMode', 'regime_adaptive');
+  const [timeframe, setTimeframe] = useLocalStorage('bt_timeframe', "15m");
+  const [symbolSource, setSymbolSource] = useLocalStorage<'manual' | 'auto'>('bt_symbolSource', 'manual');
+  const [manualSymbols, setManualSymbols] = useLocalStorage('bt_manualSymbols', "BTCUSDT, ETHUSDT");
+  const [startDate, setStartDate] = useLocalStorage('bt_startDate', new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useLocalStorage('bt_endDate', new Date().toISOString().split('T')[0]);
+  const [initialBalance, setInitialBalance] = useLocalStorage('bt_initialBalance', 10000);
+  const [riskLevel, setRiskLevel] = useLocalStorage('bt_riskLevel', 100);
+  const [useBtcShield, setUseBtcShield] = useLocalStorage('bt_useBtcShield', true);
+  const [useHtfShield, setUseHtfShield] = useLocalStorage('bt_useHtfShield', true);
+  const [useRegimeShield, setUseRegimeShield] = useLocalStorage('bt_useRegimeShield', true);
+  const [configJsonText, setConfigJsonText] = useLocalStorage('bt_configJsonText', JSON.stringify({
     bull_tactic: { min_adx: 25.0, rsi_threshold: 42.0 },
     bear_tactic: { min_adx: 25.0, rsi_threshold: 58.0 },
     sideways_tactic: { rsi_oversold: 30.0, rsi_overbought: 70.0 }
   }, null, 2));
-
-  useEffect(() => {
-    localStorage.setItem('bt_exchange', exchange);
-    localStorage.setItem('bt_configMode', configMode);
-    localStorage.setItem('bt_timeframe', timeframe);
-    localStorage.setItem('bt_symbolSource', symbolSource);
-    localStorage.setItem('bt_manualSymbols', manualSymbols);
-    localStorage.setItem('bt_startDate', startDate);
-    localStorage.setItem('bt_endDate', endDate);
-    localStorage.setItem('bt_initialBalance', initialBalance.toString());
-    localStorage.setItem('bt_riskLevel', riskLevel.toString());
-    localStorage.setItem('bt_useBtcShield', useBtcShield.toString());
-    localStorage.setItem('bt_useHtfShield', useHtfShield.toString());
-    localStorage.setItem('bt_useRegimeShield', useRegimeShield.toString());
-    localStorage.setItem('bt_configJsonText', configJsonText);
-  }, [exchange, configMode, timeframe, symbolSource, manualSymbols, startDate, endDate, initialBalance, riskLevel, useBtcShield, useHtfShield, useRegimeShield, configJsonText]);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const res = await axios.get('/api/v1/backtest');
+        const res = await getBacktestJobs();
         setJobs(res.data);
       } catch (e) {
         console.error(e);
@@ -108,7 +94,7 @@ const Backtesting: React.FC = () => {
 
     const fetchLogs = async () => {
       try {
-        const res = await axios.get(`/api/v1/logs/recent?account_name=backtest-${selectedJobId}&limit=100`);
+        const res = await getRecentLogs(`backtest-${selectedJobId}`, 100);
         setLogs(res.data);
       } catch (e) {
         console.error(e);
@@ -161,11 +147,11 @@ const Backtesting: React.FC = () => {
         run_llm: activeTab === 'llm-shadow',
       };
 
-      const res = await axios.post('/api/v1/backtest/run', payload);
+      const res = await runBacktest(payload);
       setSelectedJobId(res.data.job_id);
       setLogs([]); 
       
-      const jobsRes = await axios.get('/api/v1/backtest');
+      const jobsRes = await getBacktestJobs();
       setJobs(jobsRes.data);
     } catch (error) {
       console.error(error);
@@ -176,8 +162,8 @@ const Backtesting: React.FC = () => {
 
   const handleCancelJob = async (jobId: string) => {
     try {
-      await axios.post(`/api/v1/backtest/${jobId}/cancel`);
-      const res = await axios.get('/api/v1/backtest');
+      await cancelBacktestJob(jobId);
+      const res = await getBacktestJobs();
       setJobs(res.data);
     } catch(e) {
       console.error(e);
@@ -189,11 +175,11 @@ const Backtesting: React.FC = () => {
     try {
       const runningJobs = jobs.filter(j => j.status === 'RUNNING' || j.status === 'PENDING');
       for (const job of runningJobs) {
-        await axios.post(`/api/v1/backtest/${job.job_id}/cancel`);
+        await cancelBacktestJob(job.job_id);
       }
       setSelectedJobId(null);
       setLogs([]);
-      const res = await axios.get('/api/v1/backtest');
+      const res = await getBacktestJobs();
       setJobs(res.data);
     } catch(e) {
       console.error(e);

@@ -62,9 +62,9 @@ class BinanceWebsocketClient:
         try:
             if self._connection and self._connection.state == websockets.State.OPEN:
                 await self._connection.send(json.dumps(payload))
-                logger.debug(f"Binance WS sent: {payload}")
+                logger.debug("Binance WS sent: %s", payload)
         except Exception as e:
-            logger.error(f"Binance WS send error: {e}")
+            logger.error("Binance WS send error: %s", e)
 
     async def _handle_messages(self):
         while self._is_running:
@@ -72,7 +72,7 @@ class BinanceWebsocketClient:
                 # Connect to raw stream, without ?streams=
                 url = self.base_url
                 
-                logger.info(f"Connecting to Binance WS: {url}")
+                logger.info("Connecting to Binance WS: %s", url)
                 async with websockets.connect(url) as websocket:
                     self._connection = websocket
                     self.reconnect_delay = 1.0
@@ -116,14 +116,14 @@ class BinanceWebsocketClient:
                                 asyncio.create_task(callback(stream_name, payload))
                         elif "result" in data:
                             # Response to SUBSCRIBE/UNSUBSCRIBE
-                            logger.debug(f"Binance WS Subscription result: {data}")
+                            logger.debug("Binance WS Subscription result: %s", data)
                                 
             except websockets.ConnectionClosed:
-                logger.warning(f"Binance WS Connection closed. Reconnecting in {self.reconnect_delay}s...")
+                logger.warning("Binance WS Connection closed. Reconnecting in %ss...", self.reconnect_delay)
                 await asyncio.sleep(self.reconnect_delay)
                 self.reconnect_delay = min(self.reconnect_delay * 2, 60.0)
             except Exception as e:
-                logger.error(f"Binance WS Error: {e}")
+                logger.error("Binance WS Error: %s", e)
                 await asyncio.sleep(self.reconnect_delay)
                 self.reconnect_delay = min(self.reconnect_delay * 2, 60.0)
 

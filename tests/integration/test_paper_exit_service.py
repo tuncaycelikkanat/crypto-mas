@@ -1,37 +1,18 @@
-from collections.abc import Generator
 from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 import crypto_mas.domain.models  # noqa: F401
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
 from crypto_mas.domain.repositories.position_repository import PositionRepository
 from crypto_mas.engine.portfolio import PortfolioTarget, TargetPosition
-from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.time.time_provider import FixedTimeProvider
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
 from crypto_mas.services.paper_trading.schemas import PaperExecutionStatus
-
-
-@pytest.fixture()
-def db_session() -> Generator[Session, None, None]:
-    engine = create_engine("sqlite+pysqlite:///:memory:")
-    Base.metadata.create_all(bind=engine)
-
-    session_factory = sessionmaker(bind=engine)
-    session = session_factory()
-
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
-        engine.dispose()
 
 
 def _create_account(db: Session) -> None:

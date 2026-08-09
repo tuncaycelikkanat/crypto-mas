@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import Session, sessionmaker
 
 from crypto_mas.domain.models.paper_account import PaperAccount
@@ -16,7 +17,7 @@ from crypto_mas.services.trading_cycle_service.cycle_orchestrator import Trading
 
 @pytest.fixture
 def e2e_db_session():
-    engine = create_engine("sqlite:///:memory:", echo=False)
+    engine = create_engine("sqlite:///:memory:", echo=False, connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(bind=engine)
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()

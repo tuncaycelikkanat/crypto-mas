@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
@@ -17,7 +18,7 @@ from crypto_mas.services.trading_cycle_service.cycle_orchestrator import Trading
 
 
 def setup_fresh_db():
-    engine = create_engine("sqlite+pysqlite:///:memory:")
+    engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(bind=engine)
     session_factory = sessionmaker(bind=engine)
     return session_factory(), engine

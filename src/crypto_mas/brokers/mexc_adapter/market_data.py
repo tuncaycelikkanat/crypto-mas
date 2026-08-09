@@ -6,6 +6,7 @@ import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from crypto_mas.infrastructure.config.settings import get_settings
+from crypto_mas.brokers.base_market_data import to_millis, from_millis, is_stablecoin, is_leveraged_token
 from crypto_mas.services.market_data_service.interfaces import MarketDataProvider
 from crypto_mas.services.market_data_service.schemas import (
     Exchange,
@@ -59,8 +60,8 @@ class MexcMarketDataProvider(MarketDataProvider):
                     quote_asset=quote_asset,
                     status="TRADING" if status == "1" or status == "TRADING" else status,
                     is_active=status == "1" or status == "TRADING",
-                    is_stablecoin=self._is_stablecoin(base_asset),
-                    is_leveraged_token=self._is_leveraged_token(symbol),
+                    is_stablecoin=is_stablecoin(base_asset),
+                    is_leveraged_token=is_leveraged_token(symbol),
                     listing_date=None,
                     delisting_date=None,
                 )
@@ -94,12 +95,12 @@ class MexcMarketDataProvider(MarketDataProvider):
         params: dict[str, str | int] = {
             "symbol": symbol,
             "interval": interval,
-            "startTime": self._to_millis(start_time),
+            "startTime": to_millis(start_time),
             "limit": limit,
         }
 
         if end_time is not None:
-            params["endTime"] = self._to_millis(end_time)
+            params["endTime"] = to_millis(end_time)
 
         # Rate limit protection (MEXC can be strict)
         await asyncio.sleep(0.1)
@@ -117,13 +118,13 @@ class MexcMarketDataProvider(MarketDataProvider):
                     exchange=Exchange.MEXC,
                     symbol=symbol,
                     timeframe=timeframe,
-                    open_time=self._from_millis(int(row[0])),
+                    open_time=from_millis(int(row[0])),
                     open=Decimal(str(row[1])),
                     high=Decimal(str(row[2])),
                     low=Decimal(str(row[3])),
                     close=Decimal(str(row[4])),
                     volume=Decimal(str(row[5])),
-                    close_time=self._from_millis(int(row[6])),
+                    close_time=from_millis(int(row[6])),
                     quote_volume=Decimal(str(row[7])),
                     trade_count=int(row[8]) if len(row) > 8 else 0, # MEXC might not return trade_count in some cases
                     source="MEXC_REST",
@@ -131,47 +132,3 @@ class MexcMarketDataProvider(MarketDataProvider):
             )
 
         return candles
-
-    @staticmethod
-    def _to_millis(value: datetime) -> int:
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=UTC)
-
-        value = value.astimezone(UTC)
-
-        return int(value.timestamp() * 1000)
-
-    @staticmethod
-    def _from_millis(value: int) -> datetime:
-        return datetime.fromtimestamp(value / 1000, tz=UTC)
-
-    @staticmethod
-    def _is_stablecoin(base_asset: str) -> bool:
-        stablecoins = {
-            "USDT",
-            "USDC",
-            "FDUSD",
-            "TUSD",
-            "DAI",
-            "BUSD",
-            "USDP",
-            "EUR",
-            "TRY",
-        }
-
-        return base_asset.upper() in stablecoins
-
-    @staticmethod
-    def _is_leveraged_token(symbol: str) -> bool:
-        leveraged_suffixes = (
-            "UPUSDT",
-            "DOWNUSDT",
-            "BULLUSDT",
-            "BEARUSDT",
-            "3LUSDT",
-            "3SUSDT",
-            "5LUSDT",
-            "5SUSDT",
-        )
-
-        return symbol.upper().endswith(leveraged_suffixes)

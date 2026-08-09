@@ -51,9 +51,9 @@ class WalkForwardOptimizer:
         for idx, fold in enumerate(folds, 1):
             print(f"\n─────────────────────────────────────────────────────────────────", flush=True)
             print(f"👉 [Fold {idx:02d}/{len(folds)}] Tarih: {fold.train_start.strftime('%Y-%m-%d')} -> {fold.test_end.strftime('%Y-%m-%d')}", flush=True)
-            logger.info(f"\n{'='*50}\nStarting Walk-Forward Fold {fold.fold_id}\n{'='*50}")
-            logger.info(f"Train: {fold.train_start} -> {fold.train_end}")
-            logger.info(f"Test:  {fold.test_start} -> {fold.test_end}")
+            logger.info("\n%s\nStarting Walk-Forward Fold %s\n%s", '='*50, fold.fold_id, '='*50)
+            logger.info("Train: %s -> %s", fold.train_start, fold.train_end)
+            logger.info("Test:  %s -> %s", fold.test_start, fold.test_end)
             
             # --- 1. Pre-fetch Data for Train (Memory Caching) ---
             from crypto_mas.domain.repositories.candle_repository import CandleRepository
@@ -148,14 +148,14 @@ class WalkForwardOptimizer:
             optuna.logging.set_verbosity(optuna.logging.WARNING)
             study.optimize(objective, n_trials=n_trials, n_jobs=n_jobs)
             
-            logger.info(f"Fold {fold.fold_id} Best Params: {study.best_params}")
-            logger.info(f"Fold {fold.fold_id} Best Train Score: {study.best_value}")
+            logger.info("Fold %s Best Params: %s", fold.fold_id, study.best_params)
+            logger.info("Fold %s Best Train Score: %s", fold.fold_id, study.best_value)
             
             # --- 2. Sensitivity Analysis (Optional / Log only for now) ---
             # ...
             
             # --- 3. Evaluate Best Params on Test Fold ---
-            logger.info(f"\nEvaluating Fold {fold.fold_id} Best Params on UNSEEN TEST DATA...")
+            logger.info("\nEvaluating Fold %s Best Params on UNSEEN TEST DATA...", fold.fold_id)
             print(f"   └─ [3/3] En iyi parametrelerle Out-of-Sample Testi yapılıyor...", flush=True)
             test_run_id = uuid.uuid4().hex[:6]
             test_job_id = f"wfo-test-f{fold.fold_id}-{test_run_id}"
@@ -178,7 +178,7 @@ class WalkForwardOptimizer:
             test_result = self._run_async(run_test())
             test_score = FitnessCalculator.calculate_composite_score(test_result, min_trades=1)
             
-            logger.info(f"Fold {fold.fold_id} Test Score: {test_score}, PnL: {test_result.final_equity}, WinRate: {test_result.win_rate}")
+            logger.info("Fold %s Test Score: %s, PnL: %s, WinRate: %s", fold.fold_id, test_score, test_result.final_equity, test_result.win_rate)
             test_results.append(test_result)
             net_p = float(test_result.final_equity - test_result.initial_balance) if (test_result and test_result.final_equity and test_result.initial_balance) else 0.0
             trades_c = getattr(test_result, "total_trades", 0) if test_result else 0

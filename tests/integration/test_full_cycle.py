@@ -2,31 +2,15 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from crypto_mas.brokers.mock_adapter.market_data import MockMarketDataProvider
 from crypto_mas.domain.models import *  # noqa
 from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
-from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.services.market_data_service.schemas import Timeframe
 from crypto_mas.services.trading_cycle_service.cycle_orchestrator import TradingCycleService
+from crypto_mas.domain.value_objects.enums import CycleStatus
 
 
-@pytest.fixture
-def db_session():
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine)
-    
-    db = TestingSessionLocal()
-    yield db
-    db.close()
 
 @pytest.mark.asyncio
 async def test_run_full_trading_cycle(db_session):
@@ -65,5 +49,5 @@ async def test_run_full_trading_cycle(db_session):
     )
     
     assert cycle is not None
-    assert cycle.status == "COMPLETED"
+    assert cycle.status == CycleStatus.COMPLETED
     assert cycle.symbols_processed == 1

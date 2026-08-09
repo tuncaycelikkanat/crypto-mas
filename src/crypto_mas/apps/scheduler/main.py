@@ -51,7 +51,7 @@ async def scheduled_trading_cycle() -> None:
         latest_opt = db.query(OptimizationHistory).filter(OptimizationHistory.status == 'COMPLETED').order_by(OptimizationHistory.id.desc()).first()
         if latest_opt and latest_opt.best_params_json:
             config_json = latest_opt.best_params_json
-            logger.info(f"Loaded auto-optimized config from DB: {config_json}")
+            logger.info("Loaded auto-optimized config from DB: %s", config_json)
         
         cycle = await service.run_cycle(
             account_name="default-paper",  # Daha dinamik hale getirilebilir
@@ -61,10 +61,10 @@ async def scheduled_trading_cycle() -> None:
             config_json=config_json,
         )
         
-        logger.info(f"Scheduled cycle {cycle.id} completed with status: {cycle.status}. PnL: {cycle.cycle_pnl}")
+        logger.info("Scheduled cycle %s completed with status: %s. PnL: %s", cycle.id, cycle.status, cycle.cycle_pnl)
         
     except Exception as e:
-        logger.exception(f"Scheduled cycle failed: {e}")
+        logger.exception("Scheduled cycle failed: %s", e)
     finally:
         db.close()
 
@@ -80,7 +80,7 @@ async def scheduled_optimization_cycle() -> None:
         service.run_optimization_job(symbols=symbols, timeframe=timeframe, lookback_months=3, n_trials=50)
         logger.info("Background Auto-Optimization cycle completed successfully.")
     except Exception as e:
-        logger.exception(f"Scheduled optimization failed: {e}")
+        logger.exception("Scheduled optimization failed: %s", e)
     finally:
         db.close()
 
@@ -121,7 +121,7 @@ def main() -> None:
     queue.start()
     
     scheduler.start()
-    logger.info(f"Scheduler started. Scheduled tasks: {settings.scheduled_symbols} at '{settings.schedule_cron}'")
+    logger.info("Scheduler started. Scheduled tasks: %s at '%s'", settings.scheduled_symbols, settings.schedule_cron)
     
     # Sonsuz döngü
     try:

@@ -5,6 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.position import Position
+from crypto_mas.domain.value_objects.enums import PositionSide, PositionStatus
+
 
 
 class PositionRepository:
@@ -15,7 +17,7 @@ class PositionRepository:
         stmt = (
             select(Position)
             .where(Position.account_name == account_name)
-            .where(Position.status == "OPEN")
+            .where(Position.status == PositionStatus.OPEN)
             .order_by(Position.opened_at.asc())
         )
 
@@ -32,7 +34,7 @@ class PositionRepository:
             .where(Position.account_name == account_name)
             .where(Position.exchange == exchange)
             .where(Position.symbol == symbol)
-            .where(Position.status == "OPEN")
+            .where(Position.status == PositionStatus.OPEN)
         )
 
         return self.db.scalars(stmt).first()
@@ -52,7 +54,7 @@ class PositionRepository:
             .where(Position.account_name == account_name)
             .where(Position.exchange == exchange)
             .where(Position.symbol == symbol)
-            .where(Position.status == "CLOSED")
+            .where(Position.status == PositionStatus.CLOSED)
             .where(Position.close_reason == "STOP_LOSS")
             .where(Position.closed_at >= cutoff_time)
         )
@@ -64,7 +66,7 @@ class PositionRepository:
             select(Position.symbol)
             .where(Position.account_name == account_name)
             .where(Position.exchange == exchange)
-            .where(Position.status == "OPEN")
+            .where(Position.status == PositionStatus.OPEN)
         )
         return set(self.db.scalars(stmt).all())
 
@@ -82,7 +84,7 @@ class PositionRepository:
             select(Position.symbol)
             .where(Position.account_name == account_name)
             .where(Position.exchange == exchange)
-            .where(Position.status == "CLOSED")
+            .where(Position.status == PositionStatus.CLOSED)
             .where(Position.close_reason == "STOP_LOSS")
             .where(Position.closed_at >= cutoff_time)
         )
@@ -102,7 +104,7 @@ class PositionRepository:
             select(Position.symbol)
             .where(Position.account_name == account_name)
             .where(Position.exchange == exchange)
-            .where(Position.status == "CLOSED")
+            .where(Position.status == PositionStatus.CLOSED)
             .where(Position.closed_at >= cutoff_time)
         )
         return set(self.db.scalars(stmt).all())
@@ -123,7 +125,7 @@ class PositionRepository:
             select(Position.symbol)
             .where(Position.account_name == account_name)
             .where(Position.exchange == exchange)
-            .where(Position.status == "CLOSED")
+            .where(Position.status == PositionStatus.CLOSED)
             .where(Position.close_reason == "STOP_LOSS")
             .where(Position.closed_at >= cutoff_time)
             .group_by(Position.symbol)
@@ -143,7 +145,7 @@ class PositionRepository:
         stop_loss_price: Decimal | None = None,
         take_profit_price: Decimal | None = None,
         strategy_mode: str | None = None,
-        side: str = "LONG",
+        side: str = PositionSide.LONG,
         skip_commit: bool = False,
     ) -> Position:
         position = Position(
@@ -151,7 +153,7 @@ class PositionRepository:
             exchange=exchange,
             symbol=symbol,
             side=side,
-            status="OPEN",
+            status=PositionStatus.OPEN,
             quantity=quantity,
             entry_price=entry_price,
             current_price=entry_price,
@@ -181,7 +183,7 @@ class PositionRepository:
     ) -> Position:
         current_price = self._money(current_price)
 
-        if position.side == "LONG":
+        if position.side == PositionSide.LONG:
             raw_unrealized_pnl = (current_price - position.entry_price) * position.quantity
         else:
             raw_unrealized_pnl = (position.entry_price - current_price) * position.quantity
@@ -223,7 +225,7 @@ class PositionRepository:
     ) -> Position:
         exit_price = self._money(exit_price)
 
-        if position.side == "LONG":
+        if position.side == PositionSide.LONG:
             raw_realized_pnl = (exit_price - position.entry_price) * position.quantity
         else:
             raw_realized_pnl = (position.entry_price - exit_price) * position.quantity
@@ -238,7 +240,7 @@ class PositionRepository:
         else:
             position.notional_value = self._money(position.quantity * exit_price)
 
-        position.status = "CLOSED"
+        position.status = PositionStatus.CLOSED
         position.closed_at = closed_at
         position.close_reason = close_reason
 

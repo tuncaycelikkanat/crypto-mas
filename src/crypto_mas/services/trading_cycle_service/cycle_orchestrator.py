@@ -26,6 +26,7 @@ from crypto_mas.services.trading_cycle_service.market_data_orchestrator import (
     MarketDataOrchestrator,
 )
 from crypto_mas.services.trading_cycle_service.strategy_orchestrator import StrategyOrchestrator
+from crypto_mas.infrastructure.db.async_compat import run_sync
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ class TradingCycleService:
                 else:
                     symbols = DEFAULT_FALLBACK_SYMBOLS
             except Exception as e:
-                logger.error(f"Failed to fetch auto gainers: {e}")
+                logger.error("Failed to fetch auto gainers: %s", e)
                 if len(symbols) == 1:
                     symbols = DEFAULT_FALLBACK_SYMBOLS
                 else:
@@ -141,7 +142,7 @@ class TradingCycleService:
                 else:
                     symbols = DEFAULT_FALLBACK_SYMBOLS
             except Exception as e:
-                logger.error(f"Failed to fetch hidden gems: {e}")
+                logger.error("Failed to fetch hidden gems: %s", e)
                 if len(symbols) == 1:
                     symbols = DEFAULT_FALLBACK_SYMBOLS
                 else:
@@ -159,7 +160,7 @@ class TradingCycleService:
         is_backtest = trigger.startswith("BACKTEST-")
         if not is_backtest:
             self.cycle_repository.add(cycle)
-            self.db.commit()
+            await run_sync(self.db.commit)
             display_id = cycle.id
         else:
             display_id = cycle_index if cycle_index is not None else 0
@@ -169,7 +170,7 @@ class TradingCycleService:
         def _log(stage: str, message: str, level: str = "INFO", payload: dict | None = None):
             if trigger.startswith("BACKTEST-"):
                 if level in ("WARN", "WARNING"):
-                    logger.warning(f"[{stage}] {message}")
+                    logger.warning("[%s] %s", stage, message)
                 if level not in ("ERROR", "SUCCESS"):
                     return
             from crypto_mas.domain.models.execution_log import ExecutionLog
@@ -268,22 +269,22 @@ class TradingCycleService:
             
             if not trigger.startswith("BACKTEST-"):
                 cycle.status = "COMPLETED"
-                self.db.commit()
+                await run_sync(self.db.commit)
             cycle.trades_executed = len(decisions)
 
             
             return cycle
             
         except Exception as e:
-            logger.exception(f"[Cycle {display_id}] Failed with error: {e}")
+            logger.exception("[Cycle %s] Failed with error: %s", display_id, e)
             _log("FAILED", f"Critical error in cycle {display_id}: {str(e)}", "ERROR")
             self.cycle_repository.update_status(cycle.id, "FAILED")
             if not trigger.startswith("BACKTEST-"):
-                self.db.commit()
+                await run_sync(self.db.commit)
             raise e
 
     def _apply_risk_and_execute(self, decisions, timeframe, cycle, account_name, _log, open_positions: list[str], strategy_id: str | None = None, risk_level: int = 100):
-        logger.debug(f"[Cycle {cycle.id}] Constructing portfolio target from {len(decisions)} decisions.")
+        logger.debug("[Cycle %s] Constructing portfolio target from %s decisions.", cycle.id, len(decisions))
         _log("PORTFOLIO", f"Constructing target portfolio from {len(decisions)} active signals", payload={
             "total_signals": len(decisions),
             "candidate_symbols": [d.symbol for d in decisions],
@@ -298,7 +299,7 @@ class TradingCycleService:
         )
         target_portfolio.strategy_id = strategy_id
         
-        logger.debug(f"[Cycle {cycle.id}] Evaluating risk limits.")
+        logger.debug("[Cycle %s] Evaluating risk limits.", cycle.id)
         risk_assessment = self.risk_engine.assess(target=target_portfolio)
         approved_portfolio = risk_assessment.approved_target
         
@@ -334,7 +335,7 @@ class TradingCycleService:
                 "reason": "No eligible long candidates survived filters.",
             })
         
-        logger.debug(f"[Cycle {cycle.id}] Enqueuing portfolio target for execution.")
+        logger.debug("[Cycle %s] Enqueuing portfolio target for execution.", cycle.id)
         _log("EXECUTION", "Enqueuing approved portfolio to asynchronous OrderExecutorQueue")
         
         self.executor_queue.enqueue(

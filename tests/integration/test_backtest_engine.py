@@ -1,23 +1,12 @@
-from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
-from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.services.backtesting.engine import BacktestEngineService
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
 
-@pytest.fixture
-def db_session() -> AsyncGenerator[Session, None]:  # type: ignore
-    engine = create_engine("sqlite:///:memory:", echo=False)
-    Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = SessionLocal()
-    yield session
-    session.close()
 
 @pytest.mark.asyncio
 async def test_run_backtest(db_session: Session) -> None:

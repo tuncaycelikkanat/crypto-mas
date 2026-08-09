@@ -321,7 +321,7 @@ class BacktestEngineService:
                     use_htf_shield=use_htf_shield,
                     use_regime_shield=use_regime_shield,
                     cycle_index=cycle_count,
-                    config_json=config_json,
+                    config_json=merged_config,
                 )
                 
                 t1 = time.time()

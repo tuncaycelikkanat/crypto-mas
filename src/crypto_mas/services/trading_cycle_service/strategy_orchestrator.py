@@ -106,7 +106,7 @@ class StrategyOrchestrator:
             
             if not snapshots:
                 if not is_backtest:
-                    logger.warning(f"[Cycle {display_id}] No feature snapshots for {symbol}. Skipping.")
+                    logger.warning("[Cycle %s] No feature snapshots for %s. Skipping.", display_id, symbol)
                     _log("STRATEGY", f"No data available for {symbol}, skipped", "WARN")
                 continue
             
@@ -122,7 +122,7 @@ class StrategyOrchestrator:
                 if is_backtest:
                     continue
                 else:
-                    logger.error(f"[Cycle {display_id}] {err_msg}")
+                    logger.error("[Cycle %s] %s", display_id, err_msg)
                     raise ValueError(err_msg)
 
             htf_snapshots = []
@@ -216,11 +216,16 @@ class StrategyOrchestrator:
                             llm_context = {
                                 "symbol": symbol,
                                 "market_regime": decision.regime.regime.value if decision.regime else "UNKNOWN",
-                                "score": decision.score.total_score,
+                                "score": decision.score.final_score if decision.score else 0,
                                 "recent_features": snapshots[-1].features_json if snapshots else {}
                             }
                             
                             _log("LLM_COMMITTEE", f"Triggering Shadow Mode LLM Committee for {symbol}")
+                            if is_backtest:
+                                _log("LLM_COMMITTEE", f"Applying 13s rate-limit delay for {symbol} (Free Tier API - 5 RPM limit)")
+                                import asyncio
+                                await asyncio.sleep(13)
+                                
                             decision = await self.llm_orchestrator.evaluate_decision(
                                 symbol=symbol,
                                 context=llm_context,

@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock
 from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
 from crypto_mas.infrastructure.db.base import Base
@@ -10,17 +11,8 @@ from crypto_mas.engine.strategy.schemas import TradingDecision, DecisionAction
 from crypto_mas.engine.scoring import AssetScore
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 
-@pytest.fixture
-def test_db():
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    yield session
-    session.close()
-
 @pytest.mark.asyncio
-async def test_llm_orchestrator_shadow_mode(test_db):
+async def test_llm_orchestrator_shadow_mode(db_session):
     mock_provider = AsyncMock()
     mock_provider.complete_json.return_value = (
         AgentVote(vote="LONG", confidence=85, reasoning="Looks good"),
@@ -72,7 +64,7 @@ async def test_llm_orchestrator_shadow_mode(test_db):
         symbol="BTCUSDT",
         context={"market_regime": "BULL_TREND"},
         original_decision=original_decision,
-        db=test_db
+        db=db_session
     )
     
     # Shadow Mode should return the original unmodified decision
@@ -83,13 +75,13 @@ async def test_llm_orchestrator_shadow_mode(test_db):
     from crypto_mas.domain.models.shadow_mode_trade import ShadowModeTrade
     from crypto_mas.domain.models.llm_audit_log import LLMAuditLog
     
-    decisions = test_db.query(CommitteeDecision).all()
+    decisions = db_session.query(CommitteeDecision).all()
     assert len(decisions) == 1
     assert decisions[0].final_decision == "LONG"
     
-    shadow_trades = test_db.query(ShadowModeTrade).all()
+    shadow_trades = db_session.query(ShadowModeTrade).all()
     assert len(shadow_trades) == 1
     assert shadow_trades[0].rule_based_decision == "CONSIDER_LONG"
     
-    logs = test_db.query(LLMAuditLog).all()
+    logs = db_session.query(LLMAuditLog).all()
     assert len(logs) == 3  # One for each agent

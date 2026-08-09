@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import axios from 'axios';
+import { getAnalyticsLogs, deleteAnalyticsLogs } from '../services/api';
+import type { LogEntry } from '../types/api';
 import {
   Terminal, RefreshCw, Filter, Search, Copy, CheckCheck,
   ChevronRight, ChevronDown, Circle, Zap, Shield,
@@ -8,16 +9,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// ── Types ──────────────────────────────────────────────────────
-interface LogEntry {
-  id: number;
-  cycle_id: number | null;
-  level: string;
-  stage: string;
-  message: string;
-  created_at: string;
-  payload: any;
-}
+// Removed local LogEntry interface in favor of types/api.ts
 
 // ── Helpers ────────────────────────────────────────────────────
 const STAGE_META: Record<string, { icon: React.FC<any>; colorVar: string; label: string }> = {
@@ -347,7 +339,7 @@ const LiveLogs: React.FC = () => {
       if (filterLevel) params.set('level', filterLevel);
       if (filterSymbol) params.set('symbol', filterSymbol);
 
-      const res = await axios.get(`/api/v1/analytics/logs?${params}`);
+      const res = await getAnalyticsLogs(params);
       if (res.data?.logs) {
         setLogs(res.data.logs);
         setLiveCount(res.data.count);
@@ -444,7 +436,7 @@ const LiveLogs: React.FC = () => {
               if (window.confirm('Tüm geçmiş logları silmek istediğinize emin misiniz?')) {
                 setLoading(true);
                 try {
-                  await axios.delete('/api/v1/analytics/logs');
+                  await deleteAnalyticsLogs();
                   await fetchLogs();
                 } catch(e) { console.error(e) }
                 setLoading(false);

@@ -33,7 +33,7 @@ class MarketDataOrchestrator:
         display_id: int | None = None
     ) -> tuple[bool, Timeframe | None]:
         display_id = display_id if display_id is not None else cycle.id
-        logger.debug(f"[Cycle {display_id}] Starting market data sync for {len(symbols)} symbols.")
+        logger.debug("[Cycle %s] Starting market data sync for %s symbols.", display_id, len(symbols))
         _log("MARKET_DATA", f"Fetching history from {self.fetcher_service.provider.exchange.value} for {timeframe}")
         
         fetch_symbols = set(symbols)

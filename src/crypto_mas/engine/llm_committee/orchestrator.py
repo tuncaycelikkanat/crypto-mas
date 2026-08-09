@@ -9,6 +9,7 @@ from crypto_mas.engine.llm_committee.agents import TechnicalAgent, SentimentAgen
 from crypto_mas.engine.llm_committee.chair_agent import ChairAgent
 from crypto_mas.engine.llm_committee.cost_tracker import CostTracker
 from crypto_mas.engine.strategy.schemas import TradingDecision
+from crypto_mas.infrastructure.db.async_compat import run_sync
 
 logger = logging.getLogger(__name__)
 
@@ -63,16 +64,16 @@ class LLMCommitteeOrchestrator:
                 source="llm_committee",
                 shadow_mode=True
             )
-            db.add(decision_record)
-            db.flush()  # to get ID before creating shadow trade
+            await run_sync(db.add, decision_record)
+            await run_sync(db.flush)  # to get ID before creating shadow trade
             
             shadow_trade = ShadowModeTrade(
                 committee_decision_id=decision_record.id,
                 rule_based_decision=original_decision.action.value,
                 regime_at_entry=context.get("market_regime", "UNKNOWN")
             )
-            db.add(shadow_trade)
-            db.commit()
+            await run_sync(db.add, shadow_trade)
+            await run_sync(db.commit)
             
             for name, vote, meta in [
                 ("TechnicalAgent", tech_vote, tech_meta),
@@ -90,15 +91,15 @@ class LLMCommitteeOrchestrator:
                     cost_usd=meta.get("cost_usd", 0.0),
                     decision_id=decision_record.id
                 )
-                db.add(log)
+                await run_sync(db.add, log)
                 
-            db.commit()
-            logger.info(f"LLM Committee decided {final_action_str} for {symbol}. Score: {consensus_score:.2f}")
+            await run_sync(db.commit)
+            logger.info("LLM Committee decided %s for %s. Score: %.2f", final_action_str, symbol, consensus_score)
             
             return original_decision
             
         except Exception as e:
-            logger.error(f"LLM Committee error for {symbol}: {e}")
+            logger.error("LLM Committee error for %s: %s", symbol, e)
             log = LLMAuditLog(
                 symbol=symbol,
                 agent_name="SYSTEM_FALLBACK",
@@ -110,6 +111,6 @@ class LLMCommitteeOrchestrator:
                 cost_usd=0.0,
                 fallback_triggered=True
             )
-            db.add(log)
-            db.commit()
+            await run_sync(db.add, log)
+            await run_sync(db.commit)
             return original_decision

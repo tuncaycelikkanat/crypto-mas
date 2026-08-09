@@ -17,11 +17,15 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///crypto_mas.db"
     redis_url: str = "redis://localhost:6379/0"
 
+    # SECURITY: Required in production (app_env="production"). Set API_SECURITY_KEY env variable.
     api_security_key: str = ""
+    # SECURITY: In production, set CORS_ORIGINS to specific domains (e.g. ["https://yourdomain.com"])
+    # Default ["*"] is for development only.
     cors_origins: list[str] = ["*"]
 
     binance_api_key: str = ""
     binance_api_secret: str = ""
+    gemini_api_key: str = ""
 
     binance_base_url: str = "https://data-api.binance.vision"
     binance_testnet_base_url: str = "https://testnet.binance.vision/api"

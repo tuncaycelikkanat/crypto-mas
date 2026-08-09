@@ -17,12 +17,34 @@ def get_mocked_broker():
     
     broker = PaperBrokerService(db=db_mock, time_provider=time_provider_mock)
     
-    broker.account_repository = MagicMock()
-    broker.position_repository = MagicMock()
-    broker.feature_snapshot_repository = MagicMock()
-    broker.trade_repository = MagicMock()
-    broker.order_repository = MagicMock()
-    broker.log_repository = MagicMock()
+    # Mock repositories
+    account_repo_mock = MagicMock()
+    position_repo_mock = MagicMock()
+    feature_snapshot_repo_mock = MagicMock()
+    trade_repo_mock = MagicMock()
+    order_repo_mock = MagicMock()
+    log_repo_mock = MagicMock()
+    
+    # Assign them directly to broker for easy access in tests
+    broker.account_repository = account_repo_mock
+    broker.position_repository = position_repo_mock
+    broker.feature_snapshot_repository = feature_snapshot_repo_mock
+    broker.trade_repository = trade_repo_mock
+    broker.order_repository = order_repo_mock
+    broker.log_repository = log_repo_mock
+    
+    # Override in sub-components
+    broker.position_manager.account_repository = account_repo_mock
+    broker.position_manager.position_repository = position_repo_mock
+    broker.position_manager.feature_snapshot_repository = feature_snapshot_repo_mock
+    
+    broker.mark_to_market.account_repository = account_repo_mock
+    broker.mark_to_market.position_repository = position_repo_mock
+    broker.mark_to_market.feature_snapshot_repository = feature_snapshot_repo_mock
+    
+    broker.reporter.trade_repository = trade_repo_mock
+    broker.reporter.order_repository = order_repo_mock
+    broker.reporter.log_repository = log_repo_mock
     
     return broker
 

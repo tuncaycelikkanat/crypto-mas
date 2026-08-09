@@ -35,7 +35,7 @@ Kurallar:
 - Cevabın SADECE JSON formatında olmalı, başka hiçbir metin ekleme.
 """
 
-    async def vote(self, context: dict, model: str = "gemini-1.5-flash") -> tuple[AgentVote, dict]:
+    async def vote(self, context: dict, model: str = "gemini-3.6-flash") -> tuple[AgentVote, dict]:
         prompt = self.system_prompt_template.format(
             role=self.role,
             focus_area=self.focus_area,
@@ -69,7 +69,7 @@ class SentimentAgent(BaseCommitteeAgent):
             focus_area="haber akışı, borsalara giren/çıkan hacim, korku/açgözlülük endeksi ve piyasa psikolojisi"
         )
         
-    async def vote(self, context: dict, model: str = "gemini-1.5-flash") -> tuple[AgentVote, dict]:
+    async def vote(self, context: dict, model: str = "gemini-3.6-flash") -> tuple[AgentVote, dict]:
         # Sanitize any raw news or tweet text in the context before parsing
         safe_context = context.copy()
         if "news" in safe_context and isinstance(safe_context["news"], list):

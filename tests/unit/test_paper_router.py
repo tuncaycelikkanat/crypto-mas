@@ -8,26 +8,16 @@ from crypto_mas.domain.models import *  # noqa
 from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.infrastructure.db.session import get_db_session
 
-engine = create_engine(
-    "sqlite:///:memory:",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base.metadata.create_all(bind=engine)
+import pytest
 
-def override_get_db_session():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+@pytest.fixture
+def client(db_session):
+    app.dependency_overrides[get_db_session] = lambda: db_session
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
 
-app.dependency_overrides[get_db_session] = override_get_db_session
-
-client = TestClient(app)
-
-def test_initialize_mock_paper_account():
+def test_initialize_mock_paper_account(client):
     response = client.post("/api/v1/paper/mock/account/init")
     assert response.status_code == 200
     data = response.json()
@@ -36,7 +26,7 @@ def test_initialize_mock_paper_account():
     assert data["base_currency"] == "USDT"
     assert "initial_balance" in data
 
-def test_get_mock_paper_account():
+def test_get_mock_paper_account(client):
     client.post("/api/v1/paper/mock/account/init")
     
     response = client.get("/api/v1/paper/mock/account")

@@ -8,23 +8,12 @@ Trade rows (for PnL / win_rate / ratio calculations).
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.trade import Trade
 from crypto_mas.domain.models.trading_cycle import TradingCycle
-from crypto_mas.infrastructure.db.base import Base
 from crypto_mas.services.reporting_service.analytics import PerformanceAnalytics
 
-
-@pytest.fixture
-def db_session() -> Session:  # type: ignore
-    engine = create_engine("sqlite:///:memory:", echo=False)
-    Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = SessionLocal()
-    yield session
-    session.close()
 
 
 def test_performance_analytics(db_session: Session) -> None:

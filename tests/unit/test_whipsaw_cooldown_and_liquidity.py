@@ -6,26 +6,16 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
-from crypto_mas.infrastructure.db.base import Base
+
 from crypto_mas.domain.repositories.position_repository import PositionRepository
 from crypto_mas.services.backtesting.memory_cache import InMemoryPositionRepository
 from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
 from crypto_mas.domain.models.feature_snapshot import FeatureSnapshot
 
 
-@pytest.fixture
-def db_session():
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
+
 
 
 def test_position_repository_whipsaw_cooldown(db_session: Session):
@@ -106,6 +96,8 @@ def test_memory_cache_whipsaw_cooldown():
 
 
 def test_thin_liquidity_and_excessive_spread():
+    from crypto_mas.services.paper_trading.risk_calculator import RiskCalculator
+    
     # Normal snapshot (liquid, small spread)
     normal_snap = FeatureSnapshot(
         id=1,
@@ -121,7 +113,7 @@ def test_thin_liquidity_and_excessive_spread():
         },
         created_at=datetime.now(UTC),
     )
-    is_risky, reason = PaperBrokerService._is_thin_liquidity_or_excessive_spread(normal_snap)
+    is_risky, reason = RiskCalculator.is_thin_liquidity_or_excessive_spread(normal_snap)
     assert not is_risky
     assert reason == ""
     
@@ -140,7 +132,7 @@ def test_thin_liquidity_and_excessive_spread():
         },
         created_at=datetime.now(UTC),
     )
-    is_risky, reason = PaperBrokerService._is_thin_liquidity_or_excessive_spread(wick_snap)
+    is_risky, reason = RiskCalculator.is_thin_liquidity_or_excessive_spread(wick_snap)
     assert is_risky
     assert "Excessive bar spread/range" in reason
     
@@ -159,6 +151,6 @@ def test_thin_liquidity_and_excessive_spread():
         },
         created_at=datetime.now(UTC),
     )
-    is_risky, reason = PaperBrokerService._is_thin_liquidity_or_excessive_spread(illiquid_snap)
+    is_risky, reason = RiskCalculator.is_thin_liquidity_or_excessive_spread(illiquid_snap)
     assert is_risky
     assert "Thin liquidity bar volume" in reason
