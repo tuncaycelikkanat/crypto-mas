@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  getPaperAccount, initPaperAccount, getBotStatus, 
+  getPaperAccount, getBotStatus, 
   startBot, stopBot, runCycle, updateBotSymbols, updateBotRisk 
 } from '../services/api';
 import type { PaperAccount, BotStatusResponse, BotInfo, CycleResponse, OpenPosition } from '../types/api';
