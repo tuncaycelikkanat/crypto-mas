@@ -34,4 +34,4 @@ def test_get_mock_paper_account(client):
     data = response.json()
     assert isinstance(data, list)
     assert len(data) > 0
-    assert data[0]["name"] == "default-paper"
+    assert data[0]["name"] == "main"

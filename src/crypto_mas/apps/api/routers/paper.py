@@ -79,10 +79,29 @@ def get_mock_paper_account(
     if account_name:
         account = account_repository.get_by_name(account_name)
         if account is None:
-            raise HTTPException(status_code=404, detail="Paper account not found.")
+            # Auto-initialize the slot if queried directly and it doesn't exist
+            account = account_repository.create_if_not_exists(
+                name=account_name,
+                exchange=Exchange.MOCK.value,
+                base_currency="USDT",
+                initial_balance=Decimal("10000"),
+            )
         return _format_account(account)
     
-    accounts = account_repository.get_all()
+    # Return exactly 4 fixed slots for the UI
+    slot_names = ["main", "slot-2", "slot-3", "slot-4"]
+    accounts = []
+    for s_name in slot_names:
+        acc = account_repository.get_by_name(s_name)
+        if acc is None:
+            acc = account_repository.create_if_not_exists(
+                name=s_name,
+                exchange=Exchange.MOCK.value,
+                base_currency="USDT",
+                initial_balance=Decimal("10000"),
+            )
+        accounts.append(acc)
+
     return [_format_account(acc) for acc in accounts]
 
 @router.post("/mock/execute-target")

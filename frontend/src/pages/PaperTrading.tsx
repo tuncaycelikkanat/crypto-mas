@@ -36,7 +36,7 @@ const OptionCard: React.FC<{
 // ── Page ─────────────────────────────────────────────────────
 const PaperTrading: React.FC = () => {
   const [accounts, setAccounts]     = useState<PaperAccount[]>([]);
-  const [selectedAccountName, setSelectedAccountName] = useState<string>('default-paper');
+  const [selectedAccountName, setSelectedAccountName] = useState<string>('main');
   const account = accounts.find(a => a.name === selectedAccountName) || accounts[0] || null;
   const [loading, setLoading]       = useState(false);
   const [actionLog, setActionLog]   = useState<CycleResponse | { status: string; reason?: string } | null>(null);
@@ -81,11 +81,7 @@ const PaperTrading: React.FC = () => {
          setSelectedAccountName((data as PaperAccount).name!);
       }
     } catch (e: unknown) {
-      if (typeof e === 'object' && e !== null && 'response' in e && (e as any).response?.status === 404) {
-        const initRes = await initPaperAccount();
-        setAccounts([initRes.data]);
-        setSelectedAccountName(initRes.data.name!);
-      }
+      console.error("Failed to fetch accounts:", e);
     }
   };
 
@@ -106,19 +102,19 @@ const PaperTrading: React.FC = () => {
       const symbolsList = configSymbolSource === 'auto'
         ? ['AUTO_GAINERS']
         : configSymbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
-      for (const ex of configExchanges) {
-        await startBot({
-          bot_id: `bot-${ex.toLowerCase()}-${Date.now()}`,
-          interval_seconds: parseInt(configInterval, 10),
-          symbols: symbolsList,
-          mode: configMode,
-          exchange: ex,
-          risk_level: configRiskLevel,
-          use_btc_shield: configBtcShield,
-          use_htf_shield: configHtfShield,
-          use_regime_shield: configRegimeShield,
-        });
-      }
+      
+      // Start a single bot for this specific slot using the selectedAccountName as bot_id
+      await startBot({
+        bot_id: selectedAccountName,
+        interval_seconds: parseInt(configInterval, 10),
+        symbols: symbolsList,
+        mode: configMode,
+        exchange: configExchanges[0] || 'BINANCE',
+        risk_level: configRiskLevel,
+        use_btc_shield: configBtcShield,
+        use_htf_shield: configHtfShield,
+        use_regime_shield: configRegimeShield,
+      });
       const res = await getBotStatus();
       setBotStatus(res.data);
       setShowConfigModal(false);
@@ -218,7 +214,7 @@ const PaperTrading: React.FC = () => {
               style={{ whiteSpace: 'nowrap', borderRadius: '8px 8px 0 0', padding: '8px 16px' }}
             >
               <Bot size={14} style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'text-bottom' }}/>
-              {acc.name === 'default-paper' ? 'Main Account' : acc.name}
+              {acc.name === 'main' ? 'Main Account' : acc.name === 'slot-2' ? 'Slot 2' : acc.name === 'slot-3' ? 'Slot 3' : acc.name === 'slot-4' ? 'Slot 4' : acc.name}
             </button>
           ))}
         </motion.div>
@@ -270,7 +266,7 @@ const PaperTrading: React.FC = () => {
       </AnimatePresence>
 
       {/* Bot Status */}
-      {bots.length === 0 ? (
+      {bots.filter((b: BotInfo) => b.bot_id === selectedAccountName).length === 0 ? (
         <motion.div className="card" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: 14 }}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--bg-raised)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -282,7 +278,7 @@ const PaperTrading: React.FC = () => {
           </div>
         </motion.div>
       ) : (
-        bots.map((bot: BotInfo) => {
+        bots.filter((b: BotInfo) => b.bot_id === selectedAccountName).map((bot: BotInfo) => {
           const isRunning = bot.status === 'RUNNING';
           const currentEditingStr = editingSymbols[bot.bot_id] !== undefined ? editingSymbols[bot.bot_id] : (bot.symbols?.join(', ') || '');
           const hasChanged = normalizeSymbols(currentEditingStr) !== normalizeSymbols(bot.symbols || []);
