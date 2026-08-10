@@ -45,7 +45,8 @@ class _TradeRecord:
 
 
 class EventEngine:
-    def __init__(self):
+    def __init__(self, get_active_bots_for_symbol=None):
+        self.get_active_bots_for_symbol = get_active_bots_for_symbol
         # Per-symbol sliding windows of recent trades
         self._windows: dict[str, deque[_TradeRecord]] = defaultdict(deque)
 
@@ -238,13 +239,18 @@ class EventEngine:
             cycle_service = TradingCycleService(
                 db=db, market_provider=provider, strategy_mode="scalping"
             )
-            await cycle_service.run_cycle(
-                account_name="default-paper",
-                symbols=[symbol],
-                timeframe=Timeframe.FIFTEEN_MINUTES,
-                strategy_name="hft_momentum",
-                trigger="EVENT_TRIGGERED",
-            )
+            bot_ids = self.get_active_bots_for_symbol(symbol) if self.get_active_bots_for_symbol else ["default-paper"]
+            if not bot_ids:
+                return
+
+            for bot_id in bot_ids:
+                await cycle_service.run_cycle(
+                    account_name=bot_id,
+                    symbols=[symbol],
+                    timeframe=Timeframe.FIFTEEN_MINUTES,
+                    strategy_name="hft_momentum",
+                    trigger="EVENT_TRIGGERED",
+                )
         except Exception as exc:
             logger.error("Event-driven cycle failed for %s: %s", symbol, exc, exc_info=True)
         finally:

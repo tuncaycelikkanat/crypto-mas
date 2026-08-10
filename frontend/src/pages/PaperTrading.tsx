@@ -35,7 +35,9 @@ const OptionCard: React.FC<{
 
 // ── Page ─────────────────────────────────────────────────────
 const PaperTrading: React.FC = () => {
-  const [account, setAccount]       = useState<PaperAccount | null>(null);
+  const [accounts, setAccounts]     = useState<PaperAccount[]>([]);
+  const [selectedAccountName, setSelectedAccountName] = useState<string>('default-paper');
+  const account = accounts.find(a => a.name === selectedAccountName) || accounts[0] || null;
   const [loading, setLoading]       = useState(false);
   const [actionLog, setActionLog]   = useState<CycleResponse | { status: string; reason?: string } | null>(null);
   const [botStatus, setBotStatus]   = useState<BotStatusResponse | null>(null);
@@ -68,11 +70,21 @@ const PaperTrading: React.FC = () => {
   const fetchAccount = async () => {
     try {
       const res = await getPaperAccount();
-      setAccount(res.data);
+      const data = res.data;
+      if (Array.isArray(data)) {
+         setAccounts(data);
+         if (data.length > 0 && !data.find(a => a.name === selectedAccountName)) {
+             setSelectedAccountName(data[0].name!);
+         }
+      } else {
+         setAccounts([data as PaperAccount]);
+         setSelectedAccountName((data as PaperAccount).name!);
+      }
     } catch (e: unknown) {
       if (typeof e === 'object' && e !== null && 'response' in e && (e as any).response?.status === 404) {
         const initRes = await initPaperAccount();
-        setAccount(initRes.data);
+        setAccounts([initRes.data]);
+        setSelectedAccountName(initRes.data.name!);
       }
     }
   };
@@ -130,7 +142,7 @@ const PaperTrading: React.FC = () => {
       let lastRes = null;
       for (const ex of configExchanges) {
         lastRes = await runCycle({
-          account_name: 'default-paper',
+          account_name: selectedAccountName,
           exchange: ex,
           symbols: symbolsList,
           timeframe: configMode === 'scalping' ? '1m' : configMode === 'swing' ? '4h' : '1d',
@@ -194,6 +206,23 @@ const PaperTrading: React.FC = () => {
           </button>
         </div>
       </motion.div>
+
+      {/* Account Tabs */}
+      {accounts.length > 0 && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px', borderBottom: '1px solid var(--border)' }}>
+          {accounts.map(acc => (
+            <button
+              key={acc.name}
+              className={selectedAccountName === acc.name ? 'btn-primary' : 'btn-ghost'}
+              onClick={() => setSelectedAccountName(acc.name!)}
+              style={{ whiteSpace: 'nowrap', borderRadius: '8px 8px 0 0', padding: '8px 16px' }}
+            >
+              <Bot size={14} style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'text-bottom' }}/>
+              {acc.name === 'default-paper' ? 'Main Account' : acc.name}
+            </button>
+          ))}
+        </motion.div>
+      )}
 
       {/* Account Summary */}
       <div className="grid-cols-3">

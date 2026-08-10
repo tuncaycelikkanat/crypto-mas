@@ -10,20 +10,22 @@ import crypto_mas.domain.models  # noqa: F401
 from crypto_mas.services.trading_cycle_service.executor_queue import OrderExecutorQueue
 
 
+from crypto_mas.infrastructure.config.settings import get_settings
+
 @pytest.fixture(autouse=True)
 def reset_executor_queue_singleton():
     """
     Ensures the OrderExecutorQueue singleton is clean for each test.
-    This prevents cross-test contamination where a closed DB session is kept in the broker factory.
+    This prevents cross-test contamination where a closed DB session is kept in the broker factory,
+    and prevents asyncio Queue from being bound to the wrong event loop.
     """
-    queue = OrderExecutorQueue.get_instance()
-    queue.sync_mode = False
-    queue._broker_factory = None
+    OrderExecutorQueue._instance = None
+    get_settings.cache_clear()
     
     yield
     
-    queue.sync_mode = False
-    queue._broker_factory = None
+    OrderExecutorQueue._instance = None
+    get_settings.cache_clear()
 
 
 @pytest.fixture()

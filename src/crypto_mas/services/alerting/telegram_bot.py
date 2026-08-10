@@ -218,21 +218,31 @@ class TelegramAlerter:
         try:
             with SessionLocal() as db:
                 repo = PositionRepository(db)
-                positions = repo.list_open_positions("default-paper")
-                if not positions:
-                    await self.send("📂 <b>Açık Pozisyon Bulunmuyor</b>\nŞu anda <code>default-paper</code> hesabında aktif alım-satım pozisyonu yok.")
+                account_repo = PaperAccountRepository(db)
+                accounts = account_repo.get_all()
+                if not accounts:
+                    await self.send("📂 <b>Açık Pozisyon Bulunmuyor</b>\nSistemde henüz hesap oluşturulmamış.")
                     return
 
-                lines = ["📊 <b>Açık Pozisyonlar (default-paper)</b>\n"]
-                for p in positions:
-                    tp_val = f"{p.take_profit_price:.4f}" if p.take_profit_price is not None else "None"
-                    sl_val = f"{p.stop_loss_price:.4f}" if p.stop_loss_price is not None else "None"
-                    lines.append(
-                        f"🔹 <b>{p.symbol} ({p.status})</b>\n"
-                        f"   Giriş: <code>{p.entry_price:.4f}</code> | Miktar: <code>{p.quantity:.4f}</code>\n"
-                        f"   TP: <code>{tp_val}</code> | SL: <code>{sl_val}</code>"
-                    )
-                await self.send("\n".join(lines))
+                lines = []
+                for acc in accounts:
+                    positions = repo.list_open_positions(acc.name)
+                    if positions:
+                        lines.append(f"📊 <b>Açık Pozisyonlar ({acc.name})</b>")
+                        for p in positions:
+                            tp_val = f"{p.take_profit_price:.4f}" if p.take_profit_price is not None else "None"
+                            sl_val = f"{p.stop_loss_price:.4f}" if p.stop_loss_price is not None else "None"
+                            lines.append(
+                                f"🔹 <b>{p.symbol} ({p.status})</b>\n"
+                                f"   Giriş: <code>{p.entry_price:.4f}</code> | Miktar: <code>{p.quantity:.4f}</code>\n"
+                                f"   TP: <code>{tp_val}</code> | SL: <code>{sl_val}</code>"
+                            )
+                        lines.append("") # Empty line between accounts
+                
+                if not lines:
+                    await self.send("📂 <b>Açık Pozisyon Bulunmuyor</b>\nŞu anda hiçbir hesapta aktif alım-satım pozisyonu yok.")
+                else:
+                    await self.send("\n".join(lines))
         except Exception as exc:
             logger.error("[TelegramService] _cmd_positions error: %s", exc)
             await self.send("❌ Pozisyonlar sorgulanırken bir hata oluştu.")
@@ -242,21 +252,25 @@ class TelegramAlerter:
         try:
             with SessionLocal() as db:
                 repo = PaperAccountRepository(db)
-                account = repo.get_by_name("default-paper")
-                if not account:
+                accounts = repo.get_all()
+                if not accounts:
                     account = repo.create_if_not_exists(
                         name="default-paper",
                         exchange="MOCK",
                         base_currency="USDT",
                         initial_balance=Decimal("10000"),
                     )
+                    accounts = [account]
 
-                msg = (
-                    f"💰 <b>Portföy Bakiyesi ({account.name})</b>\n\n"
-                    f"💵 <b>Nakit Bakiye:</b> <code>${account.cash_balance:,.2f} USDT</code>\n"
-                    f"📈 <b>Toplam Özkaynak (Equity):</b> <code>${account.equity:,.2f} USDT</code>"
-                )
-                await self.send(msg)
+                lines = []
+                for account in accounts:
+                    lines.append(
+                        f"💰 <b>Portföy Bakiyesi ({account.name})</b>\n"
+                        f"💵 <b>Nakit:</b> <code>${account.cash_balance:,.2f}</code> | "
+                        f"📈 <b>Equity:</b> <code>${account.equity:,.2f}</code>\n"
+                    )
+                
+                await self.send("\n".join(lines))
         except Exception as exc:
             logger.error("[TelegramService] _cmd_balance error: %s", exc)
             await self.send("❌ Bakiye sorgulanırken bir hata oluştu.")

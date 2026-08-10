@@ -29,7 +29,7 @@ export const getTradeHistory = () => api.get<TradeHistoryResponse>('/analytics/t
 export const resetAnalytics = () => api.post('/analytics/reset');
 
 // Paper Trading
-export const getPaperAccount = () => api.get<PaperAccount>('/paper/mock/account');
+export const getPaperAccount = () => api.get<PaperAccount[] | PaperAccount>('/paper/mock/account');
 export const initPaperAccount = () => api.post<PaperAccount>('/paper/mock/account/init');
 export const runCycle = (data: any) => api.post<CycleResponse>('/cycle/run', data);
 

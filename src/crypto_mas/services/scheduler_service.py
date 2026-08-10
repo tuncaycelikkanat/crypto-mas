@@ -87,6 +87,21 @@ class SchedulerService:
         if symbols is None:
             symbols = ["BTCUSDT"]
 
+        # Create isolated paper account
+        db = SessionLocal()
+        try:
+            from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
+            from crypto_mas.services.market_data_service.schemas import Exchange
+            from decimal import Decimal
+            PaperAccountRepository(db).create_if_not_exists(
+                name=bot_id,
+                exchange=Exchange.MOCK.value,
+                base_currency="USDT",
+                initial_balance=Decimal("10000"),
+            )
+        finally:
+            db.close()
+
         mode = mode.lower() if mode else "swing"
         _, _, default_interval = MODE_CONFIG.get(mode, MODE_CONFIG["swing"])
         effective_interval = interval_seconds if interval_seconds is not None else default_interval
@@ -99,7 +114,7 @@ class SchedulerService:
             self._scheduler.add_job(
                 self._run_cycle_task,
                 trigger=interval_trigger,
-                args=[symbols, mode, exchange.upper(), risk_level, use_btc_shield, use_htf_shield, use_regime_shield],
+                args=[symbols, mode, exchange.upper(), risk_level, use_btc_shield, use_htf_shield, use_regime_shield, bot_id],
                 id=bot_id,
                 name=f"Bot Instance: {bot_id}",
                 replace_existing=True,
@@ -161,8 +176,8 @@ class SchedulerService:
                     logger.info(f"Bot {bot_id} (POLLING) updated | new risk_level: {risk_level}")
         return self.get_status()
 
-    async def _run_cycle_task(self, symbols: list[str], mode: str = "swing", exchange_str: str = "BINANCE", risk_level: int = 50, use_btc_shield: bool = True, use_htf_shield: bool = True, use_regime_shield: bool = True) -> None:
-        logger.info(f"[{mode.upper()}][{exchange_str}] Running cycle for {len(symbols)} symbols... (risk={risk_level})")
+    async def _run_cycle_task(self, symbols: list[str], mode: str = "swing", exchange_str: str = "BINANCE", risk_level: int = 50, use_btc_shield: bool = True, use_htf_shield: bool = True, use_regime_shield: bool = True, bot_id: str = "default-paper") -> None:
+        logger.info(f"[{mode.upper()}][{exchange_str}] Running cycle for {len(symbols)} symbols... (account={bot_id}, risk={risk_level})")
 
         timeframe_str, strategy_name, _ = MODE_CONFIG.get(mode, MODE_CONFIG["swing"])
 
@@ -186,7 +201,7 @@ class SchedulerService:
             )
 
             cycle = await service.run_cycle(
-                account_name="default-paper",
+                account_name=bot_id,
                 symbols=symbols,
                 timeframe=timeframe,
                 strategy_name=strategy_name,

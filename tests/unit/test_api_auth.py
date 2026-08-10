@@ -26,26 +26,28 @@ def override_get_db_session():
         db.close()
 
 
-app.dependency_overrides[get_db_session] = override_get_db_session
+@pytest.fixture(autouse=True)
+def setup_auth_dependencies():
+    app.dependency_overrides[get_db_session] = override_get_db_session
+    yield
+    app.dependency_overrides.clear()
+
 client = TestClient(app)
 
 
+from unittest.mock import patch
+from crypto_mas.infrastructure.config.settings import Settings
+
 def test_api_auth_bypass_when_key_not_configured():
-    settings = get_settings()
-    original_key = settings.api_security_key
-    try:
-        settings.api_security_key = ""
+    with patch("crypto_mas.apps.api.security.get_settings") as mock_get_settings:
+        mock_get_settings.return_value = Settings(api_security_key="", app_env="development")
         response = client.post("/api/v1/paper/mock/account/init")
         assert response.status_code == 200
-    finally:
-        settings.api_security_key = original_key
 
 
 def test_api_auth_enforces_key_when_configured():
-    settings = get_settings()
-    original_key = settings.api_security_key
-    try:
-        settings.api_security_key = "super-secret-test-key"
+    with patch("crypto_mas.apps.api.security.get_settings") as mock_get_settings:
+        mock_get_settings.return_value = Settings(api_security_key="super-secret-test-key", app_env="production")
 
         # Missing header -> 401
         response_missing = client.post("/api/v1/paper/mock/account/init")
@@ -65,5 +67,3 @@ def test_api_auth_enforces_key_when_configured():
             headers={"X-API-Key": "super-secret-test-key"},
         )
         assert response_correct.status_code == 200
-    finally:
-        settings.api_security_key = original_key

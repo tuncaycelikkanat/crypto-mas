@@ -12,8 +12,11 @@ class PaperAccountRepository:
 
     def get_by_name(self, name: str) -> PaperAccount | None:
         stmt = select(PaperAccount).where(PaperAccount.name == name)
-
         return self.db.scalars(stmt).first()
+
+    def get_all(self) -> list[PaperAccount]:
+        stmt = select(PaperAccount)
+        return list(self.db.scalars(stmt).all())
 
     def create_if_not_exists(
         self,

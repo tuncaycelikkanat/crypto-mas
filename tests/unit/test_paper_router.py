@@ -32,5 +32,6 @@ def test_get_mock_paper_account(client):
     response = client.get("/api/v1/paper/mock/account")
     assert response.status_code == 200
     data = response.json()
-    assert data["name"] == "default-paper"
-    assert "open_positions" in data
+    assert isinstance(data, list)
+    assert len(data) > 0
+    assert data[0]["name"] == "default-paper"

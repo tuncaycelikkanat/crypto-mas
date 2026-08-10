@@ -73,8 +73,14 @@ class OrderExecutorQueue:
             )
         else:
             from crypto_mas.services.paper_trading.schemas import PaperExecutionReport
+            from crypto_mas.domain.repositories.position_repository import PositionRepository
+            
             account_model = broker.account_repository.get_by_name(task.account_name)
-            start_eq = account_model.cash_balance + broker._calculate_open_positions_value(task.account_name)
+            pos_repo = PositionRepository(db)
+            open_positions = pos_repo.list_open_positions(task.account_name)
+            open_positions_value = sum(p.notional_value for p in open_positions)
+            
+            start_eq = account_model.cash_balance + open_positions_value
             close_report = PaperExecutionReport(
                 account_name=task.account_name,
                 exchange=task.target.exchange,
@@ -145,8 +151,14 @@ class OrderExecutorQueue:
                         )
                     else:
                         from crypto_mas.services.paper_trading.schemas import PaperExecutionReport
+                        from crypto_mas.domain.repositories.position_repository import PositionRepository
+                        
                         account_model = broker.account_repository.get_by_name(task.account_name)
-                        start_eq = account_model.cash_balance + broker._calculate_open_positions_value(task.account_name)
+                        pos_repo = PositionRepository(db)
+                        open_positions = pos_repo.list_open_positions(task.account_name)
+                        open_positions_value = sum(p.notional_value for p in open_positions)
+                        
+                        start_eq = account_model.cash_balance + open_positions_value
                         close_report = PaperExecutionReport(
                             account_name=task.account_name,
                             exchange=task.target.exchange,

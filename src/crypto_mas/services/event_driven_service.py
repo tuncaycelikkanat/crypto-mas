@@ -10,11 +10,20 @@ logger = logging.getLogger("crypto_mas.event_driven_service")
 
 class EventDrivenService:
     def __init__(self):
-        self._ws_client = BinanceWebsocketClient()
-        self._event_engine = EventEngine()
-        self._ws_client.add_callback(self._event_engine.process_websocket_message)
         self._event_bots = {}
+        self._ws_client = BinanceWebsocketClient()
+        self._event_engine = EventEngine(get_active_bots_for_symbol=self._get_active_bots_for_symbol)
+        self._ws_client.add_callback(self._event_engine.process_websocket_message)
         self._lock = threading.RLock()
+
+    def _get_active_bots_for_symbol(self, symbol: str) -> list[str]:
+        with self._lock:
+            active = []
+            for bot_id, data in self._event_bots.items():
+                syms = data.get("symbols", [])
+                if symbol in syms or "AUTO_GAINERS" in syms or "HIDDEN_GEMS" in syms:
+                    active.append(bot_id)
+            return active
 
     def start(self):
         self._ws_client.start()
@@ -48,6 +57,22 @@ class EventDrivenService:
         with self._lock:
             if self.is_bot_running(bot_id):
                 return self.get_status()
+
+            # Create isolated paper account
+            from crypto_mas.infrastructure.db.session import SessionLocal
+            from crypto_mas.domain.repositories.paper_account_repository import PaperAccountRepository
+            from crypto_mas.services.market_data_service.schemas import Exchange
+            from decimal import Decimal
+            db = SessionLocal()
+            try:
+                PaperAccountRepository(db).create_if_not_exists(
+                    name=bot_id,
+                    exchange=Exchange.MOCK.value,
+                    base_currency="USDT",
+                    initial_balance=Decimal("10000"),
+                )
+            finally:
+                db.close()
 
             self._event_bots[bot_id] = {
                 "symbols": symbols,

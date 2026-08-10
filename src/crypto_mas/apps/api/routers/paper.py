@@ -44,41 +44,46 @@ def initialize_mock_paper_account(
 @router.get("/mock/account")
 def get_mock_paper_account(
     db: Annotated[Session, Depends(get_db_session)],
-) -> dict[str, object]:
+    account_name: str | None = None,
+) -> dict[str, object] | list[dict[str, object]]:
     account_repository = PaperAccountRepository(db)
     position_repository = PositionRepository(db)
 
-    account = account_repository.get_by_name("default-paper")
+    def _format_account(account):
+        positions = position_repository.list_open_positions(account_name=account.name)
+        return {
+            "name": account.name,
+            "exchange": account.exchange,
+            "base_currency": account.base_currency,
+            "initial_balance": str(account.initial_balance),
+            "cash_balance": str(account.cash_balance),
+            "equity": str(account.equity),
+            "open_positions": [
+                {
+                    "symbol": position.symbol,
+                    "exchange": position.exchange,
+                    "side": position.side,
+                    "status": position.status,
+                    "quantity": str(position.quantity),
+                    "entry_price": str(position.entry_price),
+                    "current_price": str(position.current_price),
+                    "notional_value": str(position.notional_value),
+                    "unrealized_pnl": str(position.unrealized_pnl),
+                    "realized_pnl": str(position.realized_pnl),
+                    "opened_at": position.opened_at.isoformat(),
+                }
+                for position in positions
+            ],
+        }
 
-    if account is None:
-        raise HTTPException(status_code=404, detail="Paper account not found.")
-
-    positions = position_repository.list_open_positions(account_name=account.name)
-
-    return {
-        "name": account.name,
-        "exchange": account.exchange,
-        "base_currency": account.base_currency,
-        "initial_balance": str(account.initial_balance),
-        "cash_balance": str(account.cash_balance),
-        "equity": str(account.equity),
-        "open_positions": [
-            {
-                "symbol": position.symbol,
-                "exchange": position.exchange,
-                "side": position.side,
-                "status": position.status,
-                "quantity": str(position.quantity),
-                "entry_price": str(position.entry_price),
-                "current_price": str(position.current_price),
-                "notional_value": str(position.notional_value),
-                "unrealized_pnl": str(position.unrealized_pnl),
-                "realized_pnl": str(position.realized_pnl),
-                "opened_at": position.opened_at.isoformat(),
-            }
-            for position in positions
-        ],
-    }
+    if account_name:
+        account = account_repository.get_by_name(account_name)
+        if account is None:
+            raise HTTPException(status_code=404, detail="Paper account not found.")
+        return _format_account(account)
+    
+    accounts = account_repository.get_all()
+    return [_format_account(acc) for acc in accounts]
 
 @router.post("/mock/execute-target")
 def execute_mock_paper_target(

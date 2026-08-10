@@ -104,9 +104,9 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
             open_time=base_time,
             close_time=base_time + timedelta(minutes=15) - timedelta(milliseconds=1),
             open=Decimal("10000"),
-            high=Decimal("15000"),
-            low=Decimal("10000"),
-            close=Decimal("12000"), # Price rises
+            high=Decimal("10500"),
+            low=Decimal("9900"),
+            close=Decimal("10400"), # Price rises
             volume=Decimal("1000"),
             quote_volume=Decimal("41500000"),
             trade_count=10000,
@@ -180,23 +180,30 @@ async def test_end_to_end_trading_cycle_opens_position(e2e_db_session: Session):
     queue.sync_mode = True
     queue.set_broker_factory(lambda: PaperBrokerService(e2e_db_session, time_provider=time_provider, strategy_mode="scalping"))
 
-    # Act
-    cycle = await service.run_cycle(
-        account_name="default-paper",
-        symbols=["ETHUSDT"],
-        timeframe=Timeframe.FIFTEEN_MINUTES,
-        strategy_name="rsi_oversold",
-        trigger="E2E_TEST"
-    )
-        
-    e2e_db_session.refresh(cycle)
-
-    # Assert
-    assert cycle.status == "COMPLETED"
+    from unittest.mock import patch
     
-    # Check if position was opened!
-    open_positions = e2e_db_session.query(Position).filter_by(status="OPEN").all()
-    assert len(open_positions) == 1
+    async def mock_evaluate(*args, **kwargs):
+        decision = kwargs.get('original_decision', args[2] if len(args) > 2 else None)
+        return decision
+
+    # Act
+    with patch("crypto_mas.engine.llm_committee.orchestrator.LLMCommitteeOrchestrator.evaluate_decision", new_callable=AsyncMock) as mock_llm:
+        mock_llm.side_effect = mock_evaluate
+        cycle = await service.run_cycle(
+            account_name="default-paper",
+            symbols=["ETHUSDT"],
+            timeframe=Timeframe.FIFTEEN_MINUTES,
+            strategy_name="rsi_oversold",
+            trigger="E2E_TEST"
+        )
+        e2e_db_session.refresh(cycle)
+
+        # Assert
+        assert cycle.status == "COMPLETED"
+        
+        # Check if position was opened!
+        open_positions = e2e_db_session.query(Position).filter_by(status="OPEN").all()
+        assert len(open_positions) == 1
     
     position = open_positions[0]
     assert position.symbol == "ETHUSDT"

@@ -43,12 +43,11 @@ def reset_analytics(db: Session = Depends(get_db)) -> dict[str, Any]:
     return {"status": "success", "message": "All analytics and PnL reset successfully"}
 
 @router.get("/summary")
-def get_summary(db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_summary(db: Session = Depends(get_db), account_name: str = "default-paper") -> dict[str, Any]:
     account_repo = PaperAccountRepository(db)
     trade_repo = TradeRepository(db)
     position_repo = PositionRepository(db)
     
-    account_name = "default-paper"
     account = account_repo.get_by_name(account_name)
     
     if not account:
@@ -85,9 +84,8 @@ def get_summary(db: Session = Depends(get_db)) -> dict[str, Any]:
 
 
 @router.get("/equity-curve")
-def get_equity_curve(db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_equity_curve(db: Session = Depends(get_db), account_name: str = "default-paper") -> dict[str, Any]:
     cycle_repo = TradingCycleRepository(db)
-    account_name = "default-paper"
     
     cycles = cycle_repo.list_recent(account_name, limit=1000)
     # Return chronologically ascending order for charts
@@ -115,9 +113,8 @@ def get_equity_curve(db: Session = Depends(get_db)) -> dict[str, Any]:
 
 
 @router.get("/trade-history")
-def get_trade_history(db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_trade_history(db: Session = Depends(get_db), account_name: str = "default-paper") -> dict[str, Any]:
     trade_repo = TradeRepository(db)
-    account_name = "default-paper"
     
     trades = trade_repo.list_by_account(account_name, limit=50)
     
@@ -151,7 +148,7 @@ def get_active_coins(db: Session = Depends(get_db)) -> dict[str, Any]:
                 
     # Parse dynamic symbols from recent INIT logs
     log_repo = ExecutionLogRepository(db)
-    recent_logs = log_repo.list_recent("default-paper", limit=300)
+    recent_logs = log_repo.list_recent(None, limit=300) # Use None to fetch from all accounts
     init_logs = [log for log in reversed(recent_logs) if log.stage == "INIT"][-5:]
     for log in init_logs:
         if log.payload_json and "symbols" in log.payload_json:
@@ -223,7 +220,7 @@ def get_coin_details(symbol: str, db: Session = Depends(get_db)) -> dict[str, An
         features = latest_feature.features_json
         
     # 3. Fetch Recent Logs related to this symbol
-    all_logs = log_repo.list_recent("default-paper", limit=200)
+    all_logs = log_repo.list_recent(None, limit=200) # Fetch from all accounts for coin details
     
     symbol_logs = []
     for log in reversed(all_logs): # chronological
@@ -249,13 +246,14 @@ def get_coin_details(symbol: str, db: Session = Depends(get_db)) -> dict[str, An
 @router.get("/logs")
 def get_all_logs(
     db: Session = Depends(get_db),
+    account_name: str = "default-paper",
     limit: int = Query(default=200, ge=1, le=1000),
     stage: str | None = Query(default=None),
     symbol: str | None = Query(default=None),
     level: str | None = Query(default=None),
 ) -> dict[str, Any]:
     log_repo = ExecutionLogRepository(db)
-    all_logs = log_repo.list_recent("default-paper", limit=limit * 3)  # Fetch extra to allow filtering
+    all_logs = log_repo.list_recent(account_name, limit=limit * 3)  # Fetch extra to allow filtering
     
     logs_data = []
     for log in reversed(all_logs):  # chronological
@@ -283,15 +281,15 @@ def get_all_logs(
     return {"logs": logs_data, "count": len(logs_data)}
 
 @router.delete("/logs")
-def clear_all_logs(db: Session = Depends(get_db)) -> dict[str, Any]:
+def clear_all_logs(db: Session = Depends(get_db), account_name: str = "default-paper") -> dict[str, Any]:
     log_repo = ExecutionLogRepository(db)
-    log_repo.clear_all("default-paper")
+    log_repo.clear_all(account_name)
     return {"status": "ok", "message": "Logs cleared"}
 
 @router.get("/cycles")
-def get_cycles(db: Session = Depends(get_db), limit: int = Query(default=50, ge=1, le=500)) -> dict[str, Any]:
+def get_cycles(db: Session = Depends(get_db), account_name: str = "default-paper", limit: int = Query(default=50, ge=1, le=500)) -> dict[str, Any]:
     cycle_repo = TradingCycleRepository(db)
-    cycles = cycle_repo.list_recent("default-paper", limit=limit)
+    cycles = cycle_repo.list_recent(account_name, limit=limit)
     cycles = sorted(cycles, key=lambda c: c.started_at)
     
     result = []
