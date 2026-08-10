@@ -3,7 +3,7 @@ import type {
   HealthStatus, DatabaseHealth, BotStatusResponse, 
   AnalyticsSummary, EquityCurveData, TradeHistoryResponse,
   PaperAccount, CycleResponse, BacktestJob, LogsResponse,
-  RiskRegimeData, CoinSymbolsResponse, CoinDataResponse
+  CoinSymbolsResponse, CoinDataResponse
 } from '../types/api';
 
 const api = axios.create({

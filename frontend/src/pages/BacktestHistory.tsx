@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getBacktestJobs, deleteBacktestJob, getBacktestCompareData } from '../services/api';
 import type { BacktestJob, EquityCurvePoint } from '../types/api';
+import { motion } from 'framer-motion';
+import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Line } from 'recharts';
+import { ArrowRight, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 
 export const BacktestHistory: React.FC = () => {
   const [jobs, setJobs] = useState<BacktestJob[]>([]);
@@ -112,7 +115,7 @@ export const BacktestHistory: React.FC = () => {
                 <LineChart data={compareData[jobA!.job_id] || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="time" hide />
-                  <YAxis domain={['auto', 'auto']} stroke="var(--text-muted)" fontSize={12} tickFormatter={(val) => `$${val}`} />
+                  <YAxis domain={['auto', 'auto']} stroke="var(--text-muted)" fontSize={12} tickFormatter={(val: any) => `$${val}`} />
                   <RechartsTooltip contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)' }} />
                   <Line type="monotone" dataKey="equity" stroke="var(--accent)" strokeWidth={3} dot={false} isAnimationActive={true} />
                 </LineChart>
@@ -140,7 +143,7 @@ export const BacktestHistory: React.FC = () => {
                 <LineChart data={compareData[jobB!.job_id] || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="time" hide />
-                  <YAxis domain={['auto', 'auto']} stroke="var(--text-muted)" fontSize={12} tickFormatter={(val) => `$${val}`} />
+                  <YAxis domain={['auto', 'auto']} stroke="var(--text-muted)" fontSize={12} tickFormatter={(val: any) => `$${val}`} />
                   <RechartsTooltip contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)' }} />
                   <Line type="monotone" dataKey="equity" stroke="var(--success)" strokeWidth={3} dot={false} isAnimationActive={true} />
                 </LineChart>

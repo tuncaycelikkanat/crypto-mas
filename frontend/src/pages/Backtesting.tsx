@@ -443,11 +443,11 @@ const Backtesting: React.FC = () => {
                     </div>
                     <div style={{ flex: 1, minWidth: '120px' }}>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Win Rate</div>
-                      <div className="stat-value" style={{ color: 'var(--text-primary)' }}>{(selectedJob.win_rate * 100).toFixed(2)}%</div>
+                      <div className="stat-value" style={{ color: 'var(--text-primary)' }}>{((selectedJob.win_rate || 0) * 100).toFixed(2)}%</div>
                     </div>
                     <div style={{ flex: 1, minWidth: '120px' }}>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Max Drawdown</div>
-                      <div className="stat-value" style={{ color: 'var(--danger)' }}>{(selectedJob.max_drawdown * 100).toFixed(2)}%</div>
+                      <div className="stat-value" style={{ color: 'var(--danger)' }}>{((selectedJob.max_drawdown || 0) * 100).toFixed(2)}%</div>
                     </div>
                     <div style={{ flex: 1, minWidth: '120px' }}>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Total Trades</div>

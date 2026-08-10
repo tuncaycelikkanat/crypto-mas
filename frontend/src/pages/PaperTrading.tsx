@@ -198,8 +198,8 @@ const PaperTrading: React.FC = () => {
       {/* Account Summary */}
       <div className="grid-cols-3">
         {[
-          { label: 'Equity', value: `$${account ? parseFloat(account.equity).toFixed(2) : '0.00'}`, accent: true },
-          { label: 'Cash Balance', value: `$${account ? parseFloat(account.cash_balance).toFixed(2) : '0.00'}` },
+          { label: 'Equity', value: `$${account ? parseFloat(String(account.equity)).toFixed(2) : '0.00'}`, accent: true },
+          { label: 'Cash Balance', value: `$${account ? parseFloat(String(account.cash_balance)).toFixed(2) : '0.00'}` },
           { label: 'Active Positions', value: account?.open_positions?.length ?? 0 },
         ].map((item, i) => (
           <motion.div key={item.label} className="card" style={{ padding: '20px 22px' }}
@@ -228,7 +228,7 @@ const PaperTrading: React.FC = () => {
               ? <p className="text-danger" style={{ marginTop: 8 }}>{actionLog.reason}</p>
               : (
                 <div style={{ display: 'flex', gap: 24, marginTop: 10 }}>
-                  {[['Processed', actionLog.symbols_processed], ['Decisions', actionLog.decisions_made], ['Trades', actionLog.trades_executed]].map(([k, v]) => (
+                  {[['Processed', (actionLog as any).symbols_processed], ['Decisions', (actionLog as any).decisions_made], ['Trades', (actionLog as any).trades_executed]].map(([k, v]) => (
                     <div key={k}>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k}</div>
                       <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--success)' }}>{v}</div>
