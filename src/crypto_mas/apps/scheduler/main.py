@@ -114,9 +114,9 @@ def main() -> None:
     )
     
     queue = OrderExecutorQueue.get_instance()
-    def broker_factory():
+    def broker_factory(strategy_mode: str = "swing"):
         db = SessionLocal()
-        return PaperBrokerService(db=db)
+        return PaperBrokerService(db=db, strategy_mode=strategy_mode)
     queue.set_broker_factory(broker_factory)
     queue.start()
     

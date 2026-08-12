@@ -339,9 +339,7 @@ class TradingCycleService:
         _log("EXECUTION", "Enqueuing approved portfolio to asynchronous OrderExecutorQueue")
         
         self.executor_queue.enqueue(
-            account_name=account_name,
-            target=approved_portfolio,
-            cycle_id=cycle.id
+            account_name=account_name, target=approved_portfolio, cycle_id=cycle.id, strategy_mode=self.strategy_mode
         )
         
         return decisions

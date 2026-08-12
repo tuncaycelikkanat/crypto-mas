@@ -212,7 +212,7 @@ class BacktestEngineService:
             # Reuse a SINGLE broker instance — don't call factory() on every cycle
             _backtest_broker = cycle_service.paper_broker
             _backtest_broker.is_backtest = True  # disables per-operation commit/flush/logging
-            queue.set_broker_factory(lambda: _backtest_broker)
+            queue.set_broker_factory(lambda strategy_mode="swing": _backtest_broker)
             
             # Inject the isolated queue into the orchestrator
             cycle_service.executor_queue = queue

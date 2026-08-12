@@ -15,6 +15,7 @@ class ExecutionTask:
     account_name: str
     target: PortfolioTarget
     cycle_id: int | None
+    strategy_mode: str = "swing"
 
 
 class OrderExecutorQueue:
@@ -36,9 +37,9 @@ class OrderExecutorQueue:
         """Allows lazy initialization of the broker service."""
         self._broker_factory = broker_factory
 
-    def enqueue(self, account_name: str, target: PortfolioTarget, cycle_id: int | None = None) -> None:
+    def enqueue(self, account_name: str, target: PortfolioTarget, cycle_id: int | None = None, strategy_mode: str = "swing") -> None:
         """Puts a portfolio target into the async execution queue. If sync_mode is True, executes immediately."""
-        task = ExecutionTask(account_name=account_name, target=target, cycle_id=cycle_id)
+        task = ExecutionTask(account_name=account_name, target=target, cycle_id=cycle_id, strategy_mode=strategy_mode)
         
         if self.sync_mode:
             logger.debug("Executing execution task synchronously for cycle %s", cycle_id)
@@ -53,7 +54,7 @@ class OrderExecutorQueue:
             logger.error("Broker factory not set on OrderExecutorQueue.")
             return
             
-        broker = self._broker_factory()
+        broker = self._broker_factory(strategy_mode=task.strategy_mode)
         db = broker.db
         from crypto_mas.domain.repositories.trading_cycle_repository import TradingCycleRepository
         cycle_repo = TradingCycleRepository(db)
