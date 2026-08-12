@@ -46,11 +46,11 @@ const PaperTrading: React.FC = () => {
   const [editingRiskLevels, setEditingRiskLevels] = useState<Record<string, number>>({});
 
   // ─ Config state ─
-  const [configSymbols,       setConfigSymbols]       = useLocalStorage('configSymbols', 'BTCUSDT, ETHUSDT, SOLUSDT');
-  const [configInterval,      setConfigInterval]      = useLocalStorage('configInterval', '120');
-  const [configMode,          setConfigMode]          = useLocalStorage('configMode', 'swing');
+  const [configInterval,      setConfigInterval]      = useLocalStorage('configInterval', '30');
+  const [configSymbols,       setConfigSymbols]       = useLocalStorage('configSymbols', 'BTCUSDT');
+  const [configSymbolSource,  setConfigSymbolSource]  = useLocalStorage('configSymbolSource', 'auto');
   const [configExchanges,     setConfigExchanges]     = useLocalStorage<string[]>('configExchanges', ['BINANCE']);
-  const [configSymbolSource, setConfigSymbolSource] = useLocalStorage<'manual' | 'auto'>('configSymbolSource', 'manual');
+  const [configMode,          setConfigMode]          = useLocalStorage('configMode', 'scalping');
   const [configBtcShield, setConfigBtcShield] = useLocalStorage('configBtcShield', true);
   const [configHtfShield, setConfigHtfShield] = useLocalStorage('configHtfShield', true);
   const [configRegimeShield, setConfigRegimeShield] = useLocalStorage('configRegimeShield', true);

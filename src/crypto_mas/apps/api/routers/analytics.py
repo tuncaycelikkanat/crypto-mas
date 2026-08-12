@@ -32,13 +32,15 @@ def reset_analytics(db: Session = Depends(get_db)) -> dict[str, Any]:
     db.execute(text("DELETE FROM positions"))
     db.execute(text("DELETE FROM trading_cycles"))
     
-    # Reset paper account back to initial balance
+    # Reset all live paper accounts back to initial balance (excluding backtests)
     account_repo = PaperAccountRepository(db)
-    account = account_repo.get_by_name("default-paper")
-    if account:
-        account.cash_balance = account.initial_balance
-        account.equity = account.initial_balance
-        
+    all_accounts = account_repo.get_all()
+    
+    for account in all_accounts:
+        if not account.name.startswith("backtest-"):
+            account.cash_balance = account.initial_balance
+            account.equity = account.initial_balance
+            
     db.commit()
     return {"status": "success", "message": "All analytics and PnL reset successfully"}
 
