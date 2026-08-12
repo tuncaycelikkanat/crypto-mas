@@ -127,7 +127,7 @@ class OrderExecutorQueue:
                     self.queue.task_done()
                     continue
 
-                broker: PaperBrokerService = self._broker_factory()
+                broker: PaperBrokerService = self._broker_factory(strategy_mode=task.strategy_mode)
                 
                 # Execute synchronously inside a thread pool
                 def sync_execute(task=task, broker=broker):
