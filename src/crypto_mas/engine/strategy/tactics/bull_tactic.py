@@ -250,8 +250,9 @@ class BullTactic(BaseTactic):
             timeframe=timeframe,
             action=DecisionAction.CONSIDER_LONG,
             confidence=confidence,
-            signals=[signal],
+            signal=signal,
             score=score,
+            reason=reason,
             metadata={
                 "tp_mult_override": tp_mult_override,
             }
