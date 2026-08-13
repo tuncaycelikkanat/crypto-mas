@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     telegram_enabled: bool = False
 
     # Scheduler Settings
-    scheduled_symbols: list[str] = ["BTCUSDT", "ETHUSDT"]
+    scheduled_symbols: list[str] = ["AUTO_GAINERS"]
     scheduled_timeframe: str = "1h"
     schedule_cron: str = "0 * * * *"  # Every hour at minute 0
 
