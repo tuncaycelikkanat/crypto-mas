@@ -68,14 +68,15 @@ class BullTactic(BaseTactic):
                 close_factors.append(f"EXT={dist_to_ema*100:.2f}%")
                 
             # Rule 2: Trend Breakdown (Price crosses below EMA50 robustly)
-            deep_break = last_price < (ema_50 * 0.990)
+            panic_drop_pct = params.get("panic_drop_pct", 0.02)
+            deep_break = last_price < (ema_50 * (1.0 - panic_drop_pct))
             
             prev_close = snapshots[-2].features_json.get("close") if len(snapshots) >= 2 else None
             prev_ema50 = snapshots[-2].features_json.get("ema_50") if len(snapshots) >= 2 else None
             
             consecutive_break = False
             if prev_close and prev_ema50:
-                if prev_close < prev_ema50 and last_price < (ema_50 * 0.995):
+                if prev_close < prev_ema50 and last_price < (ema_50 * (1.0 - (panic_drop_pct / 2))):
                     consecutive_break = True
                     
             if deep_break or consecutive_break:

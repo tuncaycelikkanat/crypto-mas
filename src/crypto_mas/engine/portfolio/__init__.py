@@ -25,3 +25,4 @@ class PortfolioTarget(BaseModel):
     gross_exposure: float = Field(ge=0.0, le=1.0)
     reason: str
     created_at: datetime
+    metadata: dict[str, Any] = Field(default_factory=dict)

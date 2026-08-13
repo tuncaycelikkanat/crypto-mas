@@ -101,6 +101,7 @@ class PortfolioEngine:
                 gross_exposure=0.0,
                 reason="No eligible candidates found.",
                 created_at=self.time_provider.now(),
+                metadata={"close_reasons": {sym: d.reason for sym, d in close_decisions.items()}}
             )
 
 
@@ -207,6 +208,7 @@ class PortfolioEngine:
                 f"Max gross exposure={self.max_gross_exposure:.2f}."
             ),
             created_at=self.time_provider.now(),
+            metadata={"close_reasons": {sym: d.reason for sym, d in close_decisions.items()}}
         )
 
     @staticmethod

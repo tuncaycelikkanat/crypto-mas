@@ -395,10 +395,18 @@ class PositionManager:
             
             net_recovered = self.risk_calculator._money((position.quantity * position.entry_price) + raw_realized_pnl - fee)
             
+            # Determine real close reason if provided by the strategy
+            strategy_reason = target.metadata.get("close_reasons", {}).get(position.symbol)
+            if strategy_reason:
+                close_reason_msg = f"{strategy_reason} (Fee: ${float(fee):.4f})"
+            else:
+                close_reason_msg = f"Closed by PortfolioEngine (Fee: ${float(fee):.4f})"
+
             closed_position = self.position_repository.close_position(
                 position=position,
                 exit_price=execution_price,
                 closed_at=self.time_provider.now(),
+                close_reason=close_reason_msg,
                 skip_commit=self.is_backtest,
             )
             
@@ -415,7 +423,7 @@ class PositionManager:
                 realized_pnl=closed_position.realized_pnl,
                 position_id=closed_position.id,
                 cycle_id=cycle_id,
-                reason=f"Closed by PortfolioEngine (Fee: ${float(fee):.4f})"
+                reason=close_reason_msg
             )
 
             if not self.is_backtest:
