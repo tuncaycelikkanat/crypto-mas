@@ -161,6 +161,8 @@ class BullTactic(BaseTactic):
             # High volume sell-off. Do not catch falling knife.
             return None
             
+        tp_mult_override = params.get("tp_mult", 2.0)
+            
         factors.append(f"TREND(ADX={adx_14:.1f})")
         
         if is_pullback:
@@ -248,7 +250,9 @@ class BullTactic(BaseTactic):
             timeframe=timeframe,
             action=DecisionAction.CONSIDER_LONG,
             confidence=confidence,
-            signal=signal,
+            signals=[signal],
             score=score,
-            reason=reason,
+            metadata={
+                "tp_mult_override": tp_mult_override,
+            }
         )

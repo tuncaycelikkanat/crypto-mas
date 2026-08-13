@@ -188,6 +188,18 @@ class SchedulerService:
         }
         timeframe = tf_map.get(timeframe_str, Timeframe.FOUR_HOURS)
 
+        import os
+        import json
+        config_json = {}
+        data_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data')
+        config_path = os.path.join(data_dir, 'current_optimal_config.json')
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    config_json = json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load optimal config: {e}")
+
         db = SessionLocal()
         try:
             exchange = Exchange(exchange_str)
@@ -210,6 +222,7 @@ class SchedulerService:
                 use_btc_shield=use_btc_shield,
                 use_htf_shield=use_htf_shield,
                 use_regime_shield=use_regime_shield,
+                config_json=config_json,
             )
 
             logger.info(f"[{mode.upper()}] Cycle {cycle.id} done. PnL: {cycle.cycle_pnl}")
