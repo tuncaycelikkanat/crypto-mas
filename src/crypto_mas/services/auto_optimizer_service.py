@@ -63,6 +63,11 @@ class AutoOptimizerService:
         self.db.commit()
         self.db.refresh(history_record)
         
+        # Intercept magic symbol lists like AUTO_GAINERS to train on historically volatile assets
+        if symbols and symbols[0] in ("AUTO_GAINERS", "HIDDEN_GEMS"):
+            logger.info("Optimizer intercepted '%s' magic symbol. Using High-Beta Dynamic Gainers Universe for backtest training.", symbols[0])
+            symbols = ["WIFUSDT", "PEPEUSDT", "FLOKIUSDT", "SHIBUSDT", "DOGEUSDT"]
+        
         now = datetime.now(UTC)
         train_start = now - relativedelta(months=lookback_months)
         train_end = now
@@ -109,11 +114,12 @@ class AutoOptimizerService:
         logger.info("Memory caches warmed up. Starting live adaptation trials...")
 
         def objective(trial):
-            tp_mult = trial.suggest_float("tp_mult", 1.2, 2.5, step=0.1)
-            sl_mult = trial.suggest_float("sl_mult", 0.8, 1.8, step=0.1)
-            breakdown_tp_mult = trial.suggest_float("breakdown_tp_mult", 1.0, 2.0, step=0.1)
-            breakdown_sl_mult = trial.suggest_float("breakdown_sl_mult", 0.8, 1.5, step=0.1)
-            max_dist_ema = trial.suggest_float("max_dist_ema", 0.020, 0.040, step=0.005)
+            # Widened search space for high-beta / highly volatile tokens
+            tp_mult = trial.suggest_float("tp_mult", 1.5, 6.0, step=0.1)
+            sl_mult = trial.suggest_float("sl_mult", 0.5, 3.0, step=0.1)
+            breakdown_tp_mult = trial.suggest_float("breakdown_tp_mult", 1.0, 4.0, step=0.1)
+            breakdown_sl_mult = trial.suggest_float("breakdown_sl_mult", 0.5, 2.0, step=0.1)
+            max_dist_ema = trial.suggest_float("max_dist_ema", 0.010, 0.150, step=0.005)
             
             config_json = {
                 "tp_mult": tp_mult,
