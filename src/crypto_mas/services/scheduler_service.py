@@ -196,7 +196,9 @@ class SchedulerService:
         if os.path.exists(config_path):
             try:
                 with open(config_path, "r") as f:
-                    config_json = json.load(f)
+                    raw_json = json.load(f)
+                    # The saved JSON has a "best_params" wrapper. Extract it so tactics can read keys like "tp_mult" directly.
+                    config_json = raw_json.get("best_params", raw_json)
             except Exception as e:
                 logger.error(f"Failed to load optimal config: {e}")
 
