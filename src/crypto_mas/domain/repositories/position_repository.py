@@ -23,6 +23,17 @@ class PositionRepository:
 
         return list(self.db.scalars(stmt).all())
 
+    def list_closed_positions(self, account_name: str, limit: int = 50) -> list[Position]:
+        stmt = (
+            select(Position)
+            .where(Position.account_name == account_name)
+            .where(Position.status == PositionStatus.CLOSED)
+            .order_by(Position.closed_at.desc())
+            .limit(limit)
+        )
+
+        return list(self.db.scalars(stmt).all())
+
     def get_open_position(
         self,
         account_name: str,

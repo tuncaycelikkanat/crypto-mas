@@ -35,6 +35,20 @@ export interface PaperAccount {
   unrealized_pnl?: number | string;
   margin_used?: number | string;
   open_positions?: OpenPosition[];
+  closed_positions?: ClosedPosition[];
+}
+
+export interface ClosedPosition {
+  symbol: string;
+  exchange?: string;
+  side: 'LONG' | 'SHORT' | string;
+  quantity: number | string;
+  entry_price: number | string;
+  current_price: number | string;
+  realized_pnl: number | string;
+  opened_at: string;
+  closed_at: string;
+  close_reason: string;
 }
 
 export interface OpenPosition {

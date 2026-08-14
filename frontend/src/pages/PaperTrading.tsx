@@ -408,6 +408,49 @@ const PaperTrading: React.FC = () => {
         </table>
       </motion.div>
 
+      {/* Closed Positions */}
+      <motion.div className="card" style={{ padding: '22px 24px', marginTop: '24px' }}
+        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+        <h3 style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between' }}>
+          <span>Closed Positions</span>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Total Closed: {account?.closed_positions?.length || 0}
+          </span>
+        </h3>
+        <table className="glass-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Entry Price</th>
+              <th>Exit Price</th>
+              <th>Realized PnL</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {account?.closed_positions && account.closed_positions.length > 0 ? account.closed_positions.map((pos: any, i: number) => (
+              <tr key={i}>
+                <td style={{ fontWeight: 600 }}>{pos.symbol}</td>
+                <td><span className={`badge badge-${pos.side === 'LONG' ? 'success' : 'danger'}`}>{pos.side}</span></td>
+                <td className="mono">${parseFloat(String(pos.entry_price)).toFixed(4)}</td>
+                <td className="mono">${parseFloat(String(pos.current_price)).toFixed(4)}</td>
+                <td className="mono" style={{ color: parseFloat(String(pos.realized_pnl)) >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                  ${parseFloat(String(pos.realized_pnl)).toFixed(2)}
+                </td>
+                <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{pos.close_reason || '-'}</td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '36px 16px' }}>
+                  No closed positions.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </motion.div>
+
       {/* Live Console */}
       <LiveConsole />
 

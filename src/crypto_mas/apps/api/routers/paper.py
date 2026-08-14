@@ -50,7 +50,26 @@ def get_mock_paper_account(
     position_repository = PositionRepository(db)
 
     def _format_account(account):
-        positions = position_repository.list_open_positions(account_name=account.name)
+        open_positions = position_repository.list_open_positions(account_name=account.name)
+        closed_positions = position_repository.list_closed_positions(account_name=account.name, limit=50)
+
+        def _format_pos(p):
+            return {
+                "symbol": p.symbol,
+                "exchange": p.exchange,
+                "side": p.side,
+                "status": p.status,
+                "quantity": str(p.quantity),
+                "entry_price": str(p.entry_price),
+                "current_price": str(p.current_price) if p.current_price else str(p.entry_price),
+                "notional_value": str(p.notional_value),
+                "unrealized_pnl": str(p.unrealized_pnl),
+                "realized_pnl": str(p.realized_pnl),
+                "opened_at": p.opened_at.isoformat(),
+                "closed_at": p.closed_at.isoformat() if p.closed_at else None,
+                "close_reason": p.close_reason,
+            }
+
         return {
             "name": account.name,
             "exchange": account.exchange,
@@ -58,22 +77,8 @@ def get_mock_paper_account(
             "initial_balance": str(account.initial_balance),
             "cash_balance": str(account.cash_balance),
             "equity": str(account.equity),
-            "open_positions": [
-                {
-                    "symbol": position.symbol,
-                    "exchange": position.exchange,
-                    "side": position.side,
-                    "status": position.status,
-                    "quantity": str(position.quantity),
-                    "entry_price": str(position.entry_price),
-                    "current_price": str(position.current_price),
-                    "notional_value": str(position.notional_value),
-                    "unrealized_pnl": str(position.unrealized_pnl),
-                    "realized_pnl": str(position.realized_pnl),
-                    "opened_at": position.opened_at.isoformat(),
-                }
-                for position in positions
-            ],
+            "open_positions": [_format_pos(p) for p in open_positions],
+            "closed_positions": [_format_pos(p) for p in closed_positions],
         }
 
     if account_name:
