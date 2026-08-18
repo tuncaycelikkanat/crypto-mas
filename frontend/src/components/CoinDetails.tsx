@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export const CoinDetails: React.FC = () => {
@@ -11,7 +11,7 @@ export const CoinDetails: React.FC = () => {
   useEffect(() => {
     const fetchSymbols = async () => {
       try {
-        const res = await axios.get('/api/v1/analytics/coins');
+        const res = await api.get('/analytics/coins');
         if (res.data && res.data.symbols) {
           setSymbols(res.data.symbols);
           if (res.data.symbols.length > 0) {
@@ -31,7 +31,7 @@ export const CoinDetails: React.FC = () => {
     const fetchCoinData = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`/api/v1/analytics/coin/${selectedSymbol}`);
+        const res = await api.get(`/analytics/coin/${selectedSymbol}`);
         setCoinData(res.data);
       } catch (err) {
         console.error("Error fetching coin data:", err);

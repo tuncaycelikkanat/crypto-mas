@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { Terminal } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -33,9 +33,9 @@ const LiveConsole: React.FC<LiveConsoleProps> = ({ symbol }) => {
   const fetchLogs = React.useCallback(async () => {
     if (paused) return;
     try {
-      const res = await axios.get('/api/v1/logs/recent?limit=150');
-      let fetched: LogEntry[] = res.data;
-      if (symbol) fetched = fetched.filter(l => l.message.includes(symbol) || l.stage.includes(symbol));
+      const res = await api.get<LogEntry[]>('/logs/recent?limit=150');
+      let fetched: LogEntry[] = Array.isArray(res.data) ? res.data : [];
+      if (symbol) fetched = fetched.filter(l => (l.message && l.message.includes(symbol)) || (l.stage && l.stage.includes(symbol)));
       setLogs(fetched);
     } catch { /* ignore */ }
   }, [symbol, paused]);

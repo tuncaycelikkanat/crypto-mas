@@ -71,14 +71,14 @@ const PaperTrading: React.FC = () => {
     try {
       const res = await getPaperAccount();
       const data = res.data;
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
          setAccounts(data);
-         if (data.length > 0 && !data.find(a => a.name === selectedAccountName)) {
-             setSelectedAccountName(data[0].name!);
+         if (!data.find(a => a.name === selectedAccountName)) {
+             setSelectedAccountName(data[0].name || 'main');
          }
-      } else {
+      } else if (data && typeof data === 'object' && 'name' in data) {
          setAccounts([data as PaperAccount]);
-         setSelectedAccountName((data as PaperAccount).name!);
+         setSelectedAccountName((data as PaperAccount).name || 'main');
       }
     } catch (e: unknown) {
       console.error("Failed to fetch accounts:", e);

@@ -5,7 +5,7 @@ import {
   Sun, Moon, TrendingUp, Activity, Wifi, WifiOff
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import axios from 'axios';
+import api from '../services/api';
 
 const NAV_ITEMS = [
   { to: '/',            label: 'Overview',       icon: LayoutDashboard, end: true },
@@ -30,7 +30,7 @@ const Layout: React.FC = () => {
 
   useEffect(() => {
     const check = async () => {
-      try { await axios.get('/api/v1/health'); setSysOnline(true); }
+      try { await api.get('/health'); setSysOnline(true); }
       catch { setSysOnline(false); }
     };
     check();
