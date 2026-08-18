@@ -1,12 +1,4 @@
-# Stage 1: Build React Frontend
-FROM node:20-alpine AS frontend-builder
-WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm install
-COPY frontend/ ./
-RUN npm run build
-
-# Stage 2: Python Backend Runtime
+# Pure Python Backend Runtime (Decoupled from Frontend)
 FROM python:3.12-slim
 WORKDIR /app
 
@@ -25,8 +17,6 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --no-install-project
 
 COPY . .
-# Copy built static frontend files from Stage 1
-COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 EXPOSE 8000
 
