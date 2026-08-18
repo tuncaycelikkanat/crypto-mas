@@ -14,7 +14,7 @@ def test_bulk_upsert_empty():
     assert result == 0
     db_mock.execute.assert_not_called()
 
-@patch("crypto_mas.domain.repositories.symbol_repository.insert")
+@patch("crypto_mas.domain.repositories.symbol_repository.sqlite_insert")
 def test_bulk_upsert(mock_insert):
     db_mock = MagicMock()
     repo = SymbolRepository(db_mock)

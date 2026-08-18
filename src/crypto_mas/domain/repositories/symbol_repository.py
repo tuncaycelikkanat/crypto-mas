@@ -1,7 +1,8 @@
 from collections.abc import Sequence
 
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.symbol import Symbol
@@ -32,21 +33,37 @@ class SymbolRepository:
             for symbol in symbols
         ]
 
-        stmt = insert(Symbol).values(rows)
-
-        stmt = stmt.on_conflict_do_update(
-            constraint="uq_symbols_exchange_symbol",
-            set_={
-                "base_asset": stmt.excluded.base_asset,
-                "quote_asset": stmt.excluded.quote_asset,
-                "status": stmt.excluded.status,
-                "is_active": stmt.excluded.is_active,
-                "is_stablecoin": stmt.excluded.is_stablecoin,
-                "is_leveraged_token": stmt.excluded.is_leveraged_token,
-                "listing_date": stmt.excluded.listing_date,
-                "delisting_date": stmt.excluded.delisting_date,
-            },
-        )
+        is_pg = bool(self.db.bind and hasattr(self.db.bind, "dialect") and "postgresql" in getattr(self.db.bind.dialect, "name", ""))
+        if is_pg:
+            stmt = pg_insert(Symbol).values(rows)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["exchange", "symbol"],
+                set_={
+                    "base_asset": stmt.excluded.base_asset,
+                    "quote_asset": stmt.excluded.quote_asset,
+                    "status": stmt.excluded.status,
+                    "is_active": stmt.excluded.is_active,
+                    "is_stablecoin": stmt.excluded.is_stablecoin,
+                    "is_leveraged_token": stmt.excluded.is_leveraged_token,
+                    "listing_date": stmt.excluded.listing_date,
+                    "delisting_date": stmt.excluded.delisting_date,
+                },
+            )
+        else:
+            stmt = sqlite_insert(Symbol).values(rows)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["exchange", "symbol"],
+                set_={
+                    "base_asset": stmt.excluded.base_asset,
+                    "quote_asset": stmt.excluded.quote_asset,
+                    "status": stmt.excluded.status,
+                    "is_active": stmt.excluded.is_active,
+                    "is_stablecoin": stmt.excluded.is_stablecoin,
+                    "is_leveraged_token": stmt.excluded.is_leveraged_token,
+                    "listing_date": stmt.excluded.listing_date,
+                    "delisting_date": stmt.excluded.delisting_date,
+                },
+            )
 
         self.db.execute(stmt)
         self.db.commit()

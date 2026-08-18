@@ -17,15 +17,27 @@ class FeatureSnapshotRepository:
         if not snapshots:
             return 0
 
-        stmt = sqlite_insert(FeatureSnapshot).values(list(snapshots))
-
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["exchange", "symbol", "timeframe", "timestamp"],
-            set_={
-                "available_at": stmt.excluded.available_at,
-                "features_json": stmt.excluded.features_json,
-            },
-        )
+        is_pg = bool(self.db.bind and "postgresql" in self.db.bind.dialect.name)
+        if is_pg:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(FeatureSnapshot).values(list(snapshots))
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["exchange", "symbol", "timeframe", "timestamp"],
+                set_={
+                    "available_at": stmt.excluded.available_at,
+                    "features_json": stmt.excluded.features_json,
+                },
+            )
+        else:
+            from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+            stmt = sqlite_insert(FeatureSnapshot).values(list(snapshots))
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["exchange", "symbol", "timeframe", "timestamp"],
+                set_={
+                    "available_at": stmt.excluded.available_at,
+                    "features_json": stmt.excluded.features_json,
+                },
+            )
 
         self.db.execute(stmt)
         self.db.commit()

@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/v1/logs", tags=["Logs"])
 @router.get("/recent")
 def get_recent_logs(
     db: Annotated[Session, Depends(get_db_session)],
-    account_name: str = "default-paper",
+    account_name: str | None = None,
     limit: int = 50,
 ) -> list[dict[str, Any]]:
     repository = ExecutionLogRepository(db)

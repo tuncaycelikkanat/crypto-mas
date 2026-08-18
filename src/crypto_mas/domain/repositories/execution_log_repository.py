@@ -23,13 +23,11 @@ class ExecutionLogRepository:
         )
         return self.session.scalars(stmt).all()
 
-    def list_recent(self, account_name: str, limit: int = 100) -> Sequence[ExecutionLog]:
-        stmt = (
-            select(ExecutionLog)
-            .where(ExecutionLog.account_name == account_name)
-            .order_by(ExecutionLog.created_at.desc())
-            .limit(limit)
-        )
+    def list_recent(self, account_name: str | None = None, limit: int = 100) -> Sequence[ExecutionLog]:
+        stmt = select(ExecutionLog)
+        if account_name and account_name != "all":
+            stmt = stmt.where(ExecutionLog.account_name == account_name)
+        stmt = stmt.order_by(ExecutionLog.created_at.desc()).limit(limit)
         return self.session.scalars(stmt).all()
 
     def clear_all(self, account_name: str) -> None:

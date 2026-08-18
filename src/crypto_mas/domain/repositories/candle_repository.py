@@ -36,22 +36,41 @@ class CandleRepository:
             for candle in candles
         ]
 
-        stmt = insert(Candle).values(rows)
-
-        stmt = stmt.on_conflict_do_update(
-            constraint="uq_candles_exchange_symbol_tf_open",
-            set_={
-                "close_time": stmt.excluded.close_time,
-                "open": stmt.excluded.open,
-                "high": stmt.excluded.high,
-                "low": stmt.excluded.low,
-                "close": stmt.excluded.close,
-                "volume": stmt.excluded.volume,
-                "quote_volume": stmt.excluded.quote_volume,
-                "trade_count": stmt.excluded.trade_count,
-                "source": stmt.excluded.source,
-            },
-        )
+        is_pg = bool(self.db.bind and "postgresql" in self.db.bind.dialect.name)
+        if is_pg:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(Candle).values(rows)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["exchange", "symbol", "timeframe", "open_time"],
+                set_={
+                    "close_time": stmt.excluded.close_time,
+                    "open": stmt.excluded.open,
+                    "high": stmt.excluded.high,
+                    "low": stmt.excluded.low,
+                    "close": stmt.excluded.close,
+                    "volume": stmt.excluded.volume,
+                    "quote_volume": stmt.excluded.quote_volume,
+                    "trade_count": stmt.excluded.trade_count,
+                    "source": stmt.excluded.source,
+                },
+            )
+        else:
+            from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+            stmt = sqlite_insert(Candle).values(rows)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["exchange", "symbol", "timeframe", "open_time"],
+                set_={
+                    "close_time": stmt.excluded.close_time,
+                    "open": stmt.excluded.open,
+                    "high": stmt.excluded.high,
+                    "low": stmt.excluded.low,
+                    "close": stmt.excluded.close,
+                    "volume": stmt.excluded.volume,
+                    "quote_volume": stmt.excluded.quote_volume,
+                    "trade_count": stmt.excluded.trade_count,
+                    "source": stmt.excluded.source,
+                },
+            )
 
         self.db.execute(stmt)
         self.db.commit()
