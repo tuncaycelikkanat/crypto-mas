@@ -115,7 +115,7 @@ class TradingCycleService:
                 if not auto_symbols:
                     auto_symbols = [item["symbol"] for item in gainer_data.get("gainers", [])]
                 if auto_symbols:
-                    symbols = auto_symbols
+                    symbols = auto_symbols[:12]
                     if self.ws_client:
                         for sym in symbols:
                             self.ws_client.add_subscription(sym, "trade")
@@ -132,10 +132,10 @@ class TradingCycleService:
             try:
                 min_vol = max(1_000_000, 5_000_000 - (risk_level * 40_000))
                 max_vol = 50_000_000
-                gem_data = await fetch_hidden_gems(exchange=self.fetcher_service.provider.exchange.value, limit=50, min_volume_usdt=min_vol, max_volume_usdt=max_vol)
+                gem_data = await fetch_hidden_gems(exchange=self.fetcher_service.provider.exchange.value, limit=20, min_volume_usdt=min_vol, max_volume_usdt=max_vol)
                 auto_symbols = [item["symbol"] for item in gem_data.get("hidden_gems", [])]
                 if auto_symbols:
-                    symbols = auto_symbols
+                    symbols = auto_symbols[:12]
                     if self.ws_client:
                         for sym in symbols:
                             self.ws_client.add_subscription(sym, "trade")

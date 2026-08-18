@@ -41,7 +41,7 @@ class MarketDataOrchestrator:
             fetch_symbols.add("BTCUSDT")
         fetch_symbols_list = list(fetch_symbols)
         
-        fallback_start = now - get_timedelta(timeframe) * 1000
+        fallback_start = now - get_timedelta(timeframe) * 250
         
         await self.fetcher_service.backfill_universe(
             symbols=fetch_symbols_list,
