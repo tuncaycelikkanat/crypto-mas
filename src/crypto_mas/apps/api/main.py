@@ -131,7 +131,7 @@ app.include_router(scanner_router)
 app.include_router(audit_router)
 app.include_router(ws_risk_router)
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
     return {
         "status": "online",

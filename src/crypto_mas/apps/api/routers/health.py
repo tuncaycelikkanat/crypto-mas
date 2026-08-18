@@ -7,7 +7,7 @@ from crypto_mas.infrastructure.db.session import check_db_connection
 settings = get_settings()
 router = APIRouter(prefix="/api/v1", tags=["Health"])
 
-@router.get("/health")
+@router.api_route("/health", methods=["GET", "HEAD"])
 def health_check() -> dict[str, str]:
     return {
         "status": "ok",
@@ -15,7 +15,7 @@ def health_check() -> dict[str, str]:
         "mode": settings.trading_mode,
     }
 
-@router.get("/health/db")
+@router.api_route("/health/db", methods=["GET", "HEAD"])
 def database_health_check() -> dict[str, str]:
     is_connected = check_db_connection()
     return {
@@ -23,7 +23,7 @@ def database_health_check() -> dict[str, str]:
         "database": "connected" if is_connected else "disconnected",
     }
 
-@router.get("/health/redis")
+@router.api_route("/health/redis", methods=["GET", "HEAD"])
 def redis_health_check() -> dict[str, str]:
     is_connected = check_redis_connection()
     return {
@@ -31,14 +31,14 @@ def redis_health_check() -> dict[str, str]:
         "redis": "connected" if is_connected else "disconnected",
     }
 
-@router.get("/version")
+@router.api_route("/version", methods=["GET", "HEAD"])
 def version() -> dict[str, str]:
     return {
         "name": settings.app_name,
         "version": settings.app_version,
     }
 
-@router.get("/config")
+@router.api_route("/config", methods=["GET", "HEAD"])
 def config() -> dict[str, str]:
     return {
         "app_env": settings.app_env,
