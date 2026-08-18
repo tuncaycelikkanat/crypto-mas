@@ -56,6 +56,33 @@ class FeatureCalculator:
         # Calculate RVOL: volume / VOL_SMA_20
         df["rvol"] = df["volume"] / df["VOL_SMA_20"]
 
+        # ── Calculate Non-Parametric / Statistical Features ───────────────────
+        # Distance to EMA20
+        if "EMA_20" in df.columns:
+            df["ema_20_dist"] = (df["close"] - df["EMA_20"]) / df["EMA_20"]
+            roll_mean = df["ema_20_dist"].rolling(50, min_periods=20).mean()
+            roll_std = df["ema_20_dist"].rolling(50, min_periods=20).std()
+            df["ema_dist_zscore_50"] = (df["ema_20_dist"] - roll_mean) / (roll_std + 1e-9)
+        else:
+            df["ema_dist_zscore_50"] = 0.0
+
+        if "RSI_14" in df.columns:
+            rsi_mean = df["RSI_14"].rolling(50, min_periods=20).mean()
+            rsi_std = df["RSI_14"].rolling(50, min_periods=20).std()
+            df["rsi_zscore_50"] = (df["RSI_14"] - rsi_mean) / (rsi_std + 1e-9)
+        else:
+            df["rsi_zscore_50"] = 0.0
+
+        # RVOL Percentile Rank (0.0 to 1.0)
+        df["rvol_percentile_50"] = df["rvol"].rolling(50, min_periods=20).apply(
+            lambda s: (s <= s.iloc[-1]).sum() / len(s) if len(s) > 0 else 0.5, raw=False
+        )
+
+        # Approximate CVD (Cumulative Volume Delta) via Price Action directional volume
+        # Directional volume: +volume if close > open, -volume if close < open
+        price_dir = np.where(df["close"] >= df["open"], 1.0, -1.0)
+        df["cvd"] = (df["volume"] * price_dir).cumsum()
+
         # Replace infinite values and NaNs with None for JSON serialization
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         df[numeric_cols] = df[numeric_cols].round(8)
@@ -74,13 +101,16 @@ class FeatureCalculator:
             "ATRr_14": "atr_14", "BBU_20_2.0": "bb_upper", "BBU_20_2.0_2.0": "bb_upper",
             "BBM_20_2.0": "bb_middle", "BBM_20_2.0_2.0": "bb_middle",
             "BBL_20_2.0": "bb_lower", "BBL_20_2.0_2.0": "bb_lower",
+            "rsi_zscore_50": "rsi_zscore_50", "ema_dist_zscore_50": "ema_dist_zscore_50",
+            "rvol_percentile_50": "rvol_percentile_50", "cvd": "cvd",
         }
 
         expected_keys = [
             "open", "high", "low", "close", "volume", "volume_sma_20", "rvol", "obv", 
             "cmf_20", "ema_20", "ema_50", "sma_20", "adx_14", "plus_di", "minus_di", 
             "rsi_14", "stoch_rsi_k", "stoch_rsi_d", "roc_14", "macd", "macd_signal", 
-            "macd_hist", "atr_14", "bb_upper", "bb_middle", "bb_lower"
+            "macd_hist", "atr_14", "bb_upper", "bb_middle", "bb_lower",
+            "rsi_zscore_50", "ema_dist_zscore_50", "rvol_percentile_50", "cvd"
         ]
 
         snapshots: list[dict[str, Any]] = []

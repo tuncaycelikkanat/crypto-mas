@@ -6,8 +6,10 @@ import type {
   CoinSymbolsResponse, CoinDataResponse
 } from '../types/api';
 
+const apiBase = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/v1` : '/api/v1';
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: apiBase,
   headers: { 'Content-Type': 'application/json' },
 });
 

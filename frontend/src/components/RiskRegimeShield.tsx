@@ -30,7 +30,8 @@ const RiskRegimeShield: React.FC = () => {
 
   const fetchSnapshot = async () => {
     try {
-      const res = await axios.get('/api/v1/ws/risk-regime/snapshot');
+      const apiBase = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/v1` : '/api/v1';
+      const res = await axios.get(`${apiBase}/ws/risk-regime/snapshot`);
       if (res.data) {
         setData(res.data);
       }
@@ -42,8 +43,17 @@ const RiskRegimeShield: React.FC = () => {
   useEffect(() => {
     fetchSnapshot();
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/risk-regime`;
+    const isSecure = window.location.protocol === 'https:' || (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.startsWith('https'));
+    const protocol = isSecure ? 'wss:' : 'ws:';
+    let host = window.location.host;
+    if (import.meta.env.VITE_API_URL) {
+      try {
+        host = new URL(import.meta.env.VITE_API_URL).host;
+      } catch (e) {
+        // fallback
+      }
+    }
+    const wsUrl = `${protocol}//${host}/api/v1/ws/risk-regime`;
     let ws: WebSocket | null = null;
     let fallbackInterval: ReturnType<typeof setInterval> | null = null;
 

@@ -31,4 +31,4 @@ COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 EXPOSE 8000
 
 # Automatically run database migrations on container startup, then start FastAPI
-CMD ["sh", "-c", "uv run alembic upgrade head && uv run uvicorn crypto_mas.apps.api.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "uv run alembic upgrade head && uv run uvicorn crypto_mas.apps.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

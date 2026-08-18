@@ -54,7 +54,10 @@ class OrderExecutorQueue:
             logger.error("Broker factory not set on OrderExecutorQueue.")
             return
             
-        broker = self._broker_factory(strategy_mode=task.strategy_mode)
+        try:
+            broker = self._broker_factory(strategy_mode=task.strategy_mode)
+        except TypeError:
+            broker = self._broker_factory()
         db = broker.db
         from crypto_mas.domain.repositories.trading_cycle_repository import TradingCycleRepository
         cycle_repo = TradingCycleRepository(db)
@@ -127,7 +130,10 @@ class OrderExecutorQueue:
                     self.queue.task_done()
                     continue
 
-                broker: PaperBrokerService = self._broker_factory(strategy_mode=task.strategy_mode)
+                try:
+                    broker = self._broker_factory(strategy_mode=task.strategy_mode)
+                except TypeError:
+                    broker = self._broker_factory()
                 
                 # Execute synchronously inside a thread pool
                 def sync_execute(task=task, broker=broker):

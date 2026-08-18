@@ -4,13 +4,14 @@ from crypto_mas.infrastructure.time.time_provider import SystemTimeProvider, Tim
 from crypto_mas.services.market_data_service.schemas import Exchange, Timeframe
 from crypto_mas.engine.regime import MarketRegime
 
+from crypto_mas.engine.portfolio.bet_sizing import BetSizer
 from crypto_mas.infrastructure.config.settings import get_settings
 
 # BTC-correlated asset group for concentration risk control
-BTC_CORRELATED = get_settings().btc_correlated_symbols
+DEFAULT_BTC_CORRELATED = get_settings().btc_correlated_symbols
 
 # Asset groups for dynamic regime weighting
-COIN_GROUPS = get_settings().coin_groups
+DEFAULT_COIN_GROUPS = get_settings().coin_groups
 
 
 class PortfolioEngine:
@@ -25,12 +26,20 @@ class PortfolioEngine:
         min_confidence: float = 0.5,
         max_correlated_group_weight: float = 0.40,
         time_provider: TimeProvider | None = None,
+        coin_groups: dict[str, set[str]] | None = None,
+        btc_correlated_symbols: set[str] | None = None,
+        bet_sizer: BetSizer | None = None,
     ) -> None:
         self.max_positions = max_positions
         self.max_gross_exposure = max_gross_exposure
         self.min_confidence = min_confidence
         self.max_correlated_group_weight = max_correlated_group_weight
         self.time_provider = time_provider or SystemTimeProvider()
+        self.coin_groups = coin_groups if coin_groups is not None else DEFAULT_COIN_GROUPS
+        self.btc_correlated_symbols = (
+            btc_correlated_symbols if btc_correlated_symbols is not None else DEFAULT_BTC_CORRELATED
+        )
+        self.bet_sizer = bet_sizer
 
     def build_target_portfolio(
         self,
@@ -52,31 +61,39 @@ class PortfolioEngine:
         # Remove symbols that have a CLOSE decision from the retained list
         retained_symbols = open_symbols - set(close_decisions.keys())
         
-        # Apply Regime-Based Dynamic Adjustments
+        # Apply Regime-Based Dynamic Adjustments without mutating original input objects
+        adjusted_decisions: list[TradingDecision] = []
         for decision in decisions:
-            if decision.regime:
-                regime = decision.regime.regime
+            adj_dec = decision.model_copy(deep=True)
+            if adj_dec.regime:
+                regime = adj_dec.regime.regime
                 
                 # Filter BEAR Market Longs to only TOP10 (Flight to Quality)
-                if regime == MarketRegime.BEAR_TREND and decision.action == DecisionAction.CONSIDER_LONG:
-                    if decision.symbol not in COIN_GROUPS["TOP10"]:
-                        decision.confidence = 0.0  # Reject non-TOP10 longs in Bear Market
-                        decision.reason = f"[Filtered] Non-TOP10 Long in BEAR: {decision.reason}"
+                top10_group = self.coin_groups.get("TOP10", set())
+                if regime == MarketRegime.BEAR_TREND and adj_dec.action == DecisionAction.CONSIDER_LONG:
+                    if adj_dec.symbol not in top10_group:
+                        adj_dec.confidence = 0.0  # Reject non-TOP10 longs in Bear Market
+                        adj_dec.reason = f"[Filtered] Non-TOP10 Long in BEAR: {adj_dec.reason}"
                 
                 # Boost MEMES in BULL Market (Risk On)
-                if regime == MarketRegime.BULL_TREND and decision.symbol in COIN_GROUPS["MEMES"]:
-                    decision.confidence = min(0.99, decision.confidence + 0.15)
-                    decision.reason = f"[MEME Boost] {decision.reason}"
+                meme_group = self.coin_groups.get("MEMES", set())
+                if regime == MarketRegime.BULL_TREND and adj_dec.symbol in meme_group:
+                    adj_dec.confidence = min(0.99, adj_dec.confidence + 0.15)
+                    adj_dec.reason = f"[MEME Boost] {adj_dec.reason}"
                     
                 # Boost AI and L1 in SIDEWAYS Market (Idiosyncratic Alpha)
-                if regime == MarketRegime.SIDEWAYS and (decision.symbol in COIN_GROUPS["AI_HYPE"] or decision.symbol in COIN_GROUPS["L1"]):
-                    decision.confidence = min(0.99, decision.confidence + 0.10)
-                    decision.reason = f"[Alpha Boost] {decision.reason}"
+                ai_group = self.coin_groups.get("AI_HYPE", set())
+                l1_group = self.coin_groups.get("L1", set())
+                if regime == MarketRegime.SIDEWAYS and (adj_dec.symbol in ai_group or adj_dec.symbol in l1_group):
+                    adj_dec.confidence = min(0.99, adj_dec.confidence + 0.10)
+                    adj_dec.reason = f"[Alpha Boost] {adj_dec.reason}"
+
+            adjusted_decisions.append(adj_dec)
 
         # 2. Process NEW entry candidates
         new_candidates = [
             decision
-            for decision in decisions
+            for decision in adjusted_decisions
             if decision.action in (DecisionAction.CONSIDER_LONG, DecisionAction.CONSIDER_SHORT)
             and decision.confidence >= self.min_confidence
             and decision.score.final_score > 0
@@ -165,7 +182,7 @@ class PortfolioEngine:
 
         # Correlation group control: scale down BTC-correlated group if overweight
         corr_total = sum(
-            p.target_weight for p in positions if p.symbol in BTC_CORRELATED
+            p.target_weight for p in positions if p.symbol in self.btc_correlated_symbols
         )
         if corr_total > self.max_correlated_group_weight and corr_total > 0:
             scale = self.max_correlated_group_weight / corr_total
@@ -173,11 +190,11 @@ class PortfolioEngine:
                 self._to_target_position(
                     decision=decision,
                     target_weight=p.target_weight * scale
-                    if p.symbol in BTC_CORRELATED
+                    if p.symbol in self.btc_correlated_symbols
                     else p.target_weight,
                     reason=(
                         f"Weight scaled by {scale:.3f} due to BTC-correlated group cap."
-                        if p.symbol in BTC_CORRELATED
+                        if p.symbol in self.btc_correlated_symbols
                         else p.reason
                     ),
                 )
