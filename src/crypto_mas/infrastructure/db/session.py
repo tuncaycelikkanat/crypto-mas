@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from crypto_mas.infrastructure.config.settings import get_settings
 
+settings = get_settings()
 db_url = settings.database_url
 # Fix Neon / Heroku style postgres:// URL to standard postgresql+psycopg:// or postgresql://
 if db_url.startswith("postgres://"):
