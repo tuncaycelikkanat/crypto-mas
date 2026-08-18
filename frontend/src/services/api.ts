@@ -13,6 +13,14 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+api.interceptors.request.use((config) => {
+  const apiKey = (typeof window !== 'undefined' && localStorage.getItem('api_key')) || import.meta.env.VITE_API_KEY || '';
+  if (apiKey) {
+    config.headers['X-API-Key'] = apiKey;
+  }
+  return config;
+});
+
 // Health
 export const getHealth = () => api.get<HealthStatus>('/health');
 export const getDbHealth = () => api.get<DatabaseHealth>('/health/db');

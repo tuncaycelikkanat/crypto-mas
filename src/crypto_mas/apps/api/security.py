@@ -9,16 +9,11 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 def verify_api_key(api_key: str | None = Security(api_key_header)) -> bool:
     """Verify the X-API-Key header against the configured api_security_key.
 
-    In production, a configured api_security_key is required.
-    In development, authentication is bypassed when api_security_key is empty.
+    If api_security_key is configured, it is strictly validated.
+    If api_security_key is empty/not configured, authentication is bypassed.
     """
     settings = get_settings()
     if not settings.api_security_key:
-        if settings.app_env == "production":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="API security key is not configured. Set API_SECURITY_KEY env variable.",
-            )
         return True
 
     if not api_key or api_key != settings.api_security_key:
