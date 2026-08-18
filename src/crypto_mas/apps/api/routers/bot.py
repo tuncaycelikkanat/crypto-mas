@@ -3,10 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
-from crypto_mas.apps.api.security import verify_api_key
-from crypto_mas.services.scheduler_service import SchedulerService
-
-router = APIRouter(prefix="/api/v1/bot", tags=["Trading Bot"], dependencies=[Depends(verify_api_key)])
+router = APIRouter(prefix="/api/v1/bot", tags=["Trading Bot"])
 
 def get_scheduler(request: Request) -> SchedulerService:
     return request.app.state.scheduler  # type: ignore
