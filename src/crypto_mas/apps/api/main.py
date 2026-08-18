@@ -131,20 +131,13 @@ app.include_router(scanner_router)
 app.include_router(audit_router)
 app.include_router(ws_risk_router)
 
-# Mount frontend static files
-frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../frontend/dist"))
-
-if os.path.exists(frontend_dir):
-    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dir, "assets")), name="assets")
-    
-    @app.get("/{full_path:path}")
-    async def serve_frontend(request: Request, full_path: str):
-        # Serve API routes normally, fallback others to index.html for React Router
-        if full_path.startswith("api/"):
-            return None
-            
-        file_path = os.path.join(frontend_dir, full_path)
-        if os.path.exists(file_path) and os.path.isfile(file_path):
-            return FileResponse(file_path)
-        
-        return FileResponse(os.path.join(frontend_dir, "index.html"))
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "service": settings.app_name,
+        "version": settings.app_version,
+        "environment": settings.app_env,
+        "trading_mode": settings.trading_mode,
+        "documentation": "/docs",
+    }
