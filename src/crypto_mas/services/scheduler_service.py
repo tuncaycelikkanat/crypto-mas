@@ -121,6 +121,21 @@ class SchedulerService:
             )
             logger.info(f"Bot {bot_id} started (POLLING) | mode={mode} | exchange={exchange.upper()} | interval={effective_interval}s | {len(symbols)} symbols | risk={risk_level}")
             
+            # Fire initial cycle immediately without waiting for first interval
+            import asyncio
+            asyncio.create_task(
+                self._run_cycle_task(
+                    symbols=symbols,
+                    mode=mode,
+                    exchange_str=exchange.upper(),
+                    risk_level=risk_level,
+                    use_btc_shield=use_btc_shield,
+                    use_htf_shield=use_htf_shield,
+                    use_regime_shield=use_regime_shield,
+                    bot_id=bot_id,
+                )
+            )
+
             for sym in symbols:
                 if sym not in ("AUTO_GAINERS", "HIDDEN_GEMS"):
                     self._event_service.get_ws_client().add_subscription(sym, "trade")
