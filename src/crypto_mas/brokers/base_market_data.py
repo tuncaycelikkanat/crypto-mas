@@ -1,6 +1,9 @@
-"""Shared utilities for market data provider adapters."""
-
 from datetime import UTC, datetime
+
+DEFAULT_MARKET_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+}
 
 
 def to_millis(value: datetime) -> int:

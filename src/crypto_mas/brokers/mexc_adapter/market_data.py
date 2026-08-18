@@ -5,8 +5,14 @@ from decimal import Decimal
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from crypto_mas.brokers.base_market_data import (
+    DEFAULT_MARKET_HEADERS,
+    from_millis,
+    is_leveraged_token,
+    is_stablecoin,
+    to_millis,
+)
 from crypto_mas.infrastructure.config.settings import get_settings
-from crypto_mas.brokers.base_market_data import to_millis, from_millis, is_stablecoin, is_leveraged_token
 from crypto_mas.services.market_data_service.interfaces import MarketDataProvider
 from crypto_mas.services.market_data_service.schemas import (
     Exchange,
@@ -28,7 +34,7 @@ class MexcMarketDataProvider(MarketDataProvider):
     async def fetch_symbols(self) -> list[MarketSymbol]:
         url = f"{self.base_url}/api/v3/exchangeInfo"
 
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(headers=DEFAULT_MARKET_HEADERS, timeout=20.0) as client:
             response = await client.get(url)
             response.raise_for_status()
             payload = response.json()
@@ -105,7 +111,7 @@ class MexcMarketDataProvider(MarketDataProvider):
         # Rate limit protection (MEXC can be strict)
         await asyncio.sleep(0.1)
 
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(headers=DEFAULT_MARKET_HEADERS, timeout=20.0) as client:
             response = await client.get(url, params=params)
             response.raise_for_status()
             payload = response.json()

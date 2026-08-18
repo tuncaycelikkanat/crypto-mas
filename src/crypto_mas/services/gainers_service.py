@@ -13,8 +13,18 @@ import httpx
 
 logger = logging.getLogger("crypto_mas.gainers")
 
-BINANCE_TICKER_URL = "https://api.binance.com/api/v3/ticker/24hr"
-MEXC_TICKER_URL = "https://api.mexc.com/api/v3/ticker/24hr"
+from crypto_mas.brokers.base_market_data import DEFAULT_MARKET_HEADERS
+
+BINANCE_TICKER_URLS = [
+    "https://data-api.binance.vision/api/v3/ticker/24hr",
+    "https://api1.binance.com/api/v3/ticker/24hr",
+    "https://api2.binance.com/api/v3/ticker/24hr",
+    "https://api.binance.com/api/v3/ticker/24hr",
+    "https://api.mexc.com/api/v3/ticker/24hr",
+]
+MEXC_TICKER_URLS = [
+    "https://api.mexc.com/api/v3/ticker/24hr",
+]
 
 
 async def fetch_gainers(
@@ -28,16 +38,24 @@ async def fetch_gainers(
     Returns top gainers sorted by 24h price change %.
     Includes computed RVOL proxy and pump score.
     """
-    url = BINANCE_TICKER_URL if exchange.upper() == "BINANCE" else MEXC_TICKER_URL
+    urls = BINANCE_TICKER_URLS if exchange.upper() == "BINANCE" else MEXC_TICKER_URLS
+    tickers = None
+    last_exc = None
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            tickers = resp.json()
-    except Exception as exc:
-        logger.error(f"Failed to fetch tickers from {exchange}: {exc}")
-        return {"error": str(exc), "gainers": [], "losers": [], "pumpwatch": []}
+    async with httpx.AsyncClient(headers=DEFAULT_MARKET_HEADERS, timeout=12.0) as client:
+        for url in urls:
+            try:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    tickers = resp.json()
+                    break
+            except Exception as exc:
+                last_exc = exc
+                continue
+
+    if tickers is None:
+        logger.error(f"Failed to fetch tickers from {exchange}: {last_exc}")
+        return {"error": str(last_exc), "gainers": [], "losers": [], "pumpwatch": []}
 
     # Filter to USDT pairs with sufficient volume
     usdt_tickers = []

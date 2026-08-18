@@ -5,9 +5,15 @@ from decimal import Decimal
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from crypto_mas.brokers.base_market_data import (
+    DEFAULT_MARKET_HEADERS,
+    from_millis,
+    is_leveraged_token,
+    is_stablecoin,
+    to_millis,
+)
 from crypto_mas.infrastructure.api_client.circuit_breaker import resilient
 from crypto_mas.infrastructure.config.settings import get_settings
-from crypto_mas.brokers.base_market_data import to_millis, from_millis, is_stablecoin, is_leveraged_token
 from crypto_mas.services.market_data_service.interfaces import MarketDataProvider
 from crypto_mas.services.market_data_service.schemas import (
     Exchange,
@@ -15,6 +21,14 @@ from crypto_mas.services.market_data_service.schemas import (
     OHLCVCandle,
     Timeframe,
 )
+
+BINANCE_MIRRORS = [
+    "https://data-api.binance.vision",
+    "https://api1.binance.com",
+    "https://api2.binance.com",
+    "https://api3.binance.com",
+    "https://api.binance.com",
+]
 
 
 class BinanceMarketDataProvider(MarketDataProvider):
@@ -28,12 +42,21 @@ class BinanceMarketDataProvider(MarketDataProvider):
 
     @resilient("binance_api", max_attempts=3)
     async def fetch_symbols(self) -> list[MarketSymbol]:
-        url = f"{self.base_url}/api/v3/exchangeInfo"
+        payload = None
+        urls = [f"{self.base_url}/api/v3/exchangeInfo"] + [f"{m}/api/v3/exchangeInfo" for m in BINANCE_MIRRORS if m != self.base_url]
+        
+        async with httpx.AsyncClient(headers=DEFAULT_MARKET_HEADERS, timeout=20.0) as client:
+            for url in urls:
+                try:
+                    response = await client.get(url)
+                    response.raise_for_status()
+                    payload = response.json()
+                    break
+                except Exception:
+                    continue
 
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            payload = response.json()
+        if payload is None:
+            raise httpx.HTTPError("All Binance exchangeInfo endpoints failed")
 
         symbols: list[MarketSymbol] = []
 
@@ -98,13 +121,26 @@ class BinanceMarketDataProvider(MarketDataProvider):
         if end_time is not None:
             params["endTime"] = to_millis(end_time)
 
-        # Rate limit protection
-        await asyncio.sleep(0.1)
+        urls = [f"{self.base_url}/api/v3/klines"] + [f"{m}/api/v3/klines" for m in BINANCE_MIRRORS if m != self.base_url]
+        payload = None
+        last_exc = None
 
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            payload = response.json()
+        async with httpx.AsyncClient(headers=DEFAULT_MARKET_HEADERS, timeout=15.0) as client:
+            for url in urls:
+                try:
+                    await asyncio.sleep(0.05)
+                    response = await client.get(url, params=params)
+                    response.raise_for_status()
+                    payload = response.json()
+                    break
+                except Exception as exc:
+                    last_exc = exc
+                    continue
+
+        if payload is None:
+            if last_exc:
+                raise last_exc
+            raise httpx.HTTPError(f"All Binance klines endpoints failed for {symbol}")
 
         candles: list[OHLCVCandle] = []
 
