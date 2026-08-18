@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from crypto_mas.domain.models.optimization_history import OptimizationHistory
 from crypto_mas.infrastructure.config.settings import get_settings
+from crypto_mas.infrastructure.db.session import get_db_session
 from crypto_mas.services.auto_optimizer_service import AutoOptimizerService
 from crypto_mas.services.market_data_service.schemas import Timeframe
 
