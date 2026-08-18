@@ -118,12 +118,11 @@ class StrategyOrchestrator:
             if snap_time.tzinfo is None:
                 snap_time = snap_time.replace(tzinfo=UTC)
             if now - snap_time > max_allowed_delay:
-                err_msg = f"STALE DATA DETECTED for {symbol}: Latest snapshot timestamp {latest_snapshot.timestamp} is older than allowed {max_allowed_delay} from now {now}. Kill-Switch triggered."
-                if is_backtest:
-                    continue
-                else:
-                    logger.error("[Cycle %s] %s", display_id, err_msg)
-                    raise ValueError(err_msg)
+                err_msg = f"STALE DATA DETECTED for {symbol}: Latest snapshot timestamp {latest_snapshot.timestamp} is older than allowed {max_allowed_delay} from now {now}."
+                logger.warning("[Cycle %s] %s. Skipping symbol.", display_id, err_msg)
+                if not is_backtest:
+                    _log("STRATEGY", f"Skipped {symbol}: Data is stale (last update: {snap_time.strftime('%Y-%m-%d %H:%M')})", "WARN")
+                continue
 
             htf_snapshots = []
             if htf and use_htf_shield:

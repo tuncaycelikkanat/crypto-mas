@@ -60,17 +60,18 @@ async def test_kill_switch_triggered_on_stale_data(db_session, test_account):
     service.strategy_orchestrator.feature_snapshot_repository = service.feature_snapshot_repository
     service.market_data_orchestrator.feature_snapshot_repository = service.feature_snapshot_repository
     
-    with pytest.raises(Exception, match="STALE DATA DETECTED"):
-        await service.run_cycle(
-            account_name=test_account.name,
-            symbols=["BTCUSDT"],
-            timeframe=Timeframe.ONE_HOUR,
-            trigger="TEST",
-        )
+    cycle = await service.run_cycle(
+        account_name=test_account.name,
+        symbols=["BTCUSDT"],
+        timeframe=Timeframe.ONE_HOUR,
+        trigger="TEST",
+    )
+    assert cycle.decisions_made == 0
+    assert cycle.trades_executed == 0
         
     db_cycle = db_session.query(TradingCycle).order_by(TradingCycle.id.desc()).first()
     assert db_cycle is not None
-    assert db_cycle.status == "FAILED"
+    assert db_cycle.status == "COMPLETED"
 
 @pytest.mark.asyncio
 async def test_kill_switch_passes_on_fresh_data(db_session, test_account):
