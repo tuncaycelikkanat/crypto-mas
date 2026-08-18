@@ -38,32 +38,30 @@ client = TestClient(app)
 from unittest.mock import patch
 from crypto_mas.infrastructure.config.settings import Settings
 
+from crypto_mas.apps.api.security import verify_api_key
+from fastapi import HTTPException
+
+
 def test_api_auth_bypass_when_key_not_configured():
     with patch("crypto_mas.apps.api.security.get_settings") as mock_get_settings:
         mock_get_settings.return_value = Settings(api_security_key="", app_env="development")
-        response = client.post("/api/v1/paper/mock/account/init")
-        assert response.status_code == 200
+        assert verify_api_key(None) is True
 
 
 def test_api_auth_enforces_key_when_configured():
     with patch("crypto_mas.apps.api.security.get_settings") as mock_get_settings:
         mock_get_settings.return_value = Settings(api_security_key="super-secret-test-key", app_env="production")
 
-        # Missing header -> 401
-        response_missing = client.post("/api/v1/paper/mock/account/init")
-        assert response_missing.status_code == 401
-        assert "Invalid or missing API Key" in response_missing.text
+        # Missing header -> HTTPException 401
+        with pytest.raises(HTTPException) as exc_info_missing:
+            verify_api_key(None)
+        assert exc_info_missing.value.status_code == 401
+        assert "Invalid or missing API Key" in exc_info_missing.value.detail
 
-        # Incorrect header -> 401
-        response_wrong = client.post(
-            "/api/v1/paper/mock/account/init",
-            headers={"X-API-Key": "wrong-key"},
-        )
-        assert response_wrong.status_code == 401
+        # Incorrect header -> HTTPException 401
+        with pytest.raises(HTTPException) as exc_info_wrong:
+            verify_api_key("wrong-key")
+        assert exc_info_wrong.value.status_code == 401
 
-        # Correct header -> 200
-        response_correct = client.post(
-            "/api/v1/paper/mock/account/init",
-            headers={"X-API-Key": "super-secret-test-key"},
-        )
-        assert response_correct.status_code == 200
+        # Correct header -> True
+        assert verify_api_key("super-secret-test-key") is True

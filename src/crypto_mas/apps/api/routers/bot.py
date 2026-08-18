@@ -24,12 +24,12 @@ class StartBotRequest(BaseModel):
 
 
 @router.get("/status")
-def get_bot_status(scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
+async def get_bot_status(scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
     return scheduler.get_status()
 
 
 @router.post("/start")
-def start_bot(request: StartBotRequest, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
+async def start_bot(request: StartBotRequest, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
     return scheduler.start_bot(
         bot_id=request.bot_id,
         interval_seconds=request.interval_seconds,
@@ -48,12 +48,12 @@ class UpdateSymbolsRequest(BaseModel):
 
 
 @router.post("/stop/{bot_id}")
-def stop_bot(bot_id: str, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
+async def stop_bot(bot_id: str, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
     return scheduler.stop_bot(bot_id)
 
 
 @router.put("/symbols/{bot_id}")
-def update_bot_symbols(bot_id: str, request: UpdateSymbolsRequest, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
+async def update_bot_symbols(bot_id: str, request: UpdateSymbolsRequest, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
     return scheduler.update_symbols(bot_id, request.symbols)
 
 
@@ -62,5 +62,5 @@ class UpdateRiskRequest(BaseModel):
 
 
 @router.put("/risk/{bot_id}")
-def update_bot_risk(bot_id: str, request: UpdateRiskRequest, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
+async def update_bot_risk(bot_id: str, request: UpdateRiskRequest, scheduler: SchedulerService = Depends(get_scheduler)) -> dict[str, Any]:
     return scheduler.update_risk(bot_id, request.risk_level)

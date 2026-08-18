@@ -110,31 +110,18 @@ class SchedulerService:
             # Scalping with fixed symbols → event_service
             self._event_service.start_bot(bot_id, symbols, mode, exchange, risk_level)
         else:
+            from datetime import datetime
             interval_trigger = IntervalTrigger(seconds=effective_interval, timezone=UTC)
             self._scheduler.add_job(
                 self._run_cycle_task,
                 trigger=interval_trigger,
+                next_run_time=datetime.now(UTC),
                 args=[symbols, mode, exchange.upper(), risk_level, use_btc_shield, use_htf_shield, use_regime_shield, bot_id],
                 id=bot_id,
                 name=f"Bot Instance: {bot_id}",
                 replace_existing=True,
             )
             logger.info(f"Bot {bot_id} started (POLLING) | mode={mode} | exchange={exchange.upper()} | interval={effective_interval}s | {len(symbols)} symbols | risk={risk_level}")
-            
-            # Fire initial cycle immediately without waiting for first interval
-            import asyncio
-            asyncio.create_task(
-                self._run_cycle_task(
-                    symbols=symbols,
-                    mode=mode,
-                    exchange_str=exchange.upper(),
-                    risk_level=risk_level,
-                    use_btc_shield=use_btc_shield,
-                    use_htf_shield=use_htf_shield,
-                    use_regime_shield=use_regime_shield,
-                    bot_id=bot_id,
-                )
-            )
 
             for sym in symbols:
                 if sym not in ("AUTO_GAINERS", "HIDDEN_GEMS"):

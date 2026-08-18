@@ -160,7 +160,7 @@ class TradingCycleService:
         is_backtest = trigger.startswith("BACKTEST-")
         if not is_backtest:
             self.cycle_repository.add(cycle)
-            await run_sync(self.db.commit)
+            self.db.commit()
             display_id = cycle.id
         else:
             display_id = cycle_index if cycle_index is not None else 0
@@ -269,7 +269,7 @@ class TradingCycleService:
             
             if not trigger.startswith("BACKTEST-"):
                 cycle.status = "COMPLETED"
-                await run_sync(self.db.commit)
+                self.db.commit()
             cycle.trades_executed = len(decisions)
 
             
@@ -280,7 +280,7 @@ class TradingCycleService:
             _log("FAILED", f"Critical error in cycle {display_id}: {str(e)}", "ERROR")
             self.cycle_repository.update_status(cycle.id, "FAILED")
             if not trigger.startswith("BACKTEST-"):
-                await run_sync(self.db.commit)
+                self.db.commit()
             raise e
 
     def _apply_risk_and_execute(self, decisions, timeframe, cycle, account_name, _log, open_positions: list[str], strategy_id: str | None = None, risk_level: int = 100):
