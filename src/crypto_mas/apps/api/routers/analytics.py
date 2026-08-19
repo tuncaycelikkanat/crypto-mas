@@ -11,60 +11,53 @@ from crypto_mas.domain.repositories.paper_account_repository import PaperAccount
 from crypto_mas.domain.repositories.position_repository import PositionRepository
 from crypto_mas.domain.repositories.trade_repository import TradeRepository
 from crypto_mas.domain.repositories.trading_cycle_repository import TradingCycleRepository
-from crypto_mas.infrastructure.db.session import SessionLocal
+from crypto_mas.infrastructure.db.session import get_db_session
 from crypto_mas.services.scheduler_service import SchedulerService
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics"])
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
 
 @router.post("/reset")
-def reset_analytics(db: Session = Depends(get_db)) -> dict[str, Any]:
-    from sqlalchemy import inspect
-    inspector = inspect(db.get_bind())
-    existing_tables = set(inspector.get_table_names())
+def reset_analytics(db: Session = Depends(get_db_session)) -> dict[str, Any]:
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.get_bind())
+        existing_tables = set(inspector.get_table_names())
 
-    # Delete child tables first to respect Foreign Key constraints
-    target_tables = [
-        "execution_logs",
-        "trades",
-        "orders",
-        "positions",
-        "trading_cycles",
-        "system_events",
-        "llm_audit_logs",
-        "committee_decisions",
-        "shadow_mode_trades",
-    ]
+        # Delete child tables first to respect Foreign Key constraints
+        target_tables = [
+            "execution_logs",
+            "trades",
+            "orders",
+            "positions",
+            "trading_cycles",
+            "system_events",
+            "llm_audit_logs",
+            "committee_decisions",
+            "shadow_mode_trades",
+        ]
 
-    for table_name in target_tables:
-        if table_name in existing_tables:
+        for table_name in target_tables:
+            if table_name in existing_tables:
+                try:
+                    db.execute(text(f"DELETE FROM {table_name}"))
+                except Exception:
+                    pass
+
+        if "paper_accounts" in existing_tables:
             try:
-                db.execute(text(f"DELETE FROM {table_name}"))
+                db.execute(text("UPDATE paper_accounts SET cash_balance = initial_balance, equity = initial_balance WHERE name NOT LIKE 'backtest-%'"))
             except Exception:
                 pass
 
-    if "paper_accounts" in existing_tables:
-        try:
-            db.execute(text("UPDATE paper_accounts SET cash_balance = initial_balance, equity = initial_balance WHERE name NOT LIKE 'backtest-%'"))
-        except Exception:
-            pass
-
-    try:
         db.commit()
-    except Exception:
+        return {"status": "success", "message": "All analytics and PnL reset successfully"}
+    except Exception as e:
         db.rollback()
-
-    return {"status": "success", "message": "All analytics and PnL reset successfully"}
+        return {"status": "error", "message": str(e)}
 
 @router.get("/summary")
-def get_summary(db: Session = Depends(get_db), account_name: str = "default-paper") -> dict[str, Any]:
+def get_summary(db: Session = Depends(get_db_session), account_name: str = "default-paper") -> dict[str, Any]:
     account_repo = PaperAccountRepository(db)
     trade_repo = TradeRepository(db)
     position_repo = PositionRepository(db)
