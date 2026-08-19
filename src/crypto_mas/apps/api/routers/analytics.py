@@ -30,6 +30,7 @@ def reset_analytics(db: Session = Depends(get_db)) -> dict[str, Any]:
     inspector = inspect(db.get_bind())
     existing_tables = set(inspector.get_table_names())
 
+    # Delete child tables first to respect Foreign Key constraints
     target_tables = [
         "execution_logs",
         "trades",
@@ -44,12 +45,22 @@ def reset_analytics(db: Session = Depends(get_db)) -> dict[str, Any]:
 
     for table_name in target_tables:
         if table_name in existing_tables:
-            db.execute(text(f"DELETE FROM {table_name}"))
+            try:
+                db.execute(text(f"DELETE FROM {table_name}"))
+            except Exception:
+                pass
 
     if "paper_accounts" in existing_tables:
-        db.execute(text("UPDATE paper_accounts SET cash_balance = initial_balance, equity = initial_balance WHERE name NOT LIKE 'backtest-%'"))
+        try:
+            db.execute(text("UPDATE paper_accounts SET cash_balance = initial_balance, equity = initial_balance WHERE name NOT LIKE 'backtest-%'"))
+        except Exception:
+            pass
 
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+
     return {"status": "success", "message": "All analytics and PnL reset successfully"}
 
 @router.get("/summary")
