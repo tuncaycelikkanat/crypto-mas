@@ -181,7 +181,7 @@ const PaperTrading: React.FC = () => {
   };
 
   const bots = botStatus?.bots || [];
-  const riskLabel = (v: number) => v < 33 ? 'Conservative' : v < 66 ? 'Balanced' : 'Aggressive';
+  const riskLabel = (v: number) => v < 50 ? 'Conservative' : v <= 100 ? 'Balanced' : v <= 150 ? 'Aggressive' : 'Hyper-Aggressive (Max)';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -382,13 +382,13 @@ const PaperTrading: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                       <label className="section-label">Risk Level Setting</label>
                       <span className="mono" style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)' }}>
-                        {currentRisk} / 100 — {riskLabel(currentRisk)}
+                        {currentRisk} / 200 — {riskLabel(currentRisk)}
                       </span>
                     </div>
                     <input
                       type="range"
                       min="0"
-                      max="100"
+                      max="200"
                       value={currentRisk}
                       onChange={e => setEditingRiskLevels({ ...editingRiskLevels, [bot.bot_id]: +e.target.value })}
                       onMouseUp={e => handleRiskChange(bot.bot_id, +(e.target as HTMLInputElement).value)}
@@ -644,13 +644,13 @@ const PaperTrading: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <div className="section-label">Risk Level Setting</div>
                   <span className="mono" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {configRiskLevel} — {riskLabel(configRiskLevel)}
+                    {configRiskLevel} / 200 — {riskLabel(configRiskLevel)}
                   </span>
                 </div>
                 <input
                   type="range"
                   min="0"
-                  max="100"
+                  max="200"
                   value={configRiskLevel}
                   onChange={e => setConfigRiskLevel(+e.target.value)}
                 />
