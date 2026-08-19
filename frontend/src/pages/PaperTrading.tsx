@@ -397,11 +397,26 @@ const PaperTrading: React.FC = () => {
                   
                   {/* Live Risk Slider */}
                   <div style={{ marginBottom: 18 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <label className="section-label">Risk Level Setting</label>
-                      <span className="mono" style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)' }}>
-                        {currentRisk} / 200 — {riskLabel(currentRisk)}
-                      </span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <label className="section-label">Risk Level Setting (0-200)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input
+                          type="number"
+                          min="0"
+                          max="200"
+                          className="form-input mono"
+                          style={{ width: '68px', padding: '3px 8px', fontSize: '0.8rem', textAlign: 'center' }}
+                          value={currentRisk}
+                          onChange={e => {
+                            const val = Math.max(0, Math.min(200, +e.target.value));
+                            setEditingRiskLevels({ ...editingRiskLevels, [bot.bot_id]: val });
+                            handleRiskChange(bot.bot_id, val);
+                          }}
+                        />
+                        <span className="mono" style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)' }}>
+                          / 200 — {riskLabel(currentRisk)}
+                        </span>
+                      </div>
                     </div>
                     <input
                       type="range"
@@ -412,6 +427,22 @@ const PaperTrading: React.FC = () => {
                       onMouseUp={e => handleRiskChange(bot.bot_id, +(e.target as HTMLInputElement).value)}
                       onTouchEnd={e => handleRiskChange(bot.bot_id, +(e.target as HTMLInputElement).value)}
                     />
+                    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                      {[25, 50, 100, 150, 200].map(val => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => {
+                            setEditingRiskLevels({ ...editingRiskLevels, [bot.bot_id]: val });
+                            handleRiskChange(bot.bot_id, val);
+                          }}
+                          className={currentRisk === val ? 'btn-primary' : 'btn-secondary'}
+                          style={{ padding: '2px 8px', fontSize: '0.72rem' }}
+                        >
+                          {val}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Symbol Management */}
@@ -659,11 +690,22 @@ const PaperTrading: React.FC = () => {
 
               {/* Risk Slider */}
               <div style={{ marginBottom: 20 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div className="section-label">Risk Level Setting</div>
-                  <span className="mono" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {configRiskLevel} / 200 — {riskLabel(configRiskLevel)}
-                  </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div className="section-label">Risk Level Setting (0-200)</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="200"
+                      className="form-input mono"
+                      style={{ width: '68px', padding: '3px 8px', fontSize: '0.8rem', textAlign: 'center' }}
+                      value={configRiskLevel}
+                      onChange={e => setConfigRiskLevel(Math.max(0, Math.min(200, +e.target.value)))}
+                    />
+                    <span className="mono" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      / 200 — {riskLabel(configRiskLevel)}
+                    </span>
+                  </div>
                 </div>
                 <input
                   type="range"
@@ -672,6 +714,19 @@ const PaperTrading: React.FC = () => {
                   value={configRiskLevel}
                   onChange={e => setConfigRiskLevel(+e.target.value)}
                 />
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  {[25, 50, 100, 150, 200].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setConfigRiskLevel(val)}
+                      className={configRiskLevel === val ? 'btn-primary' : 'btn-secondary'}
+                      style={{ padding: '2px 8px', fontSize: '0.72rem' }}
+                    >
+                      {val}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Symbol Source */}
