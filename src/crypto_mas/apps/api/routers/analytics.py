@@ -260,14 +260,14 @@ def get_coin_details(symbol: str, db: Session = Depends(get_db_session)) -> dict
 @router.get("/logs")
 def get_all_logs(
     db: Session = Depends(get_db_session),
-    account_name: str = "default-paper",
-    limit: int = Query(default=200, ge=1, le=1000),
+    account_name: str | None = Query(default=None),
+    limit: int = Query(default=300, ge=1, le=1000),
     stage: str | None = Query(default=None),
     symbol: str | None = Query(default=None),
     level: str | None = Query(default=None),
 ) -> dict[str, Any]:
     log_repo = ExecutionLogRepository(db)
-    all_logs = log_repo.list_recent(account_name, limit=limit * 3)  # Fetch extra to allow filtering
+    all_logs = log_repo.list_recent(account_name=account_name, limit=limit * 3)  # Fetch extra to allow filtering
     
     logs_data = []
     for log in reversed(all_logs):  # chronological
@@ -295,9 +295,13 @@ def get_all_logs(
     return {"logs": logs_data, "count": len(logs_data)}
 
 @router.delete("/logs")
-def clear_all_logs(db: Session = Depends(get_db_session), account_name: str = "default-paper") -> dict[str, Any]:
+def clear_all_logs(db: Session = Depends(get_db_session), account_name: str | None = Query(default=None)) -> dict[str, Any]:
     log_repo = ExecutionLogRepository(db)
-    log_repo.clear_all(account_name)
+    if account_name:
+        log_repo.clear_all(account_name)
+    else:
+        db.execute(text("DELETE FROM execution_logs"))
+        db.commit()
     return {"status": "ok", "message": "Logs cleared"}
 
 @router.get("/cycles")

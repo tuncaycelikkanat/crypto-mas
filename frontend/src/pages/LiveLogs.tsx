@@ -33,7 +33,7 @@ const LEVEL_COLOR: Record<string, string> = {
 function formatTime(iso: string) {
   try {
     const d = new Date(iso);
-    return d.toLocaleTimeString('tr-TR', { hour12: false });
+    return d.toLocaleTimeString('en-US', { hour12: false });
   } catch (e) {
     return iso;
   }
@@ -167,10 +167,10 @@ const DetailPanel: React.FC<{ log: LogEntry | null }> = ({ log }) => {
       }} className="text-muted">
         <Terminal size={40} opacity={0.25} />
         <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-          Detay Paneli
+          Detail Inspector
         </p>
         <p style={{ fontSize: '0.8rem', maxWidth: 280, margin: 0 }}>
-          Soldaki listeden bir log kaydına tıkladığınızda tüm JSON parametreleri burada incelenebilir.
+          Select any log entry from the stream to inspect its execution context, state, and payload.
         </p>
       </div>
     );
@@ -210,13 +210,13 @@ const DetailPanel: React.FC<{ log: LogEntry | null }> = ({ log }) => {
             {log.message}
           </p>
           <p className="text-muted mono" style={{ fontSize: '0.72rem', margin: '6px 0 0' }}>
-            {new Date(log.created_at).toLocaleString('tr-TR')}
+            {new Date(log.created_at).toLocaleString('en-US')}
           </p>
         </div>
         {log.payload && (
           <button onClick={handleCopy} className="btn-secondary" style={{ padding: '5px 10px', fontSize: '0.75rem' }}>
             {copied ? <CheckCheck size={13} /> : <Copy size={13} />}
-            {copied ? 'Kopyalandı' : 'JSON Kopyala'}
+            {copied ? 'Copied' : 'Copy JSON'}
           </button>
         )}
       </div>
@@ -229,7 +229,7 @@ const DetailPanel: React.FC<{ log: LogEntry | null }> = ({ log }) => {
         {log.payload ? (
           <JsonNode data={log.payload} depth={0} />
         ) : (
-          <div className="text-muted" style={{ fontStyle: 'italic', fontSize: '0.8rem' }}>Bu log için ek parametre (payload) bulunmuyor.</div>
+          <div className="text-muted" style={{ fontStyle: 'italic', fontSize: '0.8rem' }}>No additional payload data for this execution step.</div>
         )}
       </div>
     </motion.div>
@@ -326,7 +326,7 @@ const LiveLogs: React.FC = () => {
       if (res.data?.logs) {
         setLogs(res.data.logs);
         setLiveCount(res.data.count);
-        setLastUpdated(new Date().toLocaleTimeString('tr-TR'));
+        setLastUpdated(new Date().toLocaleTimeString('en-US'));
         setSelectedLog(prev => prev || (res.data.logs.length > 0 ? res.data.logs[0] : null));
       }
     } catch (err) {
@@ -411,12 +411,12 @@ const LiveLogs: React.FC = () => {
             style={{ padding: '6px 12px', fontSize: '0.75rem' }}
           >
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-            Yenile
+            Refresh
           </button>
           
           <button
             onClick={async () => {
-              if (window.confirm('Tüm geçmiş logları silmek istediğinize emin misiniz?')) {
+              if (window.confirm('Are you sure you want to clear all execution log history?')) {
                 setLoading(true);
                 try {
                   await deleteAnalyticsLogs();
@@ -429,7 +429,7 @@ const LiveLogs: React.FC = () => {
             style={{ padding: '6px 12px', fontSize: '0.75rem' }}
           >
             <X size={13} />
-            Temizle
+            Clear Logs
           </button>
         </div>
       </div>
@@ -439,17 +439,17 @@ const LiveLogs: React.FC = () => {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="text-muted" style={{ fontSize: '0.82rem' }}>
-              Ham JSON log kaydı (Son {logs.length} adet). Tek tıkla kopyalayıp analiz için paylaşabilirsiniz.
+              Raw JSON execution logs (Last {logs.length} entries). Copy for diagnostics and auditing.
             </span>
             <button
               onClick={() => {
                 navigator.clipboard.writeText(JSON.stringify(logs, null, 2));
-                alert("Debug log kopyalandı!");
+                alert("Debug logs copied to clipboard!");
               }}
               className="btn-primary"
               style={{ fontSize: '0.8rem' }}
             >
-              <Copy size={14} /> Tümünü Kopyala
+              <Copy size={14} /> Copy All
             </button>
           </div>
           <textarea
@@ -478,7 +478,7 @@ const LiveLogs: React.FC = () => {
             flexShrink: 0, flexWrap: 'wrap'
           }}>
             <Filter size={14} className="text-muted" />
-            <span className="section-label" style={{ fontSize: '0.65rem' }}>Filtre:</span>
+            <span className="section-label" style={{ fontSize: '0.65rem' }}>Filters:</span>
 
             {/* Stages */}
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -524,7 +524,7 @@ const LiveLogs: React.FC = () => {
               <input
                 value={filterSymbol}
                 onChange={e => setFilterSymbol(e.target.value)}
-                placeholder="Sembol ara…"
+                placeholder="Search symbol..."
                 className="form-input mono"
                 style={{ paddingLeft: '28px', width: '140px', height: '28px', fontSize: '0.75rem' }}
               />
@@ -568,7 +568,7 @@ const LiveLogs: React.FC = () => {
                 position: 'sticky', top: 0, background: 'var(--bg-surface)', zIndex: 1,
                 backdropFilter: 'blur(12px)'
               }}>
-                {['Saat', 'Aşama', 'Mesaj', ''].map(h => (
+                {['Time', 'Stage', 'Message', ''].map(h => (
                   <span key={h} className="section-label" style={{ fontSize: '0.65rem' }}>
                     {h}
                   </span>
@@ -578,7 +578,7 @@ const LiveLogs: React.FC = () => {
               {logs.length === 0 ? (
                 <div style={{ padding: '80px 20px', textAlign: 'center' }} className="text-muted">
                   <Terminal size={40} opacity={0.2} style={{ marginBottom: 14 }} />
-                  <p style={{ fontSize: '0.85rem' }}>Henüz log kaydı bulunmuyor.</p>
+                  <p style={{ fontSize: '0.85rem' }}>No execution logs found.</p>
                 </div>
               ) : (
                 logs.map(log => (
