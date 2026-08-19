@@ -1,6 +1,6 @@
-
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import { Welcome } from './pages/Welcome';
 import Dashboard from './pages/Dashboard';
 import MarketRadar from './pages/MarketRadar';
 import Backtesting from './pages/Backtesting';
@@ -14,13 +14,16 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
+          <Route index element={<Welcome />} />
+          <Route path="dashboard" element={<Dashboard />} />
           <Route path="radar" element={<MarketRadar />} />
-          <Route path="backtesting" element={<Backtesting />} />
           <Route path="paper" element={<PaperTrading />} />
-          <Route path="decisions" element={<Decisions />} />
-          <Route path="logs" element={<LiveLogs />} />
+          <Route path="backtesting" element={<Backtesting />} />
           <Route path="optimization" element={<AutoOptimizer />} />
+          <Route path="logs" element={<LiveLogs />} />
+          <Route path="decisions" element={<Decisions />} />
+          {/* Fallback to Welcome */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

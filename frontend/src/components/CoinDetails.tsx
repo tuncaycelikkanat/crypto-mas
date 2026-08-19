@@ -48,55 +48,53 @@ export const CoinDetails: React.FC = () => {
   if (symbols.length === 0) return null;
 
   return (
-    <div style={{ marginTop: '32px' }}>
-      <h2 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>Live Markets</h2>
+    <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <h2 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>Live Markets</h2>
       
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', overflowX: 'auto', paddingBottom: '8px' }}>
-        {symbols.map(sym => (
-          <button
-            key={sym}
-            onClick={() => setSelectedSymbol(sym)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
-              border: '1px solid',
-              borderColor: selectedSymbol === sym ? 'var(--primary)' : 'rgba(255,255,255,0.1)',
-              background: selectedSymbol === sym ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
-              color: selectedSymbol === sym ? 'var(--primary)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s'
-            }}
-          >
-            {sym}
-          </button>
-        ))}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
+        {symbols.map(sym => {
+          const isSelected = selectedSymbol === sym;
+          return (
+            <button
+              key={sym}
+              onClick={() => setSelectedSymbol(sym)}
+              className={isSelected ? 'btn-primary' : 'btn-secondary'}
+              style={{
+                padding: '6px 14px',
+                fontSize: '0.8rem',
+                fontFamily: 'JetBrains Mono, monospace',
+              }}
+            >
+              {sym}
+            </button>
+          );
+        })}
       </div>
 
-      {loading && !coinData && <div style={{ color: 'var(--text-muted)' }}>Loading {selectedSymbol}...</div>}
+      {loading && !coinData && <div className="text-muted">Loading {selectedSymbol}…</div>}
       
       {coinData && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="glass-card" style={{ padding: '24px' }}>
-            <h3 style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card" style={{ padding: '22px 24px' }}>
+            <h3 style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>{coinData.symbol} Price Action</span>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+              <span className="mono text-muted" style={{ fontSize: '0.75rem' }}>
                 {coinData.timeframe} | {coinData.exchange}
               </span>
             </h3>
-            <div style={{ width: '100%', height: '300px' }}>
+            <div style={{ width: '100%', height: '280px' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={coinData.candles} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <AreaChart data={coinData.candles} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="colorClose" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <linearGradient id="coinGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--success)" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="var(--success)" stopOpacity={0.0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis 
                     dataKey="time" 
-                    stroke="var(--text-muted)" 
+                    stroke="var(--text-dim)" 
                     tickFormatter={(tick) => {
                       try {
                         const d = new Date(tick);
@@ -107,31 +105,30 @@ export const CoinDetails: React.FC = () => {
                       }
                     }} 
                   />
-                  <YAxis stroke="var(--text-muted)" domain={['auto', 'auto']} />
+                  <YAxis stroke="var(--text-dim)" domain={['auto', 'auto']} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: 'var(--bg-card)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                    itemStyle={{ color: '#fff' }}
+                    contentStyle={{ backgroundColor: 'var(--bg-raised)', borderColor: 'var(--border-hover)', borderRadius: '8px' }}
+                    itemStyle={{ color: 'var(--text-primary)' }}
                     labelFormatter={(label) => new Date(label).toLocaleString()}
                   />
-                  <Area type="monotone" dataKey="close" stroke="#10b981" fillOpacity={1} fill="url(#colorClose)" />
+                  <Area type="monotone" dataKey="close" stroke="var(--success)" strokeWidth={2} fillOpacity={1} fill="url(#coinGrad)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {coinData.features && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
               {Object.entries(coinData.features).map(([key, value]: [string, any]) => (
-                <div key={key} className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{key.replace(/_/g, ' ')}</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
+                <div key={key} className="card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div className="section-label">{key.replace(/_/g, ' ')}</div>
+                  <div className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--text-primary)' }}>
                     {typeof value === 'number' ? value.toFixed(4) : value}
                   </div>
                 </div>
               ))}
             </div>
           )}
-
 
         </div>
       )}

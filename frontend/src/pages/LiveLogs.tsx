@@ -3,38 +3,27 @@ import { getAnalyticsLogs, deleteAnalyticsLogs } from '../services/api';
 import type { LogEntry } from '../types/api';
 import {
   Terminal, RefreshCw, Filter, Search, Copy, CheckCheck,
-  ChevronRight, ChevronDown, Circle, Zap, Shield,
-  TrendingUp, Package, CheckCircle, XCircle,
-  BarChart2, Clock, Layers, X
+  ChevronRight, ChevronDown, Circle,
+  Clock, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Removed local LogEntry interface in favor of types/api.ts
-
 // ── Helpers ────────────────────────────────────────────────────
-const STAGE_META: Record<string, { icon: React.FC<any>; colorVar: string; label: string }> = {
-  INIT:         { icon: Zap,          colorVar: 'var(--accent)', label: 'Init'       },
-  STRATEGY:     { icon: TrendingUp,   colorVar: 'var(--purple-400)', label: 'Strategy'   },
-  PORTFOLIO:    { icon: Package,      colorVar: 'var(--success)', label: 'Portfolio'  },
-  RISK:         { icon: Shield,       colorVar: 'var(--warning)', label: 'Risk'       },
-  EXECUTION:    { icon: BarChart2,    colorVar: 'var(--danger)', label: 'Execution'  },
-  PAPER_BROKER: { icon: BarChart2,    colorVar: 'var(--danger)', label: 'Broker'     },
-  TRAILING_SL:  { icon: TrendingUp,   colorVar: 'var(--warning)', label: 'Trail SL'   },
-  COMPLETED:    { icon: CheckCircle,  colorVar: 'var(--success)', label: 'Completed'  },
-  FAILED:       { icon: XCircle,      colorVar: 'var(--danger)', label: 'Failed'     },
-  MARKET_DATA:  { icon: Layers,       colorVar: 'var(--text-muted)', label: 'Market'     },
-};
-
-const LEVEL_CLASS: Record<string, string> = {
-  INFO:    'badge-muted',
-  SUCCESS: 'badge-success',
-  WARN:    'badge-warning',
-  WARNING: 'badge-warning',
-  ERROR:   'badge-danger',
+const STAGE_META: Record<string, { label: string }> = {
+  INIT:         { label: 'Init'       },
+  STRATEGY:     { label: 'Strategy'   },
+  PORTFOLIO:    { label: 'Portfolio'  },
+  RISK:         { label: 'Risk'       },
+  EXECUTION:    { label: 'Execution'  },
+  PAPER_BROKER: { label: 'Broker'     },
+  TRAILING_SL:  { label: 'Trail SL'   },
+  COMPLETED:    { label: 'Completed'  },
+  FAILED:       { label: 'Failed'     },
+  MARKET_DATA:  { label: 'Market'     },
 };
 
 const LEVEL_COLOR: Record<string, string> = {
-  INFO:    'var(--text-muted)',
+  INFO:    'var(--text-secondary)',
   SUCCESS: 'var(--success)',
   WARN:    'var(--warning)',
   WARNING: 'var(--warning)',
@@ -42,14 +31,18 @@ const LEVEL_COLOR: Record<string, string> = {
 };
 
 function formatTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleTimeString('tr-TR', { hour12: false });
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('tr-TR', { hour12: false });
+  } catch (e) {
+    return iso;
+  }
 }
 
-// ── JSON Viewer ───────────────────────────────────────────────
+// ── Interactive JSON Tree Viewer ───────────────────────────────
 const JsonNode: React.FC<{ data: any; depth?: number; label?: string }> = ({ data, depth = 0, label }) => {
   const [open, setOpen] = useState(depth < 2);
-  const indent = depth * 16;
+  const indent = depth * 14;
 
   if (data === null || data === undefined) {
     return (
@@ -73,7 +66,7 @@ const JsonNode: React.FC<{ data: any; depth?: number; label?: string }> = ({ dat
     return (
       <div style={{ paddingLeft: indent }} className="mono">
         {label && <span className="text-muted">{label}: </span>}
-        <span className="text-accent">{data}</span>
+        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{data}</span>
       </div>
     );
   }
@@ -102,7 +95,7 @@ const JsonNode: React.FC<{ data: any; depth?: number; label?: string }> = ({ dat
           onClick={() => setOpen(o => !o)}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, userSelect: 'none' }}
         >
-          {open ? <ChevronDown size={14} className="text-muted" /> : <ChevronRight size={14} className="text-muted" />}
+          {open ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
           {label && <span className="text-muted">{label}</span>}
           <span className="text-muted">[{data.length}]</span>
         </div>
@@ -135,9 +128,9 @@ const JsonNode: React.FC<{ data: any; depth?: number; label?: string }> = ({ dat
           onClick={() => setOpen(o => !o)}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, userSelect: 'none' }}
         >
-          {open ? <ChevronDown size={14} className="text-muted" /> : <ChevronRight size={14} className="text-muted" />}
+          {open ? <ChevronDown size={13} className="text-muted" /> : <ChevronRight size={13} className="text-muted" />}
           {label && <span className="text-muted">{label}</span>}
-          {!open && <span className="text-muted" style={{ fontSize: '0.75rem' }}>{'{'}{keys.slice(0, 3).join(', ')}{keys.length > 3 ? '...' : ''}{'}'}</span>}
+          {!open && <span className="text-muted" style={{ fontSize: '0.75rem' }}>{'{'}{keys.slice(0, 3).join(', ')}{keys.length > 3 ? '…' : ''}{'}'}</span>}
         </div>
         <AnimatePresence>
           {open && (
@@ -172,28 +165,27 @@ const DetailPanel: React.FC<{ log: LogEntry | null }> = ({ log }) => {
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', height: '100%', gap: 12, padding: 32, textAlign: 'center'
       }} className="text-muted">
-        <Terminal size={48} opacity={0.3} />
-        <p style={{ fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-secondary)', margin: 0 }}>
-          Detay Panel Bekleniyor
+        <Terminal size={40} opacity={0.25} />
+        <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+          Detay Paneli
         </p>
-        <p style={{ fontSize: '0.85rem', maxWidth: 280, margin: 0 }}>
-          Soldaki listeden herhangi bir log kaydına tıkladığınızda tüm işlem parametreleri ve JSON verisi burada görüntülenecektir.
+        <p style={{ fontSize: '0.8rem', maxWidth: 280, margin: 0 }}>
+          Soldaki listeden bir log kaydına tıkladığınızda tüm JSON parametreleri burada incelenebilir.
         </p>
       </div>
     );
   }
 
-  const meta = STAGE_META[log.stage] || { icon: Circle, colorVar: 'var(--text-muted)', label: log.stage };
-  const Icon = meta.icon;
-  const badgeClass = LEVEL_CLASS[log.level.toUpperCase()] || 'badge-muted';
+  const meta = STAGE_META[log.stage] || { label: log.stage };
+  const badgeClass = `badge-${log.level.toLowerCase() === 'error' ? 'danger' : log.level.toLowerCase() === 'success' ? 'success' : log.level.toLowerCase().includes('warn') ? 'warning' : 'primary'}`;
 
   return (
     <motion.div
       key={log.id}
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      transition={{ duration: 0.2 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
       style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
     >
       {/* Header */}
@@ -204,41 +196,40 @@ const DetailPanel: React.FC<{ log: LogEntry | null }> = ({ log }) => {
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Icon size={16} color={meta.colorVar} />
-            <span style={{ color: meta.colorVar, fontWeight: 600, fontSize: '0.85rem' }} className="mono">
-              {log.stage}
+            <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.82rem' }} className="mono">
+              [{meta.label}]
             </span>
-            <span className={`badge ${badgeClass}`}>
+            <span className={`badge ${badgeClass}`} style={{ fontSize: '0.68rem' }}>
               {log.level}
             </span>
             {log.cycle_id && (
-              <span style={{ fontSize: '0.7rem' }} className="text-muted">Cycle #{log.cycle_id}</span>
+              <span style={{ fontSize: '0.7rem' }} className="text-muted mono">Cycle #{log.cycle_id}</span>
             )}
           </div>
-          <p className="text-primary" style={{ fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
+          <p className="text-primary" style={{ fontSize: '0.85rem', lineHeight: 1.4, margin: 0, fontWeight: 500 }}>
             {log.message}
           </p>
-          <p className="text-muted mono" style={{ fontSize: '0.75rem', margin: '8px 0 0' }}>
+          <p className="text-muted mono" style={{ fontSize: '0.72rem', margin: '6px 0 0' }}>
             {new Date(log.created_at).toLocaleString('tr-TR')}
           </p>
         </div>
         {log.payload && (
-          <button onClick={handleCopy} className={copied ? "btn-primary" : "btn-secondary"} style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
-            {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
+          <button onClick={handleCopy} className="btn-secondary" style={{ padding: '5px 10px', fontSize: '0.75rem' }}>
+            {copied ? <CheckCheck size={13} /> : <Copy size={13} />}
             {copied ? 'Kopyalandı' : 'JSON Kopyala'}
           </button>
         )}
       </div>
 
-      {/* JSON Body */}
+      {/* JSON Tree View */}
       <div style={{
         flex: 1, overflowY: 'auto', padding: '16px 20px',
-        fontSize: '0.85rem', lineHeight: 1.7
+        fontSize: '0.82rem', lineHeight: 1.6
       }}>
         {log.payload ? (
           <JsonNode data={log.payload} depth={0} />
         ) : (
-          <div className="text-muted" style={{ fontStyle: 'italic' }}>Bu log için ek veri (payload) yok.</div>
+          <div className="text-muted" style={{ fontStyle: 'italic', fontSize: '0.8rem' }}>Bu log için ek parametre (payload) bulunmuyor.</div>
         )}
       </div>
     </motion.div>
@@ -251,8 +242,7 @@ const LogRow: React.FC<{
   selected: boolean;
   onClick: () => void;
 }> = React.memo(({ log, selected, onClick }) => {
-  const meta = STAGE_META[log.stage] || { icon: Circle, colorVar: 'var(--text-muted)', label: log.stage };
-  const Icon = meta.icon;
+  const meta = STAGE_META[log.stage] || { label: log.stage };
   const levelColor = LEVEL_COLOR[log.level.toUpperCase()] || 'var(--text-muted)';
   const hasPayload = !!log.payload;
 
@@ -261,12 +251,12 @@ const LogRow: React.FC<{
       onClick={onClick}
       style={{
         display: 'grid',
-        gridTemplateColumns: '75px 100px 1fr 24px',
+        gridTemplateColumns: '75px 95px 1fr 20px',
         gap: 12,
         alignItems: 'center',
-        padding: '10px 16px',
+        padding: '9px 16px',
         cursor: 'pointer',
-        borderLeft: selected ? `3px solid ${meta.colorVar}` : '3px solid transparent',
+        borderLeft: selected ? '3px solid var(--text-primary)' : '3px solid transparent',
         background: selected ? 'var(--accent-soft)' : 'transparent',
         transition: 'all 0.15s',
         borderBottom: '1px solid var(--border)'
@@ -278,34 +268,27 @@ const LogRow: React.FC<{
         if (!selected) (e.currentTarget as HTMLDivElement).style.background = 'transparent';
       }}
     >
-      {/* Time */}
       <span className="text-muted mono" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
         {formatTime(log.created_at)}
       </span>
 
-      {/* Stage badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Icon size={14} color={meta.colorVar} />
-        <span className="mono" style={{ color: meta.colorVar, fontSize: '0.75rem', fontWeight: 600 }}>
-          {meta.label}
-        </span>
-      </div>
+      <span className="mono" style={{ color: 'var(--text-primary)', fontSize: '0.75rem', fontWeight: 600 }}>
+        {meta.label}
+      </span>
 
-      {/* Message */}
       <span style={{
         color: levelColor,
-        fontSize: '0.85rem',
+        fontSize: '0.82rem',
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
         {log.message}
       </span>
 
-      {/* Payload indicator */}
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         {hasPayload && (
           <div style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: selected ? meta.colorVar : 'var(--border-strong)',
+            width: 6, height: 6, borderRadius: '50%',
+            background: selected ? 'var(--text-primary)' : 'var(--border-strong)',
           }} />
         )}
       </div>
@@ -313,7 +296,7 @@ const LogRow: React.FC<{
   );
 });
 
-// ── Filter Bar ─────────────────────────────────────────────────
+// ── Filter Constants ───────────────────────────────────────────
 const ALL_STAGES = ['INIT', 'STRATEGY', 'PORTFOLIO', 'RISK', 'PAPER_BROKER', 'TRAILING_SL', 'COMPLETED', 'FAILED'];
 const ALL_LEVELS = ['INFO', 'SUCCESS', 'WARN', 'ERROR'];
 
@@ -373,61 +356,61 @@ const LiveLogs: React.FC = () => {
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }} 
-      exit={{ opacity: 0 }} 
-      style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', gap: 0 }}
+      style={{ minHeight: 'calc(100vh - 160px)', height: '820px', display: 'flex', flexDirection: 'column', gap: 0 }}
     >
-      {/* Top bar */}
+      {/* Top Header & Actions */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 0 20px 0', flexShrink: 0, flexWrap: 'wrap', gap: 12
+        padding: '0 0 18px 0', flexShrink: 0, flexWrap: 'wrap', gap: 12
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ background: 'var(--accent-soft)', padding: '10px', borderRadius: 'var(--radius)' }}>
-            <Terminal size={24} className="text-accent" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '8px', borderRadius: 'var(--radius-sm)' }}>
+            <Terminal size={20} color="var(--text-primary)" />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.5rem', margin: 0, lineHeight: 1.2 }}>Live Logs</h1>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <h1 style={{ fontSize: '1.4rem', margin: 0 }}>System Logs</h1>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <button
                 onClick={() => setActiveTab('system')}
                 className={activeTab === 'system' ? 'btn-primary' : 'btn-ghost'}
-                style={{ padding: '6px 14px', fontSize: '0.8rem', borderRadius: '99px' }}
+                style={{ padding: '4px 12px', fontSize: '0.75rem', borderRadius: 'var(--radius-full)' }}
               >
-                System Logs
+                System Log Stream
               </button>
               <button
                 onClick={() => setActiveTab('debug')}
                 className={activeTab === 'debug' ? 'btn-primary' : 'btn-ghost'}
-                style={{ padding: '6px 14px', fontSize: '0.8rem', borderRadius: '99px' }}
+                style={{ padding: '4px 12px', fontSize: '0.75rem', borderRadius: 'var(--radius-full)' }}
               >
-                Debug Log
+                Raw JSON Debug
               </button>
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }} className="text-muted">
-            <Clock size={14} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem' }} className="text-muted mono">
+            <Clock size={13} />
             <span>{lastUpdated || '—'}</span>
             <span>·</span>
-            <span className="text-accent" style={{ fontWeight: 600 }}>{liveCount} log</span>
+            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{liveCount} entries</span>
           </div>
           
           <button
             onClick={() => setAutoScroll(a => !a)}
             className={autoScroll ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '8px 14px' }}
+            style={{ padding: '6px 12px', fontSize: '0.75rem' }}
           >
-            <Circle size={10} style={{ fill: autoScroll ? 'currentColor' : 'none' }} />
+            <Circle size={8} style={{ fill: autoScroll ? 'currentColor' : 'none' }} />
             Auto-scroll
           </button>
           
           <button
             onClick={handleManualRefresh}
             className="btn-secondary"
-            style={{ padding: '8px 14px' }}
+            style={{ padding: '6px 12px', fontSize: '0.75rem' }}
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             Yenile
           </button>
           
@@ -443,22 +426,20 @@ const LiveLogs: React.FC = () => {
               }
             }}
             className="btn-danger"
-            style={{ padding: '8px 14px' }}
+            style={{ padding: '6px 12px', fontSize: '0.75rem' }}
           >
-            <X size={14} />
+            <X size={13} />
             Temizle
           </button>
         </div>
       </div>
       
+      {/* Raw Debug View */}
       {activeTab === 'debug' && (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-          style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: '20px' }}
-        >
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="text-muted" style={{ fontSize: '0.9rem' }}>
-              Aşağıdaki tüm logları kopyalayıp sisteme veya asistana gönderebilirsiniz. Sadece son {logs.length} işlem kaydını içerir.
+            <span className="text-muted" style={{ fontSize: '0.82rem' }}>
+              Ham JSON log kaydı (Son {logs.length} adet). Tek tıkla kopyalayıp analiz için paylaşabilirsiniz.
             </span>
             <button
               onClick={() => {
@@ -466,8 +447,9 @@ const LiveLogs: React.FC = () => {
                 alert("Debug log kopyalandı!");
               }}
               className="btn-primary"
+              style={{ fontSize: '0.8rem' }}
             >
-              <Copy size={16} /> Tümünü Kopyala
+              <Copy size={14} /> Tümünü Kopyala
             </button>
           </div>
           <textarea
@@ -476,31 +458,30 @@ const LiveLogs: React.FC = () => {
             className="form-input mono"
             style={{
               flex: 1, width: '100%', resize: 'none',
-              background: 'var(--bg-surface)',
-              color: 'var(--success)',
-              fontSize: '0.85rem',
+              background: 'var(--bg-base)',
+              color: 'var(--text-secondary)',
+              fontSize: '0.8rem',
             }}
           />
-        </motion.div>
+        </div>
       )}
 
+      {/* System Stream Split View */}
       {activeTab === 'system' && (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-          style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}
-        >
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+          
           {/* Filter Bar */}
           <div style={{
-            display: 'flex', gap: 12, alignItems: 'center', padding: '12px 20px',
-            background: 'var(--bg-raised)', borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)',
+            display: 'flex', gap: 10, alignItems: 'center', padding: '10px 18px',
+            background: 'var(--bg-raised)', borderTopLeftRadius: 'var(--radius)', borderTopRightRadius: 'var(--radius)',
             border: '1px solid var(--border)', borderBottom: 'none',
             flexShrink: 0, flexWrap: 'wrap'
           }}>
-            <Filter size={16} className="text-muted" />
-            <span className="section-label">Filtreler:</span>
+            <Filter size={14} className="text-muted" />
+            <span className="section-label" style={{ fontSize: '0.65rem' }}>Filtre:</span>
 
-            {/* Stage pills */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {/* Stages */}
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {ALL_STAGES.map(s => {
                 const active = filterStage === s;
                 return (
@@ -508,7 +489,7 @@ const LiveLogs: React.FC = () => {
                     key={s}
                     onClick={() => setFilterStage(active ? '' : s)}
                     className={active ? 'badge badge-primary' : 'badge badge-muted'}
-                    style={{ cursor: 'pointer', border: active ? '1px solid var(--accent)' : '1px solid transparent' }}
+                    style={{ cursor: 'pointer', fontSize: '0.68rem', border: active ? '1px solid var(--text-primary)' : '1px solid transparent' }}
                   >
                     {s}
                   </button>
@@ -516,19 +497,18 @@ const LiveLogs: React.FC = () => {
               })}
             </div>
 
-            <div style={{ width: 1, height: 20, background: 'var(--border-strong)' }} />
+            <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
 
-            {/* Level pills */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {/* Levels */}
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {ALL_LEVELS.map(lv => {
                 const active = filterLevel === lv;
-                const badgeClass = active ? (LEVEL_CLASS[lv] || 'badge-primary') : 'badge-muted';
                 return (
                   <button
                     key={lv}
                     onClick={() => setFilterLevel(active ? '' : lv)}
-                    className={`badge ${badgeClass}`}
-                    style={{ cursor: 'pointer', border: active ? '1px solid currentColor' : '1px solid transparent' }}
+                    className={active ? 'badge badge-primary' : 'badge badge-muted'}
+                    style={{ cursor: 'pointer', fontSize: '0.68rem' }}
                   >
                     {lv}
                   </button>
@@ -536,73 +516,60 @@ const LiveLogs: React.FC = () => {
               })}
             </div>
 
-            <div style={{ width: 1, height: 20, background: 'var(--border-strong)' }} />
+            <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
 
             {/* Symbol search */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
-              <Search size={14} className="text-muted" style={{ position: 'absolute', left: 10 }} />
+            <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+              <Search size={13} className="text-muted" style={{ position: 'absolute', left: 8 }} />
               <input
                 value={filterSymbol}
                 onChange={e => setFilterSymbol(e.target.value)}
-                placeholder="Sembol ara..."
+                placeholder="Sembol ara…"
                 className="form-input mono"
-                style={{ paddingLeft: '32px', width: '160px', paddingRight: '28px' }}
+                style={{ paddingLeft: '28px', width: '140px', height: '28px', fontSize: '0.75rem' }}
               />
               {filterSymbol && (
                 <button
                   onClick={() => setFilterSymbol('')}
-                  style={{ position: 'absolute', right: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  style={{ position: 'absolute', right: 6, background: 'none', border: 'none', cursor: 'pointer' }}
                   className="text-muted"
                 >
-                  <X size={14} />
+                  <X size={12} />
                 </button>
               )}
             </div>
-
-            {(filterStage || filterLevel || filterSymbol) && (
-              <button
-                onClick={() => { setFilterStage(''); setFilterLevel(''); setFilterSymbol(''); }}
-                className="btn-ghost text-danger"
-                style={{ padding: '4px 8px', fontSize: '0.8rem', height: 'auto' }}
-              >
-                Temizle
-              </button>
-            )}
           </div>
 
-          {/* Main content: log list + detail panel */}
+          {/* Split Content Box */}
           <div className="card" style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 450px',
+            gridTemplateColumns: '1fr 420px',
             flex: 1,
             overflow: 'hidden',
             borderTopLeftRadius: 0,
             borderTopRightRadius: 0,
           }}>
-            {/* Left: Log list */}
+            
+            {/* Left Stream */}
             <div
               ref={listRef}
               onScroll={(e) => {
                 const target = e.target as HTMLDivElement;
                 const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 10;
-                if (isAtBottom && !autoScroll) {
-                  setAutoScroll(true);
-                } else if (!isAtBottom && autoScroll) {
-                  setAutoScroll(false);
-                }
+                if (isAtBottom && !autoScroll) setAutoScroll(true);
+                else if (!isAtBottom && autoScroll) setAutoScroll(false);
               }}
               style={{ overflowY: 'auto', borderRight: '1px solid var(--border)' }}
             >
-              {/* Column header */}
               <div style={{
-                display: 'grid', gridTemplateColumns: '75px 100px 1fr 24px',
-                gap: 12, padding: '12px 16px',
-                borderBottom: '1px solid var(--border-strong)',
+                display: 'grid', gridTemplateColumns: '75px 95px 1fr 20px',
+                gap: 12, padding: '10px 16px',
+                borderBottom: '1px solid var(--border)',
                 position: 'sticky', top: 0, background: 'var(--bg-surface)', zIndex: 1,
                 backdropFilter: 'blur(12px)'
               }}>
                 {['Saat', 'Aşama', 'Mesaj', ''].map(h => (
-                  <span key={h} className="section-label">
+                  <span key={h} className="section-label" style={{ fontSize: '0.65rem' }}>
                     {h}
                   </span>
                 ))}
@@ -610,8 +577,8 @@ const LiveLogs: React.FC = () => {
 
               {logs.length === 0 ? (
                 <div style={{ padding: '80px 20px', textAlign: 'center' }} className="text-muted">
-                  <Terminal size={48} opacity={0.2} style={{ marginBottom: 16 }} />
-                  <p style={{ fontSize: '0.95rem' }}>Henüz log yok. Bot'u başlatınca burası dolmaya başlar.</p>
+                  <Terminal size={40} opacity={0.2} style={{ marginBottom: 14 }} />
+                  <p style={{ fontSize: '0.85rem' }}>Henüz log kaydı bulunmuyor.</p>
                 </div>
               ) : (
                 logs.map(log => (
@@ -626,14 +593,15 @@ const LiveLogs: React.FC = () => {
               <div ref={logsEndRef} />
             </div>
 
-            {/* Right: Detail panel */}
+            {/* Right Details Panel */}
             <div style={{ overflowY: 'auto', background: 'var(--bg-base)' }}>
               <AnimatePresence mode="wait">
                 <DetailPanel key={selectedLog?.id || 'empty'} log={selectedLog} />
               </AnimatePresence>
             </div>
+
           </div>
-        </motion.div>
+        </div>
       )}
     </motion.div>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
+import { Shield } from 'lucide-react';
 
 interface RegimeSnapshot {
   btc_regime: string;
@@ -96,15 +97,28 @@ const RiskRegimeShield: React.FC = () => {
 
   if (!data) {
     return (
-      <div className="card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span className="text-muted">Shield Engine Başlatılıyor...</span>
+      <div className="card" style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <Shield size={18} className="animate-spin text-muted" />
+        <span className="text-muted" style={{ fontSize: '0.85rem' }}>Risk & Rejim Kalkanı Başlatılıyor…</span>
       </div>
     );
   }
 
   const { regime_snapshot, risk_snapshot, trading_mode, system_status } = data;
-  const isBull = regime_snapshot.btc_regime.includes('BULL');
-  const isBear = regime_snapshot.btc_regime.includes('BEAR');
+  const isBull = regime_snapshot.btc_regime?.includes('BULL');
+  const isBear = regime_snapshot.btc_regime?.includes('BEAR');
+
+  const borderColor = isBull
+    ? 'rgba(16, 185, 129, 0.4)'
+    : isBear
+    ? 'rgba(244, 63, 94, 0.4)'
+    : 'var(--border-strong)';
+
+  const glowShadow = isBull
+    ? '0 0 24px rgba(16, 185, 129, 0.08)'
+    : isBear
+    ? '0 0 24px rgba(244, 63, 94, 0.08)'
+    : 'var(--shadow)';
 
   return (
     <motion.div
@@ -115,34 +129,55 @@ const RiskRegimeShield: React.FC = () => {
         padding: '20px 24px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
-        borderLeft: isBull
-          ? '4px solid var(--success)'
-          : isBear
-          ? '4px solid var(--danger)'
-          : '4px solid var(--accent)',
+        gap: '18px',
+        borderColor: borderColor,
+        boxShadow: glowShadow,
+        position: 'relative',
       }}
     >
+      {/* Top Header Row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '1.15rem', fontWeight: 600 }} className="text-primary">
-            🛡️ Canlı Risk & Rejim Kalkanı
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 8,
+            background: 'var(--accent-soft)', border: '1px solid var(--accent-border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Shield size={15} color="var(--text-primary)" />
+          </div>
+          <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+            Risk & Rejim Kalkanı
           </span>
-          <span className={wsConnected ? 'badge-success' : 'badge-warning'} style={{ fontSize: '0.75rem', padding: '2px 8px' }}>
+          <span className={`badge ${wsConnected ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.68rem', padding: '2px 7px' }}>
             {wsConnected ? '● WS Canlı' : '○ Polling Aktif'}
           </span>
         </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="badge-primary">{trading_mode} MODU</span>
-          <span className="badge-muted">Sistem: {system_status}</span>
+          <span className="badge badge-primary" style={{ fontWeight: 700 }}>
+            {trading_mode} MODU
+          </span>
+          <span className="badge badge-muted">
+            Sistem: {system_status}
+          </span>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+      {/* 4 Bento Stat Columns */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+        
         {/* BTC Market Regime */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px', borderRadius: '8px', background: 'var(--bg-surface)' }}>
+        <div style={{
+          padding: '14px 16px',
+          borderRadius: 'var(--radius-sm)',
+          background: 'var(--bg-raised)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}>
           <span className="section-label">BTC Piyasa Rejimi</span>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '2px 0' }}>
             <span
               className="stat-value"
               style={{
@@ -150,46 +185,71 @@ const RiskRegimeShield: React.FC = () => {
                 fontSize: '1.25rem',
               }}
             >
-              {regime_snapshot.btc_regime}
+              {regime_snapshot.btc_regime || 'NEUTRAL'}
             </span>
           </div>
-          <span className="text-muted" style={{ fontSize: '0.8rem' }}>
+          <span className="text-muted mono" style={{ fontSize: '0.75rem' }}>
             Güven: %{(regime_snapshot.confidence * 100).toFixed(1)}
           </span>
         </div>
 
         {/* Risk Multiplier */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px', borderRadius: '8px', background: 'var(--bg-surface)' }}>
+        <div style={{
+          padding: '14px 16px',
+          borderRadius: 'var(--radius-sm)',
+          background: 'var(--bg-raised)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}>
           <span className="section-label">Risk Çarpanı</span>
-          <span className="stat-value text-primary" style={{ fontSize: '1.25rem' }}>
-            {regime_snapshot.risk_multiplier.toFixed(2)}x
-          </span>
-          <span className="text-muted" style={{ fontSize: '0.8rem' }}>
+          <div className="stat-value" style={{ fontSize: '1.25rem', color: 'var(--text-primary)', margin: '2px 0' }}>
+            {regime_snapshot.risk_multiplier?.toFixed(2)}x
+          </div>
+          <span className="text-muted mono" style={{ fontSize: '0.75rem' }}>
             ATR Stop & Boyut Çarpanı
           </span>
         </div>
 
         {/* Drawdown Gauge */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px', borderRadius: '8px', background: 'var(--bg-surface)' }}>
+        <div style={{
+          padding: '14px 16px',
+          borderRadius: 'var(--radius-sm)',
+          background: 'var(--bg-raised)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}>
           <span className="section-label">Drawdown Kalkanı</span>
-          <span className="stat-value text-primary" style={{ fontSize: '1.25rem' }}>
-            %{risk_snapshot.current_drawdown_pct.toFixed(2)} / %{risk_snapshot.max_drawdown_limit_pct.toFixed(0)}
-          </span>
-          <span className="text-muted" style={{ fontSize: '0.8rem' }}>
+          <div className="stat-value" style={{ fontSize: '1.25rem', color: 'var(--text-primary)', margin: '2px 0' }}>
+            %{risk_snapshot.current_drawdown_pct?.toFixed(2)} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>/ %{risk_snapshot.max_drawdown_limit_pct?.toFixed(0)}</span>
+          </div>
+          <span className="text-muted mono" style={{ fontSize: '0.75rem' }}>
             Maksimum Portföy Riski
           </span>
         </div>
 
         {/* Correlated Assets */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px', borderRadius: '8px', background: 'var(--bg-surface)' }}>
+        <div style={{
+          padding: '14px 16px',
+          borderRadius: 'var(--radius-sm)',
+          background: 'var(--bg-raised)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}>
           <span className="section-label">Korele Varlık Matrisi</span>
-          <span className="stat-value text-primary" style={{ fontSize: '1.25rem' }}>
-            {risk_snapshot.correlated_symbols_count} Coin
-          </span>
-          <span className="text-muted" style={{ fontSize: '0.8rem' }}>
+          <div className="stat-value" style={{ fontSize: '1.25rem', color: 'var(--text-primary)', margin: '2px 0' }}>
+            {risk_snapshot.correlated_symbols_count} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Coin</span>
+          </div>
+          <span className="text-muted mono" style={{ fontSize: '0.75rem' }}>
             BTC ile Yüksek Korelasyon
           </span>
         </div>
+
       </div>
     </motion.div>
   );

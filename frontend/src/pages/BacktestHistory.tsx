@@ -3,7 +3,7 @@ import { getBacktestJobs, deleteBacktestJob, getBacktestCompareData } from '../s
 import type { BacktestJob, EquityCurvePoint } from '../types/api';
 import { motion } from 'framer-motion';
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Line } from 'recharts';
-import { ArrowRight, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
+import { ArrowRight, ChevronUp, ChevronDown, Trash2, ArrowLeft } from 'lucide-react';
 
 export const BacktestHistory: React.FC = () => {
   const [jobs, setJobs] = useState<BacktestJob[]>([]);
@@ -88,112 +88,105 @@ export const BacktestHistory: React.FC = () => {
     const jobB = jobs.find(j => j.job_id === selectedIds[1]);
 
     return (
-      <motion.div className="card" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
-        <button onClick={() => setCompareMode(false)} className="btn-secondary" style={{ marginBottom: '24px' }}>
-          &larr; Back to History
+      <motion.div className="card" initial={{ opacity: 0, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }} style={{ padding: '24px' }}>
+        <button onClick={() => setCompareMode(false)} className="btn-secondary" style={{ marginBottom: '20px' }}>
+          <ArrowLeft size={14} /> Back to History
         </button>
-        <h2 style={{ marginBottom: '24px', color: 'var(--text-primary)' }}>Compare Tests</h2>
+        <h2 style={{ marginBottom: '24px', fontSize: '1.3rem' }}>Compare Backtest Runs</h2>
 
-        <div className="grid-cols-2" style={{ gap: '24px' }}>
-          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-            <h3 style={{ color: 'var(--accent)', marginBottom: '8px' }}>Test A: {jobA?.strategy_name}</h3>
-            <div className="mono" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>{jobA?.job_id}</div>
-            <div className="grid-cols-2" style={{ gap: '16px', marginBottom: '24px' }}>
-              <div><strong className="text-muted">Win Rate:</strong> <span className="stat-value" style={{ fontSize: '1.2rem' }}>{((jobA?.win_rate || 0) * 100).toFixed(1)}%</span></div>
-              <div><strong className="text-muted">Drawdown:</strong> <span className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--danger)' }}>{((jobA?.max_drawdown || 0) * 100).toFixed(1)}%</span></div>
-              <div><strong className="text-muted">Final Equity:</strong> <span className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--success)' }}>${jobA?.final_equity?.toFixed(2)}</span></div>
-              <div><strong className="text-muted">Total Trades:</strong> <span className="stat-value" style={{ fontSize: '1.2rem' }}>{jobA?.total_trades}</span></div>
-              <div style={{ gridColumn: 'span 2', padding: '12px', background: 'var(--bg-base)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                <strong style={{ color: 'var(--text-primary)' }}>Config:</strong> Risk {jobA?.config_json?.risk_level} 
-                <span className="text-muted" style={{ margin: '0 8px' }}>|</span> BTC {jobA?.config_json?.use_btc_shield ? 'On' : 'Off'} 
-                <span className="text-muted" style={{ margin: '0 8px' }}>|</span> Regime {jobA?.config_json?.use_regime_shield ? 'On' : 'Off'}
-              </div>
+        <div className="grid-cols-2" style={{ gap: '20px' }}>
+          
+          {/* Test A */}
+          <div style={{ background: 'var(--bg-raised)', padding: '20px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+            <h3 style={{ color: 'var(--text-primary)', marginBottom: '4px' }}>Test A: {jobA?.strategy_name}</h3>
+            <div className="mono text-muted" style={{ fontSize: '0.75rem', marginBottom: '16px' }}>{jobA?.job_id}</div>
+            
+            <div className="grid-cols-2" style={{ gap: '12px', marginBottom: '20px' }}>
+              <div><span className="section-label">Win Rate</span> <div className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--text-primary)', marginTop: 2 }}>{((jobA?.win_rate || 0) * 100).toFixed(1)}%</div></div>
+              <div><span className="section-label">Max Drawdown</span> <div className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--danger)', marginTop: 2 }}>{((jobA?.max_drawdown || 0) * 100).toFixed(1)}%</div></div>
+              <div><span className="section-label">Final Equity</span> <div className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--text-primary)', marginTop: 2 }}>${jobA?.final_equity?.toFixed(2)}</div></div>
+              <div><span className="section-label">Trades</span> <div className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--text-primary)', marginTop: 2 }}>{jobA?.total_trades}</div></div>
             </div>
             
-            <div style={{ height: '300px', width: '100%' }}>
+            <div style={{ height: '260px', width: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={compareData[jobA!.job_id] || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="time" hide />
-                  <YAxis domain={['auto', 'auto']} stroke="var(--text-muted)" fontSize={12} tickFormatter={(val: any) => `$${val}`} />
-                  <RechartsTooltip contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)' }} />
-                  <Line type="monotone" dataKey="equity" stroke="var(--accent)" strokeWidth={3} dot={false} isAnimationActive={true} />
+                  <YAxis domain={['auto', 'auto']} stroke="var(--text-dim)" fontSize={11} tickFormatter={(val: any) => `$${val}`} />
+                  <RechartsTooltip contentStyle={{ background: 'var(--bg-raised)', border: '1px solid var(--border-hover)', borderRadius: '8px', color: 'var(--text-primary)' }} />
+                  <Line type="monotone" dataKey="equity" stroke="var(--text-primary)" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border)' }}>
-            <h3 style={{ color: 'var(--success)', marginBottom: '8px' }}>Test B: {jobB?.strategy_name}</h3>
-            <div className="mono" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>{jobB?.job_id}</div>
-            <div className="grid-cols-2" style={{ gap: '16px', marginBottom: '24px' }}>
-              <div><strong className="text-muted">Win Rate:</strong> <span className="stat-value" style={{ fontSize: '1.2rem' }}>{((jobB?.win_rate || 0) * 100).toFixed(1)}%</span></div>
-              <div><strong className="text-muted">Drawdown:</strong> <span className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--danger)' }}>{((jobB?.max_drawdown || 0) * 100).toFixed(1)}%</span></div>
-              <div><strong className="text-muted">Final Equity:</strong> <span className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--success)' }}>${jobB?.final_equity?.toFixed(2)}</span></div>
-              <div><strong className="text-muted">Trades:</strong> <span className="stat-value" style={{ fontSize: '1.2rem' }}>{jobB?.total_trades}</span></div>
-              <div style={{ gridColumn: 'span 2', padding: '12px', background: 'var(--bg-base)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                <strong style={{ color: 'var(--text-primary)' }}>Config:</strong> Risk {jobB?.config_json?.risk_level} 
-                <span className="text-muted" style={{ margin: '0 8px' }}>|</span> BTC {jobB?.config_json?.use_btc_shield ? 'On' : 'Off'} 
-                <span className="text-muted" style={{ margin: '0 8px' }}>|</span> Regime {jobB?.config_json?.use_regime_shield ? 'On' : 'Off'}
-              </div>
+          {/* Test B */}
+          <div style={{ background: 'var(--bg-raised)', padding: '20px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+            <h3 style={{ color: 'var(--text-primary)', marginBottom: '4px' }}>Test B: {jobB?.strategy_name}</h3>
+            <div className="mono text-muted" style={{ fontSize: '0.75rem', marginBottom: '16px' }}>{jobB?.job_id}</div>
+            
+            <div className="grid-cols-2" style={{ gap: '12px', marginBottom: '20px' }}>
+              <div><span className="section-label">Win Rate</span> <div className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--text-primary)', marginTop: 2 }}>{((jobB?.win_rate || 0) * 100).toFixed(1)}%</div></div>
+              <div><span className="section-label">Max Drawdown</span> <div className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--danger)', marginTop: 2 }}>{((jobB?.max_drawdown || 0) * 100).toFixed(1)}%</div></div>
+              <div><span className="section-label">Final Equity</span> <div className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--text-primary)', marginTop: 2 }}>${jobB?.final_equity?.toFixed(2)}</div></div>
+              <div><span className="section-label">Trades</span> <div className="stat-value" style={{ fontSize: '1.2rem', color: 'var(--text-primary)', marginTop: 2 }}>{jobB?.total_trades}</div></div>
             </div>
 
-            <div style={{ height: '300px', width: '100%' }}>
+            <div style={{ height: '260px', width: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={compareData[jobB!.job_id] || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="time" hide />
-                  <YAxis domain={['auto', 'auto']} stroke="var(--text-muted)" fontSize={12} tickFormatter={(val: any) => `$${val}`} />
-                  <RechartsTooltip contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)' }} />
-                  <Line type="monotone" dataKey="equity" stroke="var(--success)" strokeWidth={3} dot={false} isAnimationActive={true} />
+                  <YAxis domain={['auto', 'auto']} stroke="var(--text-dim)" fontSize={11} tickFormatter={(val: any) => `$${val}`} />
+                  <RechartsTooltip contentStyle={{ background: 'var(--bg-raised)', border: '1px solid var(--border-hover)', borderRadius: '8px', color: 'var(--text-primary)' }} />
+                  <Line type="monotone" dataKey="equity" stroke="var(--success)" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
+
         </div>
       </motion.div>
     );
   }
 
   return (
-    <motion.div className="card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ color: 'var(--text-primary)' }}>Test History</h2>
+    <div className="card" style={{ padding: '22px 24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div>
+          <h2 style={{ fontSize: '1.25rem', marginBottom: 2 }}>Test Archive & History</h2>
+          <p className="text-muted" style={{ fontSize: '0.8rem' }}>Review and compare historical simulation results</p>
+        </div>
         <div>
           <button 
             onClick={handleCompare}
             disabled={selectedIds.length !== 2}
             className={selectedIds.length === 2 ? 'btn-primary' : 'btn-secondary'}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              opacity: selectedIds.length === 2 ? 1 : 0.5,
-              cursor: selectedIds.length === 2 ? 'pointer' : 'not-allowed',
-            }}
+            style={{ fontSize: '0.8rem', padding: '8px 14px' }}
           >
-            <ArrowRight size={16} /> Compare Selected ({selectedIds.length}/2)
+            <ArrowRight size={14} /> Compare Selected ({selectedIds.length}/2)
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading history...</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading history…</div>
       ) : jobs.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No past backtests found.</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No completed backtests found in database.</div>
       ) : (
-        <div className="glass-table-container">
+        <div style={{ overflowX: 'auto' }}>
           <table className="glass-table">
             <thead>
               <tr>
-                <th>Select</th>
-                <th>Date</th>
+                <th style={{ width: '40px' }}>Select</th>
+                <th>Date Range & Symbols</th>
                 <th>Strategy</th>
                 <th>Risk</th>
-                <th>PnL</th>
+                <th>Net PnL</th>
                 <th>Win Rate</th>
                 <th>Trades</th>
-                <th>Actions</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -205,86 +198,82 @@ export const BacktestHistory: React.FC = () => {
 
                 return (
                   <React.Fragment key={job.job_id}>
-                    <tr style={{ background: selectedIds.includes(job.job_id) ? 'var(--bg-raised)' : 'transparent', cursor: 'pointer' }} onClick={() => toggleExpand(job.job_id)}>
+                    <tr style={{ background: selectedIds.includes(job.job_id) ? 'var(--accent-soft)' : 'transparent', cursor: 'pointer' }} onClick={() => toggleExpand(job.job_id)}>
                       <td onClick={(e) => e.stopPropagation()}>
                         <input 
                           type="checkbox" 
                           checked={selectedIds.includes(job.job_id)} 
                           onChange={() => toggleSelect(job.job_id)}
-                          style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
+                          style={{ cursor: 'pointer', accentColor: 'var(--text-primary)' }}
                         />
                       </td>
                       <td>
-                        <div style={{ color: 'var(--text-primary)' }}>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                           {new Date(job.start_time).toLocaleDateString()} - {new Date(job.end_time).toLocaleDateString()}
                         </div>
-                        <div className="text-muted" style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                        <div className="text-muted mono" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
                           {job.symbols.join(', ')}
                         </div>
                       </td>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{job.strategy_name}</td>
-                      <td>{job.config_json?.risk_level ?? '-'}</td>
-                      <td style={{ color: netPnL >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                      <td className="mono">{job.config_json?.risk_level ?? '-'}</td>
+                      <td className="mono" style={{ color: netPnL >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
                         ${netPnL.toFixed(2)}
                       </td>
-                      <td style={{ color: 'var(--text-primary)' }}>
-                        {((job.win_rate || 0) * 100).toFixed(1)}%
-                      </td>
-                      <td style={{ color: 'var(--text-primary)' }}>
-                        {job.total_trades || 0}
-                      </td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                      <td className="mono">{((job.win_rate || 0) * 100).toFixed(1)}%</td>
+                      <td className="mono">{job.total_trades || 0}</td>
+                      <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: '6px' }}>
                           <button 
                             onClick={() => toggleExpand(job.job_id)}
                             className="btn-ghost"
-                            style={{ color: 'var(--text-muted)', padding: '8px' }}
+                            style={{ padding: '6px' }}
                             title="Details"
                           >
-                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           </button>
                           <button 
                             onClick={() => handleDelete(job.job_id)}
                             className="btn-ghost"
-                            style={{ color: 'var(--danger)', padding: '8px' }}
+                            style={{ color: 'var(--danger)', padding: '6px' }}
                             title="Delete"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr style={{ background: 'var(--bg-surface)' }}>
-                        <td colSpan={7} style={{ padding: '16px 24px', borderTop: 'none' }}>
+                      <tr style={{ background: 'var(--bg-raised)' }}>
+                        <td colSpan={8} style={{ padding: '14px 20px', borderTop: 'none' }}>
                           <motion.div 
                             initial={{ opacity: 0, height: 0 }} 
                             animate={{ opacity: 1, height: 'auto' }} 
                             exit={{ opacity: 0, height: 0 }}
                             className="grid-cols-4" 
-                            style={{ gap: '16px', background: 'var(--bg-base)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                            style={{ gap: '14px', background: 'var(--bg-base)', padding: '14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
                           >
                             <div>
-                              <div className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Gross PnL (Brüt)</div>
-                              <div className="stat-value" style={{ color: grossPnL >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                              <div className="section-label" style={{ marginBottom: 4 }}>Gross PnL (Brüt)</div>
+                              <div className="stat-value" style={{ fontSize: '1.15rem', color: grossPnL >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                                 ${grossPnL.toFixed(2)}
                               </div>
                             </div>
                             <div>
-                              <div className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Total Fees Paid (Komisyonlar)</div>
-                              <div className="stat-value" style={{ color: 'var(--warning)' }}>
+                              <div className="section-label" style={{ marginBottom: 4 }}>Total Fees (Komisyon)</div>
+                              <div className="stat-value" style={{ fontSize: '1.15rem', color: 'var(--warning)' }}>
                                 -${totalFees.toFixed(2)}
                               </div>
                             </div>
-                            <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: '16px' }}>
-                              <div className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Net PnL (Net)</div>
-                              <div className="stat-value" style={{ color: netPnL >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                            <div>
+                              <div className="section-label" style={{ marginBottom: 4 }}>Net Realized PnL</div>
+                              <div className="stat-value" style={{ fontSize: '1.15rem', color: netPnL >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                                 ${netPnL.toFixed(2)}
                               </div>
                             </div>
-                            <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: '16px' }}>
-                              <div className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Max Drawdown</div>
-                              <div className="stat-value" style={{ color: 'var(--danger)' }}>
+                            <div>
+                              <div className="section-label" style={{ marginBottom: 4 }}>Max Drawdown</div>
+                              <div className="stat-value" style={{ fontSize: '1.15rem', color: 'var(--danger)' }}>
                                 -{((job.max_drawdown || 0) * 100).toFixed(2)}%
                               </div>
                             </div>
@@ -299,6 +288,6 @@ export const BacktestHistory: React.FC = () => {
           </table>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 };
