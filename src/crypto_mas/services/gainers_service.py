@@ -33,10 +33,11 @@ async def fetch_gainers(
     min_volume_usdt: float = 500_000,   # Minimum 24h volume ($500k) to filter out dust
     quote_asset: str = "USDT",
     only_pump: bool = False,             # If True, only return positive movers
+    max_drop_from_high_pct: float = 12.0, # Max allowed drop from 24h high (filters exhausted pumps)
 ) -> dict[str, Any]:
     """
     Returns top gainers sorted by 24h price change %.
-    Includes computed RVOL proxy and pump score.
+    Includes computed RVOL proxy, 24h range proximity, and pump score.
     """
     urls = BINANCE_TICKER_URLS if exchange.upper() == "BINANCE" else MEXC_TICKER_URLS
     tickers = None
@@ -79,20 +80,33 @@ async def fetch_gainers(
         if only_pump and change_pct <= 0:
             continue
 
-        # Pump score: combination of price change + volume
-        # High change + high volume → high score
-        pump_score = abs(change_pct) * (vol_usdt / 1_000_000) ** 0.3
+        # ── 1. Calculate drop from 24h high (Exhaustion / Dump Filter) ────────
+        drop_from_high_pct = ((high_24h - last_price) / high_24h * 100) if high_24h > 0 else 0.0
+        if only_pump and drop_from_high_pct > max_drop_from_high_pct:
+            # Exclude coins that have already dumped significantly from their 24h high
+            continue
+
+        # ── 2. Calculate range proximity (0.0 = at low, 1.0 = at high) ────────
+        range_span = high_24h - low_24h
+        range_pos = ((last_price - low_24h) / range_span) if range_span > 0 else 0.5
+
+        # ── 3. Pump score: rewards strong breakout near highs + high volume ──
+        # Coins holding near high (range_pos >= 0.70) get higher multiplier
+        proximity_mult = max(0.2, range_pos) ** 1.2
+        pump_score = abs(change_pct) * ((vol_usdt / 1_000_000) ** 0.3) * proximity_mult
 
         usdt_tickers.append({
-            "symbol":        symbol,
-            "last_price":    last_price,
-            "change_pct":    round(change_pct, 2),
-            "volume_usdt":   round(vol_usdt, 0),
-            "volume_coins":  round(volume, 4),
-            "high_24h":      high_24h,
-            "low_24h":       low_24h,
-            "range_pct":     round((high_24h - low_24h) / low_24h * 100, 2) if low_24h > 0 else 0,
-            "pump_score":    round(pump_score, 2),
+            "symbol":             symbol,
+            "last_price":         last_price,
+            "change_pct":         round(change_pct, 2),
+            "volume_usdt":        round(vol_usdt, 0),
+            "volume_coins":       round(volume, 4),
+            "high_24h":           high_24h,
+            "low_24h":            low_24h,
+            "range_pct":          round((high_24h - low_24h) / low_24h * 100, 2) if low_24h > 0 else 0,
+            "drop_from_high_pct": round(drop_from_high_pct, 2),
+            "range_pos":          round(range_pos, 2),
+            "pump_score":         round(pump_score, 2),
         })
 
     # Sort by change %

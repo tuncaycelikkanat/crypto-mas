@@ -199,6 +199,24 @@ class StrategyOrchestrator:
                             decision.action = DecisionAction.HOLD
                             decision.reason += f" | REJECTED: Whipsaw Cooldown ({whipsaw_cooldown_mins // 60}h)"
 
+                if decision.action == DecisionAction.CONSIDER_LONG:
+                    feats = latest_snapshot.features_json if latest_snapshot else {}
+                    rsi_val = feats.get("rsi_14")
+                    if rsi_val is not None and rsi_val > 75.0:
+                        _log("STRATEGY", f"Decision for {symbol} REJECTED: Overbought (RSI_14={rsi_val:.1f} > 75.0).", "WARN")
+                        decision.action = DecisionAction.HOLD
+                        decision.reason += f" | REJECTED: Overbought (RSI={rsi_val:.1f})"
+
+                    if strategy_name not in ("rsi_oversold", "mean_reversion"):
+                        close_price = feats.get("close")
+                        ema_20 = feats.get("ema_20")
+                        if close_price and ema_20 and ema_20 > 0:
+                            dist_pct = (close_price - ema_20) / ema_20 * 100
+                            if dist_pct < -3.5:
+                                _log("STRATEGY", f"Decision for {symbol} REJECTED: Deep Downtrend ({dist_pct:.1f}% below EMA 20).", "WARN")
+                                decision.action = DecisionAction.HOLD
+                                decision.reason += f" | REJECTED: Deep Downtrend ({dist_pct:.1f}% below EMA 20)"
+
                 if decision.action not in (DecisionAction.HOLD, DecisionAction.CLOSE_LONG, DecisionAction.CLOSE_SHORT):
                     context = {
                         "btc_is_crashing": btc_is_crashing,
