@@ -230,7 +230,24 @@ class TradingCycleService:
                     display_id=display_id
                 )
             
-            time.time()
+            if not is_backtest:
+                try:
+                    from crypto_mas.services.paper_trading.paper_broker import PaperBrokerService
+                    broker = PaperBrokerService(
+                        db=self.db,
+                        time_provider=self.time_provider,
+                        strategy_mode=self.strategy_mode,
+                        is_backtest=False,
+                    )
+                    broker.update_mark_prices(
+                        account_name=account_name,
+                        exchange=self.fetcher_service.provider.exchange,
+                        timeframe=timeframe.value,
+                        cycle_id=cycle.id,
+                    )
+                except Exception as e:
+                    logger.warning("[Cycle %s] Pre-strategy mark-to-market check: %s", display_id, e)
+
             decisions, open_positions = await self.strategy_orchestrator.run_strategies_and_score(
                 symbols=symbols,
                 timeframe=timeframe,

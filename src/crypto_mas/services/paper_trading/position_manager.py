@@ -52,6 +52,21 @@ class PositionManager:
         starting_equity = account.equity
         available_cash = account.cash_balance
 
+        now = self.time_provider.now()
+        cooldown_sl_symbols = self.position_repository.get_recent_stop_loss_symbols(
+            account_name=account.name,
+            exchange=target.exchange.value,
+            time_now=now,
+            cooldown_minutes=120,
+        )
+        whipsaw_symbols = self.position_repository.get_whipsaw_cooldown_symbols(
+            account_name=account.name,
+            exchange=target.exchange.value,
+            time_now=now,
+            min_stop_count=2,
+            cooldown_minutes=2880,
+        ) if hasattr(self.position_repository, "get_whipsaw_cooldown_symbols") else set()
+
         executed: list[PaperExecutionItem] = []
         skipped: list[PaperExecutionItem] = []
 
@@ -81,6 +96,34 @@ class PositionManager:
                     level="INFO",
                     stage="PAPER_BROKER",
                     message=f"Skipped {side_enum.value} for {target_position.symbol}: Open position already exists.",
+                    cycle_id=cycle_id,
+                    payload={"target_weight": target_position.target_weight}
+                )
+                continue
+
+            if target_position.symbol in cooldown_sl_symbols or target_position.symbol in whipsaw_symbols:
+                cooldown_reason = (
+                    "Symbol in Stop-Loss Cooldown (120m)."
+                    if target_position.symbol in cooldown_sl_symbols
+                    else "Symbol in Whipsaw Cooldown (48h)."
+                )
+                skipped.append(
+                    PaperExecutionItem(
+                        symbol=target_position.symbol,
+                        side=side_enum,
+                        status=PaperExecutionStatus.SKIPPED,
+                        target_weight=target_position.target_weight,
+                        notional=0.0,
+                        price=None,
+                        quantity=None,
+                        reason=cooldown_reason,
+                    )
+                )
+                self.reporter.log_execution(
+                    account_name=account.name,
+                    level="WARNING",
+                    stage="PAPER_BROKER",
+                    message=f"Skipped {side_enum.value} for {target_position.symbol}: {cooldown_reason}",
                     cycle_id=cycle_id,
                     payload={"target_weight": target_position.target_weight}
                 )

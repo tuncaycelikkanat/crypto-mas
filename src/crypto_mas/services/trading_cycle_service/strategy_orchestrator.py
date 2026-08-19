@@ -77,11 +77,16 @@ class StrategyOrchestrator:
             pos_repo = PositionRepository(self.db)
         
         open_position_symbols: set[str] = pos_repo.get_open_position_symbols(account_name, exchange_str)
-        cooldown_symbols: set[str] = pos_repo.get_recent_closed_symbols(
+        cooldown_symbols: set[str] = pos_repo.get_recent_stop_loss_symbols(
             account_name=account_name,
             exchange=exchange_str,
             time_now=now,
-            cooldown_minutes=60,
+            cooldown_minutes=120,
+        ) if hasattr(pos_repo, "get_recent_stop_loss_symbols") else pos_repo.get_recent_closed_symbols(
+            account_name=account_name,
+            exchange=exchange_str,
+            time_now=now,
+            cooldown_minutes=120,
         )
         
         for symbol in symbols:
@@ -164,9 +169,9 @@ class StrategyOrchestrator:
                         decision.reason += " | REJECTED: Open Position Exists"
                         
                     elif symbol in cooldown_symbols:
-                        _log("STRATEGY", f"Decision {decision.action.value} for {symbol} REJECTED: Cooldown active (Recently Closed).", "WARN")
+                        _log("STRATEGY", f"Decision {decision.action.value} for {symbol} REJECTED: Cooldown active (Stop-Loss in last 120m).", "WARN")
                         decision.action = DecisionAction.HOLD
-                        decision.reason += " | REJECTED: Cooldown (60m)"
+                        decision.reason += " | REJECTED: Stop-Loss Cooldown (120m)"
                     else:
                         # ── Regime-Adaptive Whipsaw Cooldown ──────────────────────
                         whipsaw_min_stops = 2
