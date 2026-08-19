@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   getPaperAccount, getBotStatus, 
-  startBot, stopBot, runCycle, updateBotSymbols, updateBotRisk 
+  startBot, stopBot, runCycle, updateBotSymbols, updateBotRisk, resetAnalytics
 } from '../services/api';
 import type { PaperAccount, BotStatusResponse, BotInfo, CycleResponse, OpenPosition } from '../types/api';
 import { useLocalStorage } from '../hooks/useLocalStorage';
@@ -180,6 +180,20 @@ const PaperTrading: React.FC = () => {
     return arr.map(x => x.trim().toUpperCase()).filter(Boolean).sort().join(',');
   };
 
+  const handleResetData = async () => {
+    if (!window.confirm('Tüm paper işlem geçmişi, pozisyonlar ve hesap bakiyeleri sıfırlanacak. Onaylıyor musunuz?')) return;
+    setLoading(true);
+    try {
+      await resetAnalytics();
+      await fetchAccount();
+      await fetchBotStatus();
+      setActionLog({ status: "Tüm paper hesapları ve veriler başarıyla sıfırlandı." });
+    } catch (err) {
+      console.error(err);
+    }
+    setLoading(false);
+  };
+
   const bots = botStatus?.bots || [];
   const riskLabel = (v: number) => v < 50 ? 'Conservative' : v <= 100 ? 'Balanced' : v <= 150 ? 'Aggressive' : 'Hyper-Aggressive (Max)';
 
@@ -199,6 +213,10 @@ const PaperTrading: React.FC = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button className="btn-danger" onClick={handleResetData} disabled={loading} style={{ fontSize: '0.8rem', padding: '7px 12px' }}>
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            Reset Data
+          </button>
           <button className="btn-secondary" onClick={handleManualCycle} disabled={loading}>
             <PlayCircle size={14} />
             Force Cycle

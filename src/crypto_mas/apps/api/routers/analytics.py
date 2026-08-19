@@ -26,21 +26,33 @@ def get_db():
 
 @router.post("/reset")
 def reset_analytics(db: Session = Depends(get_db)) -> dict[str, Any]:
-    # Delete all analytics/trading history
-    db.execute(text("DELETE FROM execution_logs"))
-    db.execute(text("DELETE FROM trades"))
-    db.execute(text("DELETE FROM positions"))
-    db.execute(text("DELETE FROM trading_cycles"))
-    
+    # Delete all analytics/trading history across all relevant tables
+    for table_name in [
+        "execution_logs",
+        "trades",
+        "orders",
+        "positions",
+        "trading_cycles",
+        "system_events",
+        "llm_audit_logs",
+        "committee_decisions",
+        "shadow_mode_trades",
+    ]:
+        try:
+            db.execute(text(f"DELETE FROM {table_name}"))
+        except Exception:
+            pass
+
     # Reset all live paper accounts back to initial balance (excluding backtests)
-    account_repo = PaperAccountRepository(db)
-    all_accounts = account_repo.get_all()
-    
-    for account in all_accounts:
-        if not account.name.startswith("backtest-"):
-            account.cash_balance = account.initial_balance
-            account.equity = account.initial_balance
-            
+    try:
+        db.execute(text("UPDATE paper_accounts SET cash_balance = initial_balance, equity = initial_balance WHERE name NOT LIKE 'backtest-%'"))
+    except Exception:
+        account_repo = PaperAccountRepository(db)
+        for account in account_repo.get_all():
+            if not account.name.startswith("backtest-"):
+                account.cash_balance = account.initial_balance
+                account.equity = account.initial_balance
+
     db.commit()
     return {"status": "success", "message": "All analytics and PnL reset successfully"}
 
