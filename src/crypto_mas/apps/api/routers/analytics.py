@@ -26,8 +26,11 @@ def get_db():
 
 @router.post("/reset")
 def reset_analytics(db: Session = Depends(get_db)) -> dict[str, Any]:
-    # Delete all analytics/trading history across all relevant tables
-    for table_name in [
+    from sqlalchemy import inspect
+    inspector = inspect(db.get_bind())
+    existing_tables = set(inspector.get_table_names())
+
+    target_tables = [
         "execution_logs",
         "trades",
         "orders",
@@ -37,21 +40,14 @@ def reset_analytics(db: Session = Depends(get_db)) -> dict[str, Any]:
         "llm_audit_logs",
         "committee_decisions",
         "shadow_mode_trades",
-    ]:
-        try:
-            db.execute(text(f"DELETE FROM {table_name}"))
-        except Exception:
-            pass
+    ]
 
-    # Reset all live paper accounts back to initial balance (excluding backtests)
-    try:
+    for table_name in target_tables:
+        if table_name in existing_tables:
+            db.execute(text(f"DELETE FROM {table_name}"))
+
+    if "paper_accounts" in existing_tables:
         db.execute(text("UPDATE paper_accounts SET cash_balance = initial_balance, equity = initial_balance WHERE name NOT LIKE 'backtest-%'"))
-    except Exception:
-        account_repo = PaperAccountRepository(db)
-        for account in account_repo.get_all():
-            if not account.name.startswith("backtest-"):
-                account.cash_balance = account.initial_balance
-                account.equity = account.initial_balance
 
     db.commit()
     return {"status": "success", "message": "All analytics and PnL reset successfully"}
