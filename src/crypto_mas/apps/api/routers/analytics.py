@@ -98,7 +98,7 @@ def get_summary(db: Session = Depends(get_db_session), account_name: str = "defa
 
 
 @router.get("/equity-curve")
-def get_equity_curve(db: Session = Depends(get_db), account_name: str = "default-paper") -> dict[str, Any]:
+def get_equity_curve(db: Session = Depends(get_db_session), account_name: str = "default-paper") -> dict[str, Any]:
     cycle_repo = TradingCycleRepository(db)
     
     cycles = cycle_repo.list_recent(account_name, limit=1000)
@@ -127,7 +127,7 @@ def get_equity_curve(db: Session = Depends(get_db), account_name: str = "default
 
 
 @router.get("/trade-history")
-def get_trade_history(db: Session = Depends(get_db), account_name: str = "default-paper") -> dict[str, Any]:
+def get_trade_history(db: Session = Depends(get_db_session), account_name: str = "default-paper") -> dict[str, Any]:
     trade_repo = TradeRepository(db)
     
     trades = trade_repo.list_by_account(account_name, limit=50)
@@ -150,7 +150,7 @@ def get_trade_history(db: Session = Depends(get_db), account_name: str = "defaul
 
 
 @router.get("/coins")
-def get_active_coins(db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_active_coins(db: Session = Depends(get_db_session)) -> dict[str, Any]:
     scheduler = SchedulerService()
     status = scheduler.get_status()
     
@@ -177,7 +177,7 @@ def get_active_coins(db: Session = Depends(get_db)) -> dict[str, Any]:
 
 
 @router.get("/coin/{symbol}")
-def get_coin_details(symbol: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_coin_details(symbol: str, db: Session = Depends(get_db_session)) -> dict[str, Any]:
     scheduler = SchedulerService()
     status = scheduler.get_status()
     
@@ -259,7 +259,7 @@ def get_coin_details(symbol: str, db: Session = Depends(get_db)) -> dict[str, An
 
 @router.get("/logs")
 def get_all_logs(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_session),
     account_name: str = "default-paper",
     limit: int = Query(default=200, ge=1, le=1000),
     stage: str | None = Query(default=None),
@@ -295,13 +295,13 @@ def get_all_logs(
     return {"logs": logs_data, "count": len(logs_data)}
 
 @router.delete("/logs")
-def clear_all_logs(db: Session = Depends(get_db), account_name: str = "default-paper") -> dict[str, Any]:
+def clear_all_logs(db: Session = Depends(get_db_session), account_name: str = "default-paper") -> dict[str, Any]:
     log_repo = ExecutionLogRepository(db)
     log_repo.clear_all(account_name)
     return {"status": "ok", "message": "Logs cleared"}
 
 @router.get("/cycles")
-def get_cycles(db: Session = Depends(get_db), account_name: str = "default-paper", limit: int = Query(default=50, ge=1, le=500)) -> dict[str, Any]:
+def get_cycles(db: Session = Depends(get_db_session), account_name: str = "default-paper", limit: int = Query(default=50, ge=1, le=500)) -> dict[str, Any]:
     cycle_repo = TradingCycleRepository(db)
     cycles = cycle_repo.list_recent(account_name, limit=limit)
     cycles = sorted(cycles, key=lambda c: c.started_at)
