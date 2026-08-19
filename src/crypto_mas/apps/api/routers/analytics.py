@@ -23,8 +23,8 @@ def reset_analytics(db: Session = Depends(get_db_session)) -> dict[str, Any]:
         from sqlalchemy import inspect
         inspector = inspect(db.get_bind())
         existing_tables = set(inspector.get_table_names())
+        dialect = db.bind.dialect.name
 
-        # Delete child tables first to respect Foreign Key constraints
         target_tables = [
             "execution_logs",
             "trades",
@@ -36,22 +36,22 @@ def reset_analytics(db: Session = Depends(get_db_session)) -> dict[str, Any]:
             "committee_decisions",
             "shadow_mode_trades",
         ]
+        valid_tables = [t for t in target_tables if t in existing_tables]
 
-        for table_name in target_tables:
-            if table_name in existing_tables:
-                try:
-                    db.execute(text(f"DELETE FROM {table_name}"))
-                except Exception:
-                    pass
+        if dialect == "postgresql":
+            if valid_tables:
+                db.execute(text(f"TRUNCATE TABLE {', '.join(valid_tables)} CASCADE"))
+        else:
+            db.execute(text("PRAGMA foreign_keys = OFF"))
+            for t in valid_tables:
+                db.execute(text(f"DELETE FROM {t}"))
+            db.execute(text("PRAGMA foreign_keys = ON"))
 
         if "paper_accounts" in existing_tables:
-            try:
-                db.execute(text("UPDATE paper_accounts SET cash_balance = initial_balance, equity = initial_balance WHERE name NOT LIKE 'backtest-%'"))
-            except Exception:
-                pass
+            db.execute(text("UPDATE paper_accounts SET cash_balance = initial_balance, equity = initial_balance WHERE name NOT LIKE 'backtest-%'"))
 
         db.commit()
-        return {"status": "success", "message": "All analytics and PnL reset successfully"}
+        return {"status": "success", "message": "All analytics, positions, trades, and paper accounts reset successfully"}
     except Exception as e:
         db.rollback()
         return {"status": "error", "message": str(e)}
