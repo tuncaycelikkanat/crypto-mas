@@ -8,6 +8,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import { PlayCircle, RefreshCw, Square, XCircle, Activity, X, Bot, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LiveConsole from '../components/LiveConsole';
+import { LiquidMetalButton } from '../components/ui/liquid-metal-button';
 
 // ── Option Card (for modal choices) ──────────────────────────
 const OptionCard: React.FC<{
@@ -221,10 +222,11 @@ const PaperTrading: React.FC = () => {
             <PlayCircle size={14} />
             Force Cycle
           </button>
-          <button className="btn-primary" onClick={() => setShowConfigModal(true)} disabled={loading}>
-            {loading ? <RefreshCw size={14} className="animate-spin" /> : <Bot size={14} />}
-            {loading ? 'Processing…' : 'Start Trading'}
-          </button>
+          <LiquidMetalButton
+            label="Start Trading"
+            onClick={() => setShowConfigModal(true)}
+            icon={<Bot size={15} color="#ffffff" />}
+          />
         </div>
       </motion.div>
 
@@ -852,12 +854,13 @@ const PaperTrading: React.FC = () => {
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', alignItems: 'center' }}>
                 <button className="btn-secondary" onClick={() => setShowConfigModal(false)}>Cancel</button>
-                <button className="btn-primary" onClick={handleStartBot} disabled={loading}>
-                  {loading ? <RefreshCw size={14} className="animate-spin" /> : <ChevronRight size={14} />}
-                  {loading ? 'Starting…' : 'Launch Bot'}
-                </button>
+                <LiquidMetalButton
+                  label={loading ? 'Starting…' : 'Launch Bot'}
+                  onClick={handleStartBot}
+                  icon={<ChevronRight size={15} color="#ffffff" />}
+                />
               </div>
             </motion.div>
           </motion.div>

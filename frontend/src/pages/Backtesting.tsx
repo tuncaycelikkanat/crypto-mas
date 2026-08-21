@@ -5,6 +5,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Play, Terminal as TerminalIcon, CheckCircle, XCircle, Activity, History } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BacktestHistory } from './BacktestHistory';
+import { LiquidMetalButton } from '../components/ui/liquid-metal-button';
 
 const STAGE_META: Record<string, { label: string }> = {
   INIT:        { label: 'Init'       },
@@ -359,9 +360,16 @@ const Backtesting: React.FC = () => {
                 </div>
               )}
 
-              <button type="submit" className={activeTab === 'llm-shadow' ? 'btn-danger' : 'btn-primary'} disabled={loading} style={{ marginTop: '6px', padding: '10px' }}>
-                {loading ? 'Simulating…' : (activeTab === 'llm-shadow' ? 'Run LLM Simulation' : 'Run Backtest Simulation')}
-              </button>
+              <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
+                <LiquidMetalButton
+                  label={loading ? 'Simulating…' : (activeTab === 'llm-shadow' ? 'Run LLM' : 'Run Backtest')}
+                  onClick={() => {
+                    const form = document.querySelector('form');
+                    if (form) form.requestSubmit();
+                  }}
+                  icon={<Play size={15} color="#ffffff" />}
+                />
+              </div>
             </form>
           </div>
 
