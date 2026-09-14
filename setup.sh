@@ -11,10 +11,7 @@ echo "=========================================================="
 if [ ! -f .env ]; then
     echo "[+] Creating .env from .env.example..."
     cp .env.example .env
-    # Auto-configure for SQLite and localhost redis by default
-    sed -i 's|postgresql+psycopg://crypto:crypto@postgres:5432/crypto_mas|sqlite:///crypto_mas.db|g' .env
-    sed -i 's|redis://redis:6379/0|redis://localhost:6379/0|g' .env
-    echo "[+] .env configured with default SQLite database."
+    echo "[+] .env configured for containerized TimescaleDB & Redis."
 else
     echo "[✓] .env already exists."
 fi
