@@ -79,6 +79,9 @@ async def lifespan(app: FastAPI):
     queue.set_broker_factory(broker_factory)
     queue.start()
 
+    # Auto-resume bots that were active before restart/crash
+    scheduler_service.resume_active_bots()
+
     # Start Telegram Bot & Command Center
     telegram_service = TelegramService(
         token=settings.telegram_bot_token,

@@ -107,7 +107,41 @@ class PortfolioEngine:
         )
 
         available_slots = max(0, self.max_positions - len(retained_symbols))
-        selected_new = new_candidates[:available_slots]
+        selected_new = list(new_candidates[:available_slots])
+        remaining_candidates = new_candidates[available_slots:]
+
+        # --- Dynamic Relative-Strength Replacement Logic ---
+        # If slots are full (or overfilled) and we have strong candidates,
+        # replace the weakest retained positions if the new candidate is significantly stronger.
+        replacement_close_reasons: dict[str, str] = {}
+        if remaining_candidates and len(retained_symbols) >= self.max_positions:
+            # Map retained symbols to their current decision score if evaluated, else default low score
+            decision_by_sym = {d.symbol: d for d in adjusted_decisions}
+            retained_scores = []
+            for sym in list(retained_symbols):
+                d = decision_by_sym.get(sym)
+                score = (d.score.final_score * d.confidence) if (d and d.score) else 0.15
+                retained_scores.append((sym, score))
+
+            # Sort retained from weakest to strongest
+            retained_scores.sort(key=lambda x: x[1])
+
+            for cand in remaining_candidates:
+                cand_score = cand.score.final_score * cand.confidence
+                if not retained_scores:
+                    break
+                weakest_sym, weakest_score = retained_scores[0]
+                # Replace if new candidate is stronger with at least 0.10 margin (conviction delta)
+                if cand_score > (weakest_score + 0.10):
+                    retained_scores.pop(0)
+                    retained_symbols.remove(weakest_sym)
+                    selected_new.append(cand)
+                    replacement_msg = f"REPLACED_BY_STRONGER_SIGNAL: Replaced by {cand.symbol} (Score: {cand_score:.2f} vs {weakest_score:.2f})"
+                    replacement_close_reasons[weakest_sym] = replacement_msg
+                    close_decisions[weakest_sym] = cand  # Mark for closure in metadata
+
+        all_close_reasons = {sym: d.reason for sym, d in close_decisions.items()}
+        all_close_reasons.update(replacement_close_reasons)
 
         if not retained_symbols and not selected_new:
             return PortfolioTarget(
@@ -118,7 +152,7 @@ class PortfolioEngine:
                 gross_exposure=0.0,
                 reason="No eligible candidates found.",
                 created_at=self.time_provider.now(),
-                metadata={"close_reasons": {sym: d.reason for sym, d in close_decisions.items()}}
+                metadata={"close_reasons": all_close_reasons}
             )
 
 
@@ -225,7 +259,7 @@ class PortfolioEngine:
                 f"Max gross exposure={self.max_gross_exposure:.2f}."
             ),
             created_at=self.time_provider.now(),
-            metadata={"close_reasons": {sym: d.reason for sym, d in close_decisions.items()}}
+            metadata={"close_reasons": all_close_reasons}
         )
 
     @staticmethod

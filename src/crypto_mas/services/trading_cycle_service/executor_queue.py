@@ -69,7 +69,8 @@ class OrderExecutorQueue:
             cycle_id=task.cycle_id,
         )
         
-        if broker.strategy_mode != "scalping":
+        has_explicit_closes = bool(task.target.metadata.get("close_reasons"))
+        if broker.strategy_mode != "scalping" or has_explicit_closes:
             close_report = broker.close_positions_not_in_target(
                 account_name=task.account_name,
                 target=task.target,
@@ -150,7 +151,8 @@ class OrderExecutorQueue:
                         cycle_id=task.cycle_id,
                     )
                     
-                    if broker.strategy_mode != "scalping":
+                    has_explicit_closes = bool(task.target.metadata.get("close_reasons"))
+                    if broker.strategy_mode != "scalping" or has_explicit_closes:
                         close_report = broker.close_positions_not_in_target(
                             account_name=task.account_name,
                             target=task.target,

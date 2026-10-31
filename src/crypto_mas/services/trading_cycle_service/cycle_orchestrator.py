@@ -196,7 +196,15 @@ class TradingCycleService:
         })
 
         try:
-            is_backtest = trigger.startswith("BACKTEST-")
+            # Ensure all currently open positions are also included in symbols list so they get fresh market data and M2M checks
+            if not is_backtest:
+                from crypto_mas.domain.repositories.position_repository import PositionRepository
+                current_open_syms = PositionRepository(self.db).get_open_position_symbols(
+                    account_name, self.fetcher_service.provider.exchange.value
+                )
+                if current_open_syms:
+                    symbols = list(dict.fromkeys(list(symbols) + list(current_open_syms)))
+
             if is_backtest:
                 htf_map = {
                     Timeframe.ONE_MINUTE: Timeframe.FOUR_HOURS,

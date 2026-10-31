@@ -123,13 +123,89 @@ class SchedulerService:
             )
             logger.info(f"Bot {bot_id} started (POLLING) | mode={mode} | exchange={exchange.upper()} | interval={effective_interval}s | {len(symbols)} symbols | risk={risk_level}")
 
+            self._save_bot_state(
+                bot_id=bot_id,
+                interval_seconds=effective_interval,
+                symbols=symbols,
+                mode=mode,
+                exchange=exchange.upper(),
+                risk_level=risk_level,
+                use_btc_shield=use_btc_shield,
+                use_htf_shield=use_htf_shield,
+                use_regime_shield=use_regime_shield,
+            )
+
             for sym in symbols:
                 if sym not in ("AUTO_GAINERS", "HIDDEN_GEMS"):
                     self._event_service.get_ws_client().add_subscription(sym, "trade")
         
         return self.get_status()
 
+    def _get_state_filepath(self) -> str:
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        data_dir = os.path.join(base_dir, "data")
+        os.makedirs(data_dir, exist_ok=True)
+        return os.path.join(data_dir, "active_bots.json")
+
+    def _save_bot_state(self, bot_id: str, **kwargs) -> None:
+        import json, os
+        path = self._get_state_filepath()
+        state = {}
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    state = json.load(f)
+            except Exception:
+                state = {}
+        state[bot_id] = kwargs
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Could not persist bot state: {e}")
+
+    def _remove_bot_state(self, bot_id: str) -> None:
+        import json, os
+        path = self._get_state_filepath()
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    state = json.load(f)
+                if bot_id in state:
+                    del state[bot_id]
+                    with open(path, "w", encoding="utf-8") as f:
+                        json.dump(state, f, indent=2)
+            except Exception as e:
+                logger.warning(f"Could not remove bot state: {e}")
+
+    def resume_active_bots(self) -> None:
+        """Automatically resumes any bots that were running before the server restarted."""
+        import json, os
+        path = self._get_state_filepath()
+        if not os.path.exists(path):
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            for bot_id, params in state.items():
+                logger.info(f"🔄 Resuming active bot on startup: {bot_id}")
+                self.start_bot(
+                    bot_id=bot_id,
+                    interval_seconds=params.get("interval_seconds"),
+                    symbols=params.get("symbols"),
+                    mode=params.get("mode", "swing"),
+                    exchange=params.get("exchange", "BINANCE"),
+                    risk_level=params.get("risk_level", 50),
+                    use_btc_shield=params.get("use_btc_shield", True),
+                    use_htf_shield=params.get("use_htf_shield", True),
+                    use_regime_shield=params.get("use_regime_shield", True),
+                )
+        except Exception as e:
+            logger.error(f"Failed to auto-resume active bots: {e}")
+
     def stop_bot(self, bot_id: str) -> dict[str, Any]:
+        self._remove_bot_state(bot_id)
         if self.is_bot_running(bot_id):
             if self._event_service.is_bot_running(bot_id):
                 self._event_service.stop_bot(bot_id)

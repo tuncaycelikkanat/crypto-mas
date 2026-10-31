@@ -406,6 +406,9 @@ class PositionManager:
             )
 
             price = self.risk_calculator.extract_close_price(latest_snapshot)
+            if (price is None or price <= Decimal("0")) and position.current_price and position.current_price > Decimal("0"):
+                price = position.current_price
+
             side_enum = PaperOrderSide.SELL if position.side == "LONG" else PaperOrderSide.BUY
 
             if price is None or price <= Decimal("0"):
