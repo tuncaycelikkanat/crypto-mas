@@ -134,13 +134,61 @@ app.include_router(scanner_router)
 app.include_router(audit_router)
 app.include_router(ws_risk_router)
 
-@app.api_route("/", methods=["GET", "HEAD"])
-def root():
-    return {
-        "status": "online",
-        "service": settings.app_name,
-        "version": settings.app_version,
-        "environment": settings.app_env,
-        "trading_mode": settings.trading_mode,
-        "documentation": "/docs",
-    }
+# Mount Frontend SPA if dist folder exists
+frontend_dist = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))), "frontend", "dist")
+if not os.path.exists(frontend_dist):
+    frontend_dist = "/app/frontend/dist"
+
+if os.path.exists(frontend_dist):
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.api_route("/", methods=["GET", "HEAD"])
+    async def serve_root():
+        index_file = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {
+            "status": "online",
+            "service": settings.app_name,
+            "version": settings.app_version,
+            "environment": settings.app_env,
+            "trading_mode": settings.trading_mode,
+            "documentation": "/docs",
+        }
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Don't intercept API routes or docs
+        if full_path.startswith("api/") or full_path.startswith("docs") or full_path.startswith("openapi.json"):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Not Found")
+        
+        file_path = os.path.join(frontend_dist, full_path)
+        if full_path and os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+            
+        index_file = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+            
+        return {
+            "status": "online",
+            "service": settings.app_name,
+            "version": settings.app_version,
+            "environment": settings.app_env,
+            "trading_mode": settings.trading_mode,
+            "documentation": "/docs",
+        }
+else:
+    @app.api_route("/", methods=["GET", "HEAD"])
+    def root():
+        return {
+            "status": "online",
+            "service": settings.app_name,
+            "version": settings.app_version,
+            "environment": settings.app_env,
+            "trading_mode": settings.trading_mode,
+            "documentation": "/docs",
+        }
